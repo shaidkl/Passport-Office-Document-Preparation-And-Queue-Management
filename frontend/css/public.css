@@ -1,0 +1,350 @@
+/* ==========================================================================
+   PUBLIC PAGES STYLES (Landing, Login, Register, Track)
+   Derived from Stitch "Public Landing Page" & "National Civil Identity System"
+   ========================================================================== */
+
+/* Hero Section */
+.hero-section {
+  position: relative;
+  background-color: var(--surface-bright);
+  border-bottom: 1px solid var(--outline-variant);
+  padding: 60px 0 80px 0;
+  overflow: hidden;
+}
+
+.hero-pattern {
+  position: absolute;
+  inset: 0;
+  opacity: 0.035;
+  background-image: radial-gradient(circle at 2px 2px, var(--primary) 1px, transparent 0);
+  background-size: 24px 24px;
+  pointer-events: none;
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  background-color: var(--surface-variant);
+  color: var(--primary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  margin-bottom: var(--spacing-md);
+  border: 1px solid var(--outline-variant);
+}
+
+.hero-title {
+  font-size: 2.75rem;
+  font-weight: 800;
+  color: var(--primary);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  margin-bottom: var(--spacing-md);
+}
+
+@media (max-width: 768px) {
+  .hero-title {
+    font-size: 2rem;
+  }
+}
+
+.hero-desc {
+  font-size: 1.125rem;
+  color: var(--on-surface-variant);
+  line-height: 1.6;
+  max-width: 580px;
+  margin-bottom: var(--spacing-lg);
+}
+
+.hero-track-box {
+  background: var(--surface);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+  box-shadow: var(--shadow-md);
+  max-width: 460px;
+}
+
+.hero-track-box .track-input-group {
+  display: flex;
+  margin-top: var(--spacing-xs);
+}
+
+.hero-track-box input {
+  flex: 1;
+  border: 1px solid var(--outline-variant);
+  border-right: none;
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+  padding: 10px 14px;
+  font-size: 0.875rem;
+}
+
+.hero-track-box button {
+  background-color: var(--secondary);
+  color: var(--on-secondary);
+  border: none;
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  padding: 0 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease;
+}
+
+.hero-track-box button:hover {
+  background-color: var(--secondary-dark);
+}
+
+/* 9-Step Application Process (Stitch Bento Cards) */
+.process-section {
+  padding: 80px 0;
+  background-color: var(--background);
+}
+
+.process-card {
+  background-color: var(--surface);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.process-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--primary-light);
+}
+
+.process-card-watermark {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 56px;
+  height: 56px;
+  background-color: var(--surface-container);
+  border-bottom-left-radius: var(--radius-full);
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 6px 12px 0 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--outline);
+  opacity: 0.5;
+  transition: all 0.2s ease;
+}
+
+.process-card:hover .process-card-watermark {
+  color: var(--primary);
+  background-color: var(--surface-variant);
+  opacity: 0.9;
+}
+
+.process-card-icon {
+  font-size: 2rem;
+  color: var(--primary);
+  margin-bottom: var(--spacing-sm);
+  display: block;
+}
+
+.process-card-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: 6px;
+}
+
+.process-card-desc {
+  font-size: 0.875rem;
+  color: var(--on-surface-variant);
+  line-height: 1.5;
+  margin-bottom: 0;
+}
+
+/* Service Tiers & Requirements */
+.service-tier-card {
+  background: var(--surface);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-xl);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.service-tier-card.featured {
+  border: 2px solid var(--primary);
+  position: relative;
+}
+
+.service-tier-badge {
+  position: absolute;
+  top: -12px;
+  right: 20px;
+  background-color: var(--primary);
+  color: var(--on-primary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: var(--radius-full);
+}
+
+.service-price {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--primary);
+  margin: var(--spacing-sm) 0;
+}
+
+.service-price span {
+  font-size: 0.875rem;
+  color: var(--on-surface-variant);
+  font-weight: 400;
+}
+
+/* Auth Cards (Login & Register) */
+.auth-page-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - var(--header-height) - var(--topbar-height) - 160px);
+  padding: var(--spacing-xl) var(--spacing-md);
+  background-color: var(--background);
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 480px;
+  background-color: var(--surface);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  padding: var(--spacing-xl);
+}
+
+.auth-header {
+  text-align: center;
+  margin-bottom: var(--spacing-xl);
+}
+
+.auth-header-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-lg);
+  background-color: var(--surface-variant);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.75rem;
+  margin: 0 auto var(--spacing-sm) auto;
+}
+
+.auth-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: 4px;
+}
+
+.auth-subtitle {
+  font-size: 0.875rem;
+  color: var(--on-surface-variant);
+}
+
+.auth-tabs {
+  display: flex;
+  background-color: var(--surface-container);
+  border-radius: var(--radius-md);
+  padding: 4px;
+  margin-bottom: var(--spacing-lg);
+}
+
+.auth-tab {
+  flex: 1;
+  text-align: center;
+  padding: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  color: var(--on-surface-variant);
+  border: none;
+  background: transparent;
+}
+
+.auth-tab.active {
+  background-color: var(--surface);
+  color: var(--primary);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Track Page Status Result Card */
+.track-result-card {
+  background: var(--surface);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-xl);
+  box-shadow: var(--shadow-md);
+  margin-top: var(--spacing-xl);
+  display: none;
+}
+
+.track-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  position: relative;
+  padding-left: 28px;
+  margin: var(--spacing-xl) 0;
+}
+
+.track-timeline::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 9px;
+  width: 2px;
+  background-color: var(--outline-variant);
+}
+
+.track-timeline-step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.track-timeline-bullet {
+  position: absolute;
+  left: -28px;
+  top: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background-color: var(--surface);
+  border: 2px solid var(--outline-variant);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.track-timeline-step.completed .track-timeline-bullet {
+  background-color: var(--success);
+  border-color: var(--success);
+  color: #ffffff;
+}
+
+.track-timeline-step.active .track-timeline-bullet {
+  background-color: var(--primary);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}

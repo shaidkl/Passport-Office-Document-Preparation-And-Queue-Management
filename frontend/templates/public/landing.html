@@ -1,0 +1,309 @@
+{% extends "base.html" %}
+
+{% block title %}Nepal Passport Office — Official Application & Queue Management Portal{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/public.css">
+{% endblock %}
+
+{% block content %}
+<!-- 1. Hero Section -->
+<section class="hero-section">
+  <div class="hero-pattern"></div>
+  <div class="container relative" style="z-index: 2;">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-xl items-center">
+      
+      <!-- Left Column: Headline & CTA -->
+      <div>
+        <div class="hero-badge">
+          <span class="material-symbols-outlined" style="font-size: 14px; color: var(--secondary);">verified</span>
+          <span data-i18n="hero_badge">Official Government of Nepal Portal</span>
+        </div>
+        
+        <h1 class="hero-title">
+          <span data-i18n="hero_title_1">Passport Application &amp;</span><br>
+          <span style="color: var(--secondary);" data-i18n="hero_title_2">Queue Management</span>
+        </h1>
+        
+        <p class="hero-desc" data-i18n="hero_desc">
+          Apply online, complete seamless digital verification, and access your verified <strong>Virtual e-Passport</strong> directly on your device. Instant, secure, and 100% paperless passport services for all Nepali citizens.
+        </p>
+
+        <div class="flex flex-wrap gap-md mb-lg">
+          <a href="/applicant/apply/" class="btn btn-primary btn-lg">
+            <span class="material-symbols-outlined">badge</span>
+            <span data-i18n="btn_apply_now">Apply for Digital Passport</span>
+          </a>
+          <a href="/track/" class="btn btn-outline btn-lg">
+            <span class="material-symbols-outlined">search</span>
+            <span data-i18n="btn_track_status">Track Status</span>
+          </a>
+        </div>
+
+        <!-- Quick Track Box (Stitch Design) -->
+        <div class="hero-track-box">
+          <label class="form-label" style="margin-bottom: 4px; font-size: 0.8125rem;">
+            <span class="material-symbols-outlined text-primary" style="font-size: 16px; vertical-align: text-bottom;">qr_code_scanner</span>
+            <span data-i18n="quick_lookup_title">Quick Application Status Lookup</span>
+          </label>
+          <form onsubmit="handleQuickTrack(event)" class="track-input-group">
+            <input type="text" id="quick-track-id" placeholder="Enter Application ID (e.g. 1)" data-i18n-placeholder="quick_lookup_placeholder" required>
+            <button type="submit" title="Search application status" data-i18n-title="btn_track_status">
+              <span class="material-symbols-outlined">search</span>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Right Column: Visual Showcase -->
+      <div class="flex justify-center">
+        <div class="card" style="width: 100%; max-width: 460px; background: linear-gradient(145deg, #ffffff 0%, var(--surface-container-low) 100%); border: 1px solid var(--outline-variant); padding: var(--spacing-xl);">
+          
+          <div class="flex items-center justify-between pb-md mb-md" style="border-bottom: 1px solid var(--outline-variant);">
+            <div class="flex items-center gap-sm">
+              <div style="width: 36px; height: 36px; border-radius: var(--radius-sm); background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center;">
+                <span class="material-symbols-outlined" style="font-size: 20px;">badge</span>
+              </div>
+              <div>
+                <h4 style="font-size: 0.9375rem; margin: 0; color: var(--primary);" data-i18n="showcase_title">Virtual e-Passport Nepal</h4>
+                <span class="text-xs text-muted">ICAO 9303 &amp; QR Validated</span>
+              </div>
+            </div>
+            <span class="badge badge-approved" data-i18n="showcase_badge">100% Digital</span>
+          </div>
+
+          <!-- Feature items -->
+          <div class="flex flex-col gap-md">
+            <div class="flex items-start gap-md">
+              <span class="material-symbols-outlined text-primary" style="background: var(--surface-variant); padding: 8px; border-radius: var(--radius-md);">schedule</span>
+              <div>
+                <strong class="text-sm block text-primary" data-i18n="showcase_feat_1_title">Instant Virtual Issuance</strong>
+                <span class="text-xs text-muted" data-i18n="showcase_feat_1_desc">Upon verification, your digital passport is immediately generated and ready in your portal.</span>
+              </div>
+            </div>
+
+            <div class="flex items-start gap-md">
+              <span class="material-symbols-outlined text-primary" style="background: var(--surface-variant); padding: 8px; border-radius: var(--radius-md);">qr_code_2</span>
+              <div>
+                <strong class="text-sm block text-primary" data-i18n="showcase_feat_2_title">Cryptographic QR Verification</strong>
+                <span class="text-xs text-muted" data-i18n="showcase_feat_2_desc">Use and present your virtual passport digitally with real-time verification credentials.</span>
+              </div>
+            </div>
+
+            <div class="flex items-start gap-md">
+              <span class="material-symbols-outlined text-primary" style="background: var(--surface-variant); padding: 8px; border-radius: var(--radius-md);">notifications_active</span>
+              <div>
+                <strong class="text-sm block text-primary" data-i18n="showcase_feat_3_title">Real-Time Digital Queue</strong>
+                <span class="text-xs text-muted" data-i18n="showcase_feat_3_desc">Automated verification updates and instant alerts as your documents are reviewed.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-lg pt-md flex items-center justify-between" style="border-top: 1px solid var(--outline-variant);">
+            <span class="text-xs text-muted" data-i18n="digital_support">Digital Support:</span>
+            <span class="text-xs font-bold text-primary">1660-01-00123</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- 2. Statistics Bar -->
+<section style="background-color: var(--surface); border-bottom: 1px solid var(--outline-variant); padding: var(--spacing-lg) 0;">
+  <div class="container">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-md text-center">
+      <div class="p-sm">
+        <div class="stat-value text-primary" style="font-size: 2rem;">500K+</div>
+        <div class="stat-label" data-i18n="stat_passports">Virtual Passports Issued</div>
+      </div>
+      <div class="p-sm">
+        <div class="stat-value text-primary" style="font-size: 2rem;">77</div>
+        <div class="stat-label" data-i18n="stat_districts">Districts Supported</div>
+      </div>
+      <div class="p-sm">
+        <div class="stat-value text-secondary" style="font-size: 2rem;">Zero Wait</div>
+        <div class="stat-label" data-i18n="stat_wait">Instant Digital Access</div>
+      </div>
+      <div class="p-sm">
+        <div class="stat-value text-success" style="font-size: 2rem;">100%</div>
+        <div class="stat-label" data-i18n="stat_flow">Paperless Digital Flow</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 3. 9-Step Application Process (Stitch Bento Cards) -->
+<section id="process" class="process-section">
+  <div class="container">
+    <div class="text-center mb-xl">
+      <h2 style="color: var(--primary); margin-bottom: 8px;" data-i18n="process_title">9-Step Digital Application &amp; Verification Journey</h2>
+      <p class="text-muted" style="max-width: 600px; margin: 0 auto;" data-i18n="process_subtitle">Everything is processed digitally — apply, verify, and use your passport virtually with zero paperwork.</p>
+    </div>
+
+    <!-- Bento Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-md">
+      
+      <!-- Step 1 -->
+      <div class="process-card">
+        <div class="process-card-watermark">1</div>
+        <span class="material-symbols-outlined process-card-icon">app_registration</span>
+        <h3 class="process-card-title" data-i18n="step1_title">Online Registration</h3>
+        <p class="process-card-desc" data-i18n="step1_desc">Create your citizen profile using your valid details, email, and phone number.</p>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="process-card">
+        <div class="process-card-watermark">2</div>
+        <span class="material-symbols-outlined process-card-icon">edit_document</span>
+        <h3 class="process-card-title" data-i18n="step2_title">Fill Application</h3>
+        <p class="process-card-desc" data-i18n="step2_desc">Complete your e-passport application form with accurate personal and contact information.</p>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="process-card">
+        <div class="process-card-watermark">3</div>
+        <span class="material-symbols-outlined process-card-icon">upload_file</span>
+        <h3 class="process-card-title" data-i18n="step3_title">Upload Documents</h3>
+        <p class="process-card-desc" data-i18n="step3_desc">Upload clear scanned copies of your Nepali Citizenship Certificate and required proofs.</p>
+      </div>
+
+      <!-- Step 4 -->
+      <div class="process-card">
+        <div class="process-card-watermark">4</div>
+        <span class="material-symbols-outlined process-card-icon">event_available</span>
+        <h3 class="process-card-title" data-i18n="step4_title">Queue Token Generation</h3>
+        <p class="process-card-desc" data-i18n="step4_desc">Receive an automated digital queue token with a designated processing slot.</p>
+      </div>
+
+      <!-- Step 5 -->
+      <div class="process-card">
+        <div class="process-card-watermark">5</div>
+        <span class="material-symbols-outlined process-card-icon">payments</span>
+        <h3 class="process-card-title" data-i18n="step5_title">Fee Assessment</h3>
+        <p class="process-card-desc" data-i18n="step5_desc">Verify your category (34 pages / 66 pages / Urgent Express) and fee details.</p>
+      </div>
+
+      <!-- Step 6 -->
+      <div class="process-card">
+        <div class="process-card-watermark">6</div>
+        <span class="material-symbols-outlined process-card-icon">fingerprint</span>
+        <h3 class="process-card-title" data-i18n="step6_title">Digital Biometrics Match</h3>
+        <p class="process-card-desc" data-i18n="step6_desc">Your digital photo and biometric credentials are authenticated electronically against national databases.</p>
+      </div>
+
+      <!-- Step 7 -->
+      <div class="process-card">
+        <div class="process-card-watermark">7</div>
+        <span class="material-symbols-outlined process-card-icon">fact_check</span>
+        <h3 class="process-card-title" data-i18n="step7_title">Staff Verification</h3>
+        <p class="process-card-desc" data-i18n="step7_desc">Staff officer reviews and validates your submitted digital documents and verifies eligibility.</p>
+      </div>
+
+      <!-- Step 8 -->
+      <div class="process-card">
+        <div class="process-card-watermark">8</div>
+        <span class="material-symbols-outlined process-card-icon">draw</span>
+        <h3 class="process-card-title" data-i18n="step8_title">Government Digital Signature</h3>
+        <p class="process-card-desc" data-i18n="step8_desc">Upon verification, your Virtual e-Passport is cryptographically signed and authenticated by the Government of Nepal certifying authority.</p>
+      </div>
+
+      <!-- Step 9 -->
+      <div class="process-card">
+        <div class="process-card-watermark">9</div>
+        <span class="material-symbols-outlined process-card-icon">badge</span>
+        <h3 class="process-card-title" data-i18n="step9_title">Virtual Passport Ready</h3>
+        <p class="process-card-desc" data-i18n="step9_desc">Access, view, and use your active Virtual e-Passport directly from your citizen portal anytime.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- 4. Passport Categories & Fee Structure -->
+<section id="services" style="padding: 80px 0; background-color: var(--surface); border-top: 1px solid var(--outline-variant);">
+  <div class="container">
+    <div class="text-center mb-xl">
+      <h2 style="color: var(--primary); margin-bottom: 8px;" data-i18n="tariff_title">Passport Categories &amp; Fee Structure</h2>
+      <p class="text-muted" style="max-width: 600px; margin: 0 auto;" data-i18n="tariff_subtitle">Standard official fee tariffs established by the Ministry of Foreign Affairs, Government of Nepal.</p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-lg">
+      
+      <!-- Tier 1 -->
+      <div class="service-tier-card">
+        <h4 style="color: var(--primary);" data-i18n="tier1_title">Ordinary e-Passport (34 Pages)</h4>
+        <p class="text-sm text-muted" data-i18n="tier1_desc">Recommended for regular tourists, students, and travelers.</p>
+        <div class="service-price" data-i18n="tier1_price">NPR 5,000 / Standard Delivery</div>
+        <ul style="list-style: none; margin: var(--spacing-md) 0; display: flex; flex-direction: column; gap: 8px; font-size: 0.875rem;">
+          <li class="flex items-center gap-xs"><span class="material-symbols-outlined text-success" style="font-size: 18px;">check</span> 10 Years Validity (Adults)</li>
+          <li class="flex items-center gap-xs"><span class="material-symbols-outlined text-success" style="font-size: 18px;">check</span> 34 Digital Pages</li>
+          <li class="flex items-center gap-xs"><span class="material-symbols-outlined text-success" style="font-size: 18px;">check</span> Standard processing: 7–14 days</li>
+        </ul>
+        <a href="/register/" class="btn btn-outline-primary btn-block mt-auto" data-i18n="btn_apply_34">Apply for 34 Pages</a>
+      </div>
+
+      <!-- Tier 2 (Featured) -->
+      <div class="service-tier-card featured">
+        <div class="service-tier-badge">Frequent Traveler</div>
+        <h4 style="color: var(--primary);" data-i18n="tier2_title">Ordinary e-Passport (66 Pages)</h4>
+        <p class="text-sm text-muted" data-i18n="tier2_desc">Ideal for business travelers, frequent flyers, and expatriates.</p>
+        <div class="service-price" data-i18n="tier2_price">NPR 10,000 / Standard Delivery</div>
+        <ul style="list-style: none; margin: var(--spacing-md) 0; display: flex; flex-direction: column; gap: 8px; font-size: 0.875rem;">
+          <li class="flex items-center gap-xs"><span class="material-symbols-outlined text-success" style="font-size: 18px;">check</span> 10 Years Validity (Adults)</li>
+          <li class="flex items-center gap-xs"><span class="material-symbols-outlined text-success" style="font-size: 18px;">check</span> 66 Digital Pages</li>
+          <li class="flex items-center gap-xs"><span class="material-symbols-outlined text-success" style="font-size: 18px;">check</span> Standard processing: 7–14 days</li>
+        </ul>
+        <a href="/register/" class="btn btn-primary btn-block mt-auto" data-i18n="btn_apply_66">Apply for 66 Pages</a>
+      </div>
+
+      <!-- Tier 3 -->
+      <div class="service-tier-card">
+        <h4 style="color: var(--primary);" data-i18n="tier3_title">Express Urgent Processing</h4>
+        <p class="text-sm text-muted" data-i18n="tier3_desc">Expedited priority queue for medical and official emergencies.</p>
+        <div class="service-price" data-i18n="tier3_price">NPR 12,000 / Fast-Track Delivery</div>
+        <ul style="list-style: none; margin: var(--spacing-md) 0; display: flex; flex-direction: column; gap: 8px; font-size: 0.875rem;">
+          <li class="flex items-center gap-xs"><span class="material-symbols-outlined text-success" style="font-size: 18px;">check</span> Priority Electronic Verification</li>
+          <li class="flex items-center gap-xs"><span class="material-symbols-outlined text-success" style="font-size: 18px;">check</span> Expedited digital approval</li>
+          <li class="flex items-center gap-xs"><span class="material-symbols-outlined text-success" style="font-size: 18px;">check</span> Ready within 2–3 business days</li>
+        </ul>
+        <a href="/register/" class="btn btn-outline-primary btn-block mt-auto" data-i18n="btn_apply_urgent">Apply Urgent Service</a>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- 5. Call To Action -->
+<section style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-container) 100%); color: #ffffff; padding: 70px 0;">
+  <div class="container text-center">
+    <h2 style="color: #ffffff; font-size: 2rem; margin-bottom: var(--spacing-sm);" data-i18n="cta_title">Ready to Apply for your Nepali e-Passport?</h2>
+    <p style="color: #cbd5e1; max-width: 540px; margin: 0 auto var(--spacing-lg) auto; font-size: 1rem;" data-i18n="cta_desc">
+      Register online in less than 2 minutes, submit required documents, and obtain your official queue token.
+    </p>
+    <div class="flex justify-center gap-md">
+      <a href="/register/" class="btn btn-secondary btn-lg">
+        <span class="material-symbols-outlined">person_add</span>
+        <span data-i18n="btn_create_account">Create Citizen Account</span>
+      </a>
+      <a href="/login/" class="btn btn-outline btn-lg" style="color: #ffffff; border-color: rgba(255,255,255,0.4);">
+        <span class="material-symbols-outlined">login</span>
+        <span data-i18n="nav_login">Sign In</span>
+      </a>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function handleQuickTrack(e) {
+    e.preventDefault();
+    const id = document.getElementById('quick-track-id').value.trim();
+    if (id) {
+      window.location.href = `/track/?id=${encodeURIComponent(id)}`;
+    }
+  }
+</script>
+{% endblock %}

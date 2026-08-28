@@ -1,0 +1,131 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="100%" height="100%">
+  <!-- Background circle / glow -->
+  <defs>
+    <linearGradient id="skyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#4a90e2" />
+      <stop offset="60%" stop-color="#b8e2f8" />
+      <stop offset="100%" stop-color="#ffffff" />
+    </linearGradient>
+    <linearGradient id="himalayaGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#d4e6f1" />
+    </linearGradient>
+    <linearGradient id="hillGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#27ae60" />
+      <stop offset="100%" stop-color="#1e824c" />
+    </linearGradient>
+    <linearGradient id="teraiGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#f1c40f" />
+      <stop offset="100%" stop-color="#f39c12" />
+    </linearGradient>
+    <linearGradient id="rhododendron" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#dc143c" />
+      <stop offset="100%" stop-color="#990024" />
+    </linearGradient>
+  </defs>
+
+  <!-- Outer Rhododendron Wreath Ring -->
+  <g id="wreath">
+    <!-- Crimson rhododendron garland surrounding the emblem -->
+    <path d="M 250,30 A 220,220 0 1,0 250,470 A 220,220 0 1,0 250,30 Z" fill="none" stroke="url(#rhododendron)" stroke-width="28" stroke-dasharray="14,10" />
+    <path d="M 250,45 A 205,205 0 1,0 250,455 A 205,205 0 1,0 250,45 Z" fill="none" stroke="#ba002e" stroke-width="6" />
+    
+    <!-- Flower Petals / Rhododendron Garland Clusters -->
+    <g fill="#dc143c">
+      <!-- Left side flowers -->
+      <circle cx="90" cy="170" r="14" /><circle cx="70" cy="220" r="14" /><circle cx="65" cy="275" r="14" /><circle cx="75" cy="330" r="14" /><circle cx="105" cy="380" r="14" />
+      <circle cx="80" cy="195" r="10" fill="#ff4d6d" /><circle cx="60" cy="248" r="10" fill="#ff4d6d" /><circle cx="68" cy="303" r="10" fill="#ff4d6d" /><circle cx="88" cy="355" r="10" fill="#ff4d6d" />
+      
+      <!-- Right side flowers -->
+      <circle cx="410" cy="170" r="14" /><circle cx="430" cy="220" r="14" /><circle cx="435" cy="275" r="14" /><circle cx="425" cy="330" r="14" /><circle cx="395" cy="380" r="14" />
+      <circle cx="420" cy="195" r="10" fill="#ff4d6d" /><circle cx="440" cy="248" r="10" fill="#ff4d6d" /><circle cx="432" cy="303" r="10" fill="#ff4d6d" /><circle cx="412" cy="355" r="10" fill="#ff4d6d" />
+    </g>
+  </g>
+
+  <!-- Central Inner Shield: Mt. Everest, Hills, Terai -->
+  <clipPath id="innerShield">
+    <circle cx="250" cy="245" r="175" />
+  </clipPath>
+
+  <g clip-path="url(#innerShield)">
+    <!-- Sky -->
+    <rect x="70" y="65" width="360" height="360" fill="url(#skyGrad)" />
+
+    <!-- Mt. Everest / Himalayas (White Snowy Peaks) -->
+    <!-- Far Peaks -->
+    <polygon points="120,240 180,130 240,240" fill="#e8f4f8" />
+    <polygon points="210,240 270,115 330,240" fill="#ffffff" />
+    <polygon points="300,240 360,140 410,240" fill="#d9edf7" />
+    
+    <!-- Sagarmatha Main Peak Center -->
+    <polygon points="160,250 250,90 340,250" fill="url(#himalayaGrad)" stroke="#bce0fd" stroke-width="1.5" />
+    <polygon points="250,90 270,170 340,250" fill="#cbe3f5" opacity="0.6" />
+    <polygon points="160,250 230,170 250,90" fill="#ffffff" />
+
+    <!-- Mountain ridge shadows -->
+    <path d="M 250,90 L 245,140 L 260,180 L 240,220 L 250,250" stroke="#7fb3d5" stroke-width="2.5" fill="none" />
+
+    <!-- Green Hills (Pahad) -->
+    <path d="M 70,290 Q 150,190 240,230 Q 330,180 430,280 L 430,360 L 70,360 Z" fill="url(#hillGrad)" />
+    <path d="M 70,310 Q 180,240 280,270 Q 370,230 430,310 L 430,370 L 70,370 Z" fill="#1b6e3b" />
+
+    <!-- Yellow Fertile Terai Plains (Yellow base) -->
+    <path d="M 70,340 Q 250,310 430,340 L 430,420 L 70,420 Z" fill="url(#teraiGrad)" />
+    
+    <!-- National Handshake (Gender Equality & Unity) -->
+    <g id="handshake" transform="translate(180, 275) scale(0.7)">
+      <!-- Left Hand (Female - Gold Bangle) -->
+      <path d="M 0,40 L 40,30 L 70,50 L 50,75 L 10,65 Z" fill="#e8a87c" stroke="#5d4037" stroke-width="2" />
+      <rect x="0" y="30" width="12" height="38" rx="4" fill="#ffd700" stroke="#b8860b" stroke-width="2" />
+      
+      <!-- Right Hand (Male) -->
+      <path d="M 140,40 L 100,30 L 70,50 L 90,75 L 130,65 Z" fill="#e8a87c" stroke="#5d4037" stroke-width="2" />
+      
+      <!-- Clasped Fingers -->
+      <ellipse cx="70" cy="52" rx="18" ry="14" fill="#d9986c" stroke="#5d4037" stroke-width="2" />
+      <path d="M 60,42 Q 70,55 80,45" stroke="#5d4037" stroke-width="2" fill="none" />
+      <path d="M 58,52 Q 70,65 82,55" stroke="#5d4037" stroke-width="2" fill="none" />
+    </g>
+
+    <!-- Ears of Paddy / Wheat Garlands at Base -->
+    <g fill="#f39c12" stroke="#d68910" stroke-width="1">
+      <ellipse cx="160" cy="340" rx="12" ry="6" transform="rotate(-30 160 340)" />
+      <ellipse cx="180" cy="330" rx="12" ry="6" transform="rotate(-20 180 330)" />
+      <ellipse cx="205" cy="325" rx="12" ry="6" transform="rotate(-10 205 325)" />
+      <ellipse cx="295" cy="325" rx="12" ry="6" transform="rotate(10 295 325)" />
+      <ellipse cx="320" cy="330" rx="12" ry="6" transform="rotate(20 320 330)" />
+      <ellipse cx="340" cy="340" rx="12" ry="6" transform="rotate(30 340 340)" />
+    </g>
+  </g>
+
+  <!-- Top: National Flag of Nepal (Double Pennant with Sun and Crescent Moon) -->
+  <g id="nepalFlag" transform="translate(222, 12) scale(0.65)">
+    <!-- Flag Shape (Double Triangle with Blue Border & Crimson Body) -->
+    <polygon points="0,0 80,45 25,45 80,95 0,95" fill="#dc143c" stroke="#002045" stroke-width="8" stroke-linejoin="round" />
+    
+    <!-- Top Moon Symbol (White) -->
+    <path d="M 22,24 A 10,10 0 1,0 38,24 A 8,8 0 1,1 22,24 Z" fill="#ffffff" />
+    <circle cx="30" cy="27" r="3" fill="#ffffff" />
+    
+    <!-- Bottom Sun Symbol (White 12 Rays) -->
+    <circle cx="30" cy="72" r="7" fill="#ffffff" />
+    <!-- Sun Rays -->
+    <path d="M 30,59 L 30,85 M 17,72 L 43,72 M 21,63 L 39,81 M 21,81 L 39,63" stroke="#ffffff" stroke-width="2.5" />
+    
+    <!-- Flagpole -->
+    <line x1="0" y1="0" x2="0" y2="120" stroke="#ffd700" stroke-width="6" stroke-linecap="round" />
+    <circle cx="0" cy="0" r="5" fill="#ffd700" />
+  </g>
+
+  <!-- Bottom: Red Ribbon with National Motto in Devanagari -->
+  <g id="bottomRibbon" transform="translate(0, 395)">
+    <!-- Crimson Banner Scroll -->
+    <path d="M 45,35 L 90,15 L 410,15 L 455,35 L 435,65 L 410,50 L 90,50 L 65,65 Z" fill="#b30024" stroke="#800018" stroke-width="2" />
+    <path d="M 80,15 L 420,15 L 405,50 L 95,50 Z" fill="#dc143c" stroke="#ffd700" stroke-width="1.5" />
+    
+    <!-- Gold Motto Text (जननी जन्मभूमिश्च स्वर्गादपि गरीयसी) -->
+    <text x="250" y="38" font-family="'Inter', 'Noto Sans Devanagari', 'Mukti', sans-serif" font-size="14.5" font-weight="700" fill="#ffffff" text-anchor="middle" letter-spacing="0.5px">
+      जननी जन्मभूमिश्च स्वर्गादपि गरीयसी
+    </text>
+  </g>
+</svg>

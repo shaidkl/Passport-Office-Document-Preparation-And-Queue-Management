@@ -10,6 +10,7 @@ from .models import (
     Report,
     ActivityLog,
     Notification,
+    Payment,
 )
 
 # 1. APPLICANT
@@ -18,6 +19,9 @@ class ApplicantSerializer(serializers.ModelSerializer):
     class Meta:
         model = Applicant
         fields = '__all__'
+        extra_kwargs = {
+            'password': {'write_only': True}
+        }
 
 
 # 2. STAFF
@@ -85,7 +89,9 @@ class DigitalSignatureSerializer(serializers.ModelSerializer):
 
         read_only_fields = [
             'signature_id',
+            'signed_at',
         ]
+
 
 
 # 7. QUEUE TOKEN
@@ -139,3 +145,15 @@ class NotificationSerializer(serializers.ModelSerializer):
             'notification_id',
             'created_at',
         ]
+
+# 11. PAYMENT
+class PaymentSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Payment
+        fields = '__all__'
+
+        read_only_fields = [
+            'payment_id',
+            'payment_date',
+        ]

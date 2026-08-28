@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+
+{% block title %}Sign In — Nepal Passport Portal{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/public.css">
+{% endblock %}
+
+{% block content %}
+<div class="auth-page-wrapper">
+  <div class="auth-card">
+    
+    <!-- Branding Header -->
+    <div class="auth-header">
+      <div class="auth-header-icon">
+        <span class="material-symbols-outlined" style="font-size: 32px;">account_balance</span>
+      </div>
+      <h1 class="auth-title" data-i18n="signin_title">Sign In</h1>
+      <p class="auth-subtitle" data-i18n="signin_subtitle">Citizen &amp; Administrative Unified Access</p>
+    </div>
+
+    <!-- Alert Container -->
+    <div id="login-alert" class="alert alert-danger" style="display: none;"></div>
+
+    <!-- Login Form -->
+    <form id="login-form" onsubmit="handleLoginSubmit(event)">
+      
+      <!-- Email / Identifier -->
+      <div class="form-group">
+        <label class="form-label" for="login-email">
+          <span data-i18n="email_label">Email Address</span> <span class="required">*</span>
+        </label>
+        <div style="position: relative;">
+          <input 
+            type="email" 
+            id="login-email" 
+            class="form-control" 
+            placeholder="e.g. citizen@example.com" 
+            required 
+            autocomplete="email"
+            autofocus
+          >
+        </div>
+      </div>
+
+      <!-- Password -->
+      <div class="form-group">
+        <div class="flex justify-between items-center mb-xs">
+          <label class="form-label m-0" for="login-password">
+            <span data-i18n="password_label">Password</span> <span class="required">*</span>
+          </label>
+          <a href="#" onclick="UI.showToast('Please contact office helpline 1660-01-00123 for credential assistance.', 'info')" class="text-xs text-primary font-medium hover:underline">Forgot password?</a>
+        </div>
+        <div style="position: relative;">
+          <input 
+            type="password" 
+            id="login-password" 
+            class="form-control" 
+            placeholder="Enter your account password" 
+            required
+            autocomplete="current-password"
+          >
+          <button 
+            type="button" 
+            onclick="togglePasswordVisibility('login-password', this)"
+            style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--outline); cursor: pointer;"
+            title="Toggle password visibility"
+          >
+            <span class="material-symbols-outlined" style="font-size: 18px;">visibility</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Remember device & Portal hint -->
+      <div class="flex justify-between items-center mb-md">
+        <label class="flex items-center gap-xs text-sm text-muted" style="cursor: pointer;">
+          <input type="checkbox" id="remember-me" checked>
+          <span>Remember me on this device</span>
+        </label>
+      </div>
+
+      <!-- Submit Button -->
+      <button type="submit" id="login-submit-btn" class="btn btn-primary btn-block btn-lg mb-sm">
+        <span class="material-symbols-outlined">login</span>
+        <span id="login-btn-text" data-i18n="signin_btn">Sign In to Account</span>
+      </button>
+
+      <!-- Citizen Registration CTA -->
+      <div class="mt-lg pt-md text-center" style="border-top: 1px solid var(--outline-variant);">
+        <p class="text-sm text-muted m-0">
+          Don't have a citizen account yet?
+          <a href="/register/" class="font-bold text-primary hover:underline" data-i18n="nav_register">Register here</a>
+        </p>
+      </div>
+
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Check URL query parameters (e.g. ?msg=session_expired or ?msg=logged_out)
+  document.addEventListener('DOMContentLoaded', () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const msg = urlParams.get('msg');
+    if (msg === 'session_expired') {
+      const alertBox = document.getElementById('login-alert');
+      alertBox.textContent = 'Your session has expired. Please sign in again.';
+      alertBox.style.display = 'flex';
+    } else if (msg === 'logged_out') {
+      UI.showToast('You have been signed out safely.', 'info');
+    } else if (msg === 'registered') {
+      UI.showToast('Account created successfully! Please sign in with your credentials.', 'success');
+    }
+
+    // If user is already logged in, redirect them to their portal
+    if (Auth.isAuthenticated()) {
+      const role = Auth.getRole();
+      if (role === 'citizen' || role === 'applicant') {
+        window.location.href = '/applicant/dashboard/';
+      } else if (role === 'staff') {
+        window.location.href = '/staff/dashboard/';
+      } else if (role === 'administrator') {
+        window.location.href = '/admin-portal/dashboard/';
+      }
+    }
+  });
+
+  function togglePasswordVisibility(inputId, btn) {
+    const input = document.getElementById(inputId);
+    const icon = btn.querySelector('.material-symbols-outlined');
+    if (input.type === 'password') {
+      input.type = 'text';
+      icon.textContent = 'visibility_off';
+    } else {
+      input.type = 'password';
+      icon.textContent = 'visibility';
+    }
+  }
+
+  async function handleLoginSubmit(event) {
+    event.preventDefault();
+    const emailInput = document.getElementById('login-email');
+    const passwordInput = document.getElementById('login-password');
+    const alertBox = document.getElementById('login-alert');
+    const submitBtn = document.getElementById('login-submit-btn');
+    const btnText = document.getElementById('login-btn-text');
+
+    alertBox.style.display = 'none';
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+
+    if (!email || !password) {
+      alertBox.textContent = 'Please enter both your email address and password.';
+      alertBox.style.display = 'flex';
+      return;
+    }
+
+    // Button loading state
+    submitBtn.disabled = true;
+    btnText.textContent = 'Signing in...';
+
+    try {
+      const res = await Auth.login(email, password);
+      UI.showToast(`Welcome back, ${res.name || 'Citizen'}!`, 'success');
+
+      // Check next param
+      const urlParams = new URLSearchParams(window.location.search);
+      const nextUrl = urlParams.get('next');
+
+      setTimeout(() => {
+        if (nextUrl && nextUrl.startsWith('/')) {
+          window.location.href = nextUrl;
+        } else {
+          // Route according to real backend role
+          if (res.role === 'staff') {
+            window.location.href = '/staff/dashboard/';
+          } else if (res.role === 'administrator') {
+            window.location.href = '/admin-portal/dashboard/';
+          } else {
+            window.location.href = '/applicant/dashboard/';
+          }
+        }
+      }, 500);
+
+    } catch (err) {
+      console.error('Login error:', err);
+      alertBox.textContent = err.message || 'Invalid email or password. Please try again.';
+      alertBox.style.display = 'flex';
+      submitBtn.disabled = false;
+      btnText.textContent = 'Sign In to Account';
+    }
+  }
+</script>
+{% endblock %}

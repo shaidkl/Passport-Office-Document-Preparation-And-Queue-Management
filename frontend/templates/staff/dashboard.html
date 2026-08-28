@@ -1,0 +1,404 @@
+{% extends "base.html" %}
+
+{% block title %}Staff Verification & Queue Desk — Nepal Passport Office{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/staff.css">
+{% endblock %}
+
+{% block content %}
+<div class="staff-workspace-layout">
+  
+  <!-- 1. Left Sidebar Navigation -->
+  <aside class="staff-sidebar">
+    
+    <!-- Officer Badge -->
+    <div class="flex items-center gap-sm mb-lg pb-md" style="border-bottom: 1px solid var(--outline-variant);">
+      <div class="user-avatar-circle auth-user-avatar" style="width: 40px; height: 40px; font-size: 1rem; background-color: var(--primary);">ST</div>
+      <div class="flex flex-col">
+        <span class="auth-user-name font-bold text-sm text-primary">Staff Officer</span>
+        <span class="text-xs counter-active-badge">● Desk Counter 03</span>
+      </div>
+    </div>
+
+    <!-- Navigation Items -->
+    <span class="sidebar-title">Operations</span>
+    <a href="/staff/dashboard/" class="sidebar-item active">
+      <span class="material-symbols-outlined">how_to_reg</span>
+      <span>Queue & Verification</span>
+    </a>
+    <a href="#queue-roster" class="sidebar-item">
+      <span class="material-symbols-outlined">queue</span>
+      <span>Waiting Roster</span>
+    </a>
+    
+    <span class="sidebar-title mt-lg">System</span>
+    <a href="/" class="sidebar-item">
+      <span class="material-symbols-outlined">home</span>
+      <span>Home Portal</span>
+    </a>
+    <button type="button" onclick="Auth.logout()" class="sidebar-item text-error mt-auto" style="background: none; border: none; width: 100%; text-align: left; cursor: pointer;">
+      <span class="material-symbols-outlined text-error">logout</span>
+      <span>Sign Out</span>
+    </button>
+  </aside>
+
+  <!-- 2. Main Staff Content -->
+  <main class="staff-content">
+    
+    <!-- Officer Desk Header -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-md mb-xl">
+      <div>
+        <div class="flex items-center gap-sm">
+          <h1 style="font-size: 1.75rem; color: var(--primary); margin: 0;">Digital Verification &amp; Queue Desk</h1>
+          <span class="counter-active-badge">Desk Active</span>
+        </div>
+        <p class="text-sm text-muted m-0">Review citizen applications, verify uploaded digital documents, and grant instant Virtual e-Passports.</p>
+      </div>
+
+      <div class="flex items-center gap-sm">
+        <button type="button" onclick="loadStaffWorkspace()" class="btn btn-outline" title="Refresh queue">
+          <span class="material-symbols-outlined">sync</span>
+          Sync Queue
+        </button>
+      </div>
+    </div>
+
+    <!-- Live Queue Calling Controller & Counter Statistics -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-xl mb-xl">
+      
+      <!-- Col 1 & 2: Active Caller Control Box -->
+      <div class="card queue-caller-card lg:col-span-2">
+        <div class="flex flex-wrap items-center justify-between gap-md pb-md mb-md" style="border-bottom: 1px solid var(--outline-variant);">
+          <div>
+            <span class="text-xs font-bold text-muted uppercase tracking-wider block">Currently Serving Token</span>
+            <div class="flex items-baseline gap-md">
+              <span id="current-token-num" class="serving-token-number">--</span>
+              <div id="current-token-badge">
+                <span class="badge badge-inactive">No Token Called</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="text-right">
+            <span id="current-app-ref" class="text-sm font-bold text-primary block">Ref: None</span>
+            <span id="current-app-date" class="text-xs text-muted">Awaiting Next Citizen</span>
+          </div>
+        </div>
+
+        <!-- Token Calling Action Buttons -->
+        <div class="flex flex-wrap gap-sm pt-sm">
+          <button type="button" onclick="handleCallNextToken()" class="btn btn-primary btn-lg" id="btn-call-next">
+            <span class="material-symbols-outlined">campaign</span>
+            Call Next Token
+          </button>
+          
+          <button type="button" onclick="handleUpdateTokenStatus('Serving')" class="btn btn-outline-primary" id="btn-serving" disabled>
+            <span class="material-symbols-outlined">record_voice_over</span>
+            Mark Serving
+          </button>
+
+          <button type="button" onclick="handleUpdateTokenStatus('Completed')" class="btn btn-success" id="btn-complete" disabled>
+            <span class="material-symbols-outlined">task_alt</span>
+            Complete Service
+          </button>
+
+          <button type="button" onclick="handleUpdateTokenStatus('Skipped')" class="btn btn-danger" id="btn-skip" disabled>
+            <span class="material-symbols-outlined">skip_next</span>
+            Skip Token
+          </button>
+        </div>
+      </div>
+
+      <!-- Col 3: Today's Desk Metrics -->
+      <div class="flex flex-col gap-md">
+        
+        <div class="stat-card">
+          <div>
+            <span class="stat-label">Citizens In Queue</span>
+            <div class="stat-value text-primary" id="stat-waiting-count">0</div>
+            <span class="text-xs text-muted">Awaiting verification</span>
+          </div>
+          <div class="stat-icon primary">
+            <span class="material-symbols-outlined">groups</span>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div>
+            <span class="stat-label">Completed Today</span>
+            <div class="stat-value text-success" id="stat-completed-count">0</div>
+            <span class="text-xs text-success">Processed &amp; Verified</span>
+          </div>
+          <div class="stat-icon success">
+            <span class="material-symbols-outlined">done_all</span>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- Active Queue & Pending Applications Table -->
+    <div class="card mb-xl" id="queue-roster">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="material-symbols-outlined text-primary">list_alt</span>
+          Active Applications &amp; Verification Queue
+        </div>
+        <span class="text-xs text-muted" id="table-record-count">0 records</span>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Token / Ref</th>
+              <th>Applicant Details</th>
+              <th>Submission Date</th>
+              <th>Status</th>
+              <th>Verification Action</th>
+            </tr>
+          </thead>
+          <tbody id="staff-queue-table-body">
+            <tr>
+              <td colspan="5" class="text-center text-muted py-lg">Loading queue records...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  let activeToken = null;
+  let queueTokensList = [];
+  let applicationsList = [];
+
+  document.addEventListener('DOMContentLoaded', () => {
+    // 1. Guard page for Staff / Administrator
+    if (!Auth.requireAuth(['staff', 'administrator'])) return;
+
+    loadStaffWorkspace();
+  });
+
+  async function loadStaffWorkspace() {
+    UI.showLoading('Syncing desk queue...');
+
+    try {
+      // 1. Fetch Queue Tokens
+      const tokens = await API.get('/queue-tokens/');
+      queueTokensList = Array.isArray(tokens) ? tokens : (tokens.results || []);
+
+      // 2. Fetch Applications
+      const apps = await API.get('/applications/');
+      applicationsList = Array.isArray(apps) ? apps : (apps.results || []);
+
+      renderQueueDashboard();
+      renderQueueTable();
+
+    } catch (err) {
+      console.error('Error loading staff workspace:', err);
+      UI.showToast('Could not load queue tokens. Please check your network.', 'error');
+    } finally {
+      UI.hideLoading();
+    }
+  }
+
+  function renderQueueDashboard() {
+    const waitingTokens = queueTokensList.filter(t => t.queue_status === 'Waiting');
+    const completedTokens = queueTokensList.filter(t => t.queue_status === 'Completed');
+    const currentCalled = queueTokensList.find(t => t.queue_status === 'Called' || t.queue_status === 'Serving');
+
+    document.getElementById('stat-waiting-count').textContent = waitingTokens.length;
+    document.getElementById('stat-completed-count').textContent = completedTokens.length;
+
+    activeToken = currentCalled || null;
+
+    const tokenNumEl = document.getElementById('current-token-num');
+    const badgeEl = document.getElementById('current-token-badge');
+    const appRefEl = document.getElementById('current-app-ref');
+    const appDateEl = document.getElementById('current-app-date');
+
+    const btnServing = document.getElementById('btn-serving');
+    const btnComplete = document.getElementById('btn-complete');
+    const btnSkip = document.getElementById('btn-skip');
+
+    if (activeToken) {
+      tokenNumEl.textContent = `T-${activeToken.token_number}`;
+      badgeEl.innerHTML = UI.renderStatusBadge(activeToken.queue_status);
+      appRefEl.textContent = `App Ref: #NP-${String(activeToken.application).padStart(4, '0')}`;
+      appDateEl.textContent = `Called on: ${activeToken.called_time ? UI.formatDateTime(activeToken.called_time) : 'Active Desk'}`;
+
+      btnServing.disabled = activeToken.queue_status === 'Serving';
+      btnComplete.disabled = false;
+      btnSkip.disabled = false;
+    } else {
+      tokenNumEl.textContent = '--';
+      badgeEl.innerHTML = '<span class="badge badge-inactive">No Token Called</span>';
+      appRefEl.textContent = 'Ref: None';
+      appDateEl.textContent = 'Awaiting Next Citizen';
+
+      btnServing.disabled = true;
+      btnComplete.disabled = true;
+      btnSkip.disabled = true;
+    }
+  }
+
+  function renderQueueTable() {
+    const tbody = document.getElementById('staff-queue-table-body');
+    const countEl = document.getElementById('table-record-count');
+
+    if (!applicationsList || applicationsList.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="5" class="text-center text-muted py-lg">No pending applications found in queue.</td>
+        </tr>
+      `;
+      countEl.textContent = '0 records';
+      return;
+    }
+
+    countEl.textContent = `${applicationsList.length} applications`;
+
+    tbody.innerHTML = applicationsList.map(app => {
+      const token = queueTokensList.find(t => t.application === app.application_id);
+      const tokenText = token ? `T-${token.token_number}` : 'Unassigned';
+
+      return `
+        <tr>
+          <td>
+            <strong class="text-primary block">#NP-${String(app.application_id).padStart(4, '0')}</strong>
+            <span class="text-xs text-muted font-mono">${tokenText}</span>
+          </td>
+          <td>
+            <span class="text-sm font-semibold block text-on-surface">Applicant #${app.applicant}</span>
+            <span class="text-xs text-muted">Submitted via Online Portal</span>
+          </td>
+          <td class="text-xs text-muted">${UI.formatDate(app.submission_date)}</td>
+          <td>${UI.renderStatusBadge(app.status)}</td>
+          <td>
+            <div class="flex items-center gap-xs">
+              <button type="button" onclick="handleApproveApplication(${app.application_id})" class="btn btn-success btn-sm" title="Approve Application">
+                <span class="material-symbols-outlined" style="font-size: 16px;">check</span> Approve
+              </button>
+              <button type="button" onclick="handleRejectApplication(${app.application_id})" class="btn btn-danger btn-sm" title="Reject Application">
+                <span class="material-symbols-outlined" style="font-size: 16px;">close</span> Reject
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  async function handleCallNextToken() {
+    const waitingToken = queueTokensList.find(t => t.queue_status === 'Waiting');
+    
+    UI.showLoading('Calling next citizen token...');
+
+    try {
+      if (waitingToken) {
+        // Update existing waiting token to 'Called'
+        const updated = await API.patch(`/queue-tokens/${waitingToken.token_id}/`, {
+          queue_status: 'Called',
+          called_time: new Date().toISOString()
+        });
+        UI.showToast(`Token T-${updated.token_number} called to Counter 03!`, 'success');
+      } else if (applicationsList.length > 0) {
+        // Check for an application that has no token and create one
+        const nextApp = applicationsList.find(a => a.status === 'Pending' || a.status === 'Under Review');
+        if (nextApp) {
+          const user = Auth.getUser();
+          const nextNum = (queueTokensList.length + 1) * 10;
+          const newToken = await API.post('/queue-tokens/', {
+            application: nextApp.application_id,
+            staff: user.user_id,
+            token_number: nextNum,
+            queue_status: 'Called',
+            called_time: new Date().toISOString()
+          });
+          UI.showToast(`Called Token T-${newToken.token_number} for Application #${nextApp.application_id}!`, 'success');
+        } else {
+          UI.showToast('No more pending citizens waiting in queue.', 'info');
+        }
+      } else {
+        UI.showToast('No pending applicants in queue.', 'info');
+      }
+
+      loadStaffWorkspace();
+    } catch (err) {
+      console.error('Call next error:', err);
+      UI.showToast(err.message || 'Could not update token status.', 'error');
+    } finally {
+      UI.hideLoading();
+    }
+  }
+
+  async function handleUpdateTokenStatus(newStatus) {
+    if (!activeToken) return;
+
+    UI.showLoading(`Updating token status to ${newStatus}...`);
+
+    try {
+      await API.patch(`/queue-tokens/${activeToken.token_id}/`, {
+        queue_status: newStatus
+      });
+
+      // If completed, also update application status to 'Approved'
+      if (newStatus === 'Completed' && activeToken.application) {
+        await API.patch(`/applications/${activeToken.application}/`, {
+          status: 'Approved'
+        });
+      }
+
+      UI.showToast(`Token T-${activeToken.token_number} marked as ${newStatus}.`, 'success');
+      loadStaffWorkspace();
+    } catch (err) {
+      console.error('Update status error:', err);
+      UI.showToast(err.message || 'Could not update status.', 'error');
+    } finally {
+      UI.hideLoading();
+    }
+  }
+
+  async function handleApproveApplication(appId) {
+    UI.showLoading('Approving application...');
+    try {
+      await API.patch(`/applications/${appId}/`, {
+        status: 'Approved'
+      });
+      UI.showToast(`Application #NP-${String(appId).padStart(4, '0')} approved!`, 'success');
+      loadStaffWorkspace();
+    } catch (err) {
+      console.error('Approval error:', err);
+      UI.showToast(err.message || 'Could not approve application.', 'error');
+    } finally {
+      UI.hideLoading();
+    }
+  }
+
+  async function handleRejectApplication(appId) {
+    const reason = prompt('Please specify the reason for rejection:');
+    if (!reason) return;
+
+    UI.showLoading('Rejecting application...');
+    try {
+      await API.patch(`/applications/${appId}/`, {
+        status: 'Rejected'
+      });
+      UI.showToast(`Application #NP-${String(appId).padStart(4, '0')} rejected.`, 'info');
+      loadStaffWorkspace();
+    } catch (err) {
+      console.error('Rejection error:', err);
+      UI.showToast(err.message || 'Could not reject application.', 'error');
+    } finally {
+      UI.hideLoading();
+    }
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+
+{% block title %}Track Application Status — Nepal Passport Portal{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/public.css">
+{% endblock %}
+
+{% block content %}
+<div class="container py-xl" style="max-width: 800px;">
+  
+  <!-- Search Card -->
+  <div class="card mb-xl" style="border-radius: var(--radius-xl); box-shadow: var(--shadow-md);">
+    <div class="text-center mb-lg">
+      <div class="stat-icon primary mx-auto" style="margin: 0 auto var(--spacing-sm) auto;">
+        <span class="material-symbols-outlined" style="font-size: 28px;">search_check</span>
+      </div>
+      <h1 style="font-size: 1.5rem; color: var(--primary); margin: 0;">Live Passport Application Tracking</h1>
+      <p class="text-sm text-muted m-0">Enter your official Application Reference ID or Queue Token number to check your processing status.</p>
+    </div>
+
+    <!-- Search Form -->
+    <form onsubmit="handleTrackSearch(event)" class="flex flex-col sm:flex-row gap-sm">
+      <div style="flex: 1; position: relative;">
+        <input 
+          type="text" 
+          id="track-query" 
+          class="form-control" 
+          placeholder="e.g. 1 or NP-12345" 
+          style="padding-left: 38px; font-size: 1rem;" 
+          required 
+          autofocus
+        >
+        <span class="material-symbols-outlined" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--outline); font-size: 20px;">
+          tag
+        </span>
+      </div>
+      <button type="submit" id="track-btn" class="btn btn-primary btn-lg" style="min-width: 140px;">
+        <span class="material-symbols-outlined">search</span>
+        <span id="track-btn-text">Track Status</span>
+      </button>
+    </form>
+  </div>
+
+  <!-- Alert State -->
+  <div id="track-alert" class="alert alert-danger" style="display: none;"></div>
+
+  <!-- Result Container (Hidden until search result) -->
+  <div id="track-result" class="card track-result-card">
+    
+    <!-- Result Header -->
+    <div class="flex flex-wrap items-center justify-between gap-md pb-md mb-lg" style="border-bottom: 1px solid var(--outline-variant);">
+      <div>
+        <span class="text-xs text-muted font-bold uppercase tracking-wider block">Application ID</span>
+        <h2 id="res-app-id" style="color: var(--primary); margin: 0; font-size: 1.5rem;">#NP-0001</h2>
+        <span id="res-applicant-name" class="text-sm text-muted font-medium">Applicant: R*** S***</span>
+      </div>
+      <div class="text-right">
+        <div id="res-status-badge"></div>
+        <span id="res-last-updated" class="text-xs text-muted block mt-xs">Updated: Today</span>
+      </div>
+    </div>
+
+    <!-- Live Stage Timeline -->
+    <h4 class="text-sm font-bold text-primary mb-sm">Processing Stage Timeline</h4>
+    <div class="track-timeline">
+      
+      <!-- Stage 1 -->
+      <div id="stage-submitted" class="track-timeline-step completed">
+        <div class="track-timeline-bullet">
+          <span class="material-symbols-outlined" style="font-size: 12px;">check</span>
+        </div>
+        <strong class="text-sm text-primary">Application Submitted</strong>
+        <span id="res-submission-date" class="text-xs text-muted">Online form received</span>
+      </div>
+
+      <!-- Stage 2 -->
+      <div id="stage-review" class="track-timeline-step">
+        <div class="track-timeline-bullet">
+          <span class="material-symbols-outlined" style="font-size: 12px;">hourglass_top</span>
+        </div>
+        <strong class="text-sm text-primary">Document Review &amp; Biometrics</strong>
+        <span id="res-review-desc" class="text-xs text-muted">Verification against national registry</span>
+      </div>
+
+      <!-- Stage 3 -->
+      <div id="stage-approved" class="track-timeline-step">
+        <div class="track-timeline-bullet">
+          <span class="material-symbols-outlined" style="font-size: 12px;">verified</span>
+        </div>
+        <strong class="text-sm text-primary">Officer Verification &amp; Approval</strong>
+        <span class="text-xs text-muted">Digital eligibility and security clearance</span>
+      </div>
+
+      <!-- Stage 4 -->
+      <div id="stage-completed" class="track-timeline-step">
+        <div class="track-timeline-bullet">
+          <span class="material-symbols-outlined" style="font-size: 12px;">badge</span>
+        </div>
+        <strong class="text-sm text-primary">Virtual e-Passport Issued</strong>
+        <span class="text-xs text-muted">Active and accessible in your Citizen Portal</span>
+      </div>
+
+    </div>
+
+    <!-- Queue & Document Details Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-md mt-lg pt-md" style="border-top: 1px solid var(--outline-variant);">
+      
+      <!-- Queue Token Box -->
+      <div class="p-md rounded-lg" style="background-color: var(--surface-container-low); border: 1px solid var(--outline-variant);">
+        <div class="flex items-center justify-between mb-xs">
+          <span class="text-xs font-bold text-muted uppercase">Digital Queue Token</span>
+          <span id="res-queue-status-badge"></span>
+        </div>
+        <div class="flex items-baseline gap-sm">
+          <span id="res-token-number" style="font-size: 2rem; font-weight: 800; color: var(--primary);">--</span>
+          <span id="res-token-slot" class="text-xs text-muted">Time Slot: Scheduled</span>
+        </div>
+      </div>
+
+      <!-- Document Verification Box -->
+      <div class="p-md rounded-lg" style="background-color: var(--surface-container-low); border: 1px solid var(--outline-variant);">
+        <span class="text-xs font-bold text-muted uppercase block mb-xs">Uploaded Documents</span>
+        <div class="flex items-center justify-between">
+          <span class="text-sm font-semibold text-primary" id="res-doc-count">0 of 0 Verified</span>
+          <span class="material-symbols-outlined text-success" style="font-size: 22px;">verified_user</span>
+        </div>
+        <span class="text-xs text-muted block mt-xs">Scanned Citizenship &amp; NID files</span>
+      </div>
+
+    </div>
+
+    <!-- Actions -->
+    <div class="mt-lg pt-md flex items-center justify-between" style="border-top: 1px solid var(--outline-variant);">
+      <span class="text-xs text-muted">Need to modify details or upload missing documents?</span>
+      <a href="/login/" class="btn btn-outline-primary btn-sm">
+        <span class="material-symbols-outlined">login</span> Sign In to Portal
+      </a>
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    // Check if query was passed via URL (e.g. /track/?id=1 or /track/?query=1)
+    const urlParams = new URLSearchParams(window.location.search);
+    const query = urlParams.get('id') || urlParams.get('query');
+    if (query) {
+      document.getElementById('track-query').value = query;
+      performTrack(query);
+    }
+  });
+
+  function handleTrackSearch(e) {
+    e.preventDefault();
+    const query = document.getElementById('track-query').value.trim();
+    if (query) {
+      performTrack(query);
+    }
+  }
+
+  async function performTrack(query) {
+    const alertBox = document.getElementById('track-alert');
+    const resultCard = document.getElementById('track-result');
+    const trackBtn = document.getElementById('track-btn');
+    const btnText = document.getElementById('track-btn-text');
+
+    alertBox.style.display = 'none';
+    resultCard.style.display = 'none';
+
+    trackBtn.disabled = true;
+    btnText.textContent = 'Searching...';
+
+    try {
+      const data = await API.get('/track/', { query });
+      renderTrackResult(data);
+    } catch (err) {
+      alertBox.textContent = err.message || `No application record found for "${query}". Please check your ID and try again.`;
+      alertBox.style.display = 'flex';
+    } finally {
+      trackBtn.disabled = false;
+      btnText.textContent = 'Track Status';
+    }
+  }
+
+  function renderTrackResult(data) {
+    const resultCard = document.getElementById('track-result');
+    
+    document.getElementById('res-app-id').textContent = `#NP-${String(data.application_id).padStart(4, '0')}`;
+    document.getElementById('res-applicant-name').textContent = `Applicant: ${data.applicant_name}`;
+    document.getElementById('res-status-badge').innerHTML = UI.renderStatusBadge(data.status);
+    document.getElementById('res-last-updated').textContent = `Updated: ${UI.formatDateTime(data.last_updated)}`;
+    document.getElementById('res-submission-date').textContent = `Submitted on ${UI.formatDate(data.submission_date)}`;
+
+    // Documents
+    document.getElementById('res-doc-count').textContent = `${data.documents_verified || 0} of ${data.documents_count || 0} Verified`;
+
+    // Queue Token
+    if (data.queue_token) {
+      document.getElementById('res-token-number').textContent = `T-${data.queue_token.token_number}`;
+      document.getElementById('res-queue-status-badge').innerHTML = UI.renderStatusBadge(data.queue_token.queue_status);
+      document.getElementById('res-token-slot').textContent = data.queue_token.time_slot ? `Slot: ${data.queue_token.time_slot}` : 'Time Slot: Standard';
+    } else {
+      document.getElementById('res-token-number').textContent = 'Pending';
+      document.getElementById('res-queue-status-badge').innerHTML = '<span class="badge badge-inactive">Not Issued</span>';
+      document.getElementById('res-token-slot').textContent = 'Token assigned upon document review';
+    }
+
+    // Update timeline stages
+    const st = (data.status || '').toLowerCase();
+    const stageSubmitted = document.getElementById('stage-submitted');
+    const stageReview = document.getElementById('stage-review');
+    const stageApproved = document.getElementById('stage-approved');
+    const stageCompleted = document.getElementById('stage-completed');
+
+    // Reset stages
+    [stageSubmitted, stageReview, stageApproved, stageCompleted].forEach(el => {
+      el.className = 'track-timeline-step';
+    });
+
+    stageSubmitted.classList.add('completed');
+
+    if (st === 'pending') {
+      stageReview.classList.add('active');
+    } else if (st === 'under review') {
+      stageReview.classList.add('completed');
+      stageApproved.classList.add('active');
+    } else if (st === 'approved') {
+      stageReview.classList.add('completed');
+      stageApproved.classList.add('completed');
+      stageCompleted.classList.add('active');
+    } else if (st === 'completed') {
+      stageReview.classList.add('completed');
+      stageApproved.classList.add('completed');
+      stageCompleted.classList.add('completed');
+    } else if (st === 'rejected') {
+      stageReview.classList.add('completed');
+      document.getElementById('res-review-desc').textContent = 'Application rejected. Please see portal for details.';
+    }
+
+    resultCard.style.display = 'block';
+    resultCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+</script>
+{% endblock %}

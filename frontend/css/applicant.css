@@ -1,0 +1,204 @@
+/* ==========================================================================
+   APPLICANT / CITIZEN PORTAL STYLES
+   ========================================================================== */
+
+.portal-wrapper {
+  display: flex;
+  min-height: calc(100vh - var(--header-height) - var(--topbar-height) - 160px);
+}
+
+.portal-sidebar {
+  width: var(--sidebar-width);
+  background-color: var(--surface);
+  border-right: 1px solid var(--outline-variant);
+  padding: var(--spacing-lg) var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  flex-shrink: 0;
+}
+
+@media (max-width: 900px) {
+  .portal-sidebar {
+    display: none;
+  }
+}
+
+.portal-content {
+  flex: 1;
+  padding: var(--spacing-xl);
+  background-color: var(--background);
+  overflow-y: auto;
+}
+
+@media (max-width: 600px) {
+  .portal-content {
+    padding: var(--spacing-md);
+  }
+}
+
+.applicant-profile-card {
+  background: var(--surface);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.application-status-card {
+  background: var(--surface);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-xl);
+  box-shadow: var(--shadow-sm);
+}
+
+.queue-display-box {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-container) 100%);
+  color: #ffffff;
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-xl);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ==========================================================================
+   VIRTUAL E-PASSPORT CARD STYLES
+   ========================================================================== */
+
+.virtual-passport-card {
+  background: linear-gradient(135deg, #001733 0%, #002855 50%, #001b3a 100%);
+  color: #ffffff;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 12px 32px rgba(0, 32, 69, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  position: relative;
+  overflow: hidden;
+  border: 2px solid #ffd700;
+}
+
+.virtual-passport-card::before {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle at 30% 20%, rgba(255, 215, 0, 0.08) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.passport-watermark {
+  position: absolute;
+  right: 15px;
+  bottom: 60px;
+  width: 140px;
+  height: 140px;
+  opacity: 0.08;
+  pointer-events: none;
+  filter: grayscale(100%) brightness(200%);
+}
+
+.passport-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 215, 0, 0.3);
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+}
+
+.passport-gov-title {
+  display: flex;
+  flex-direction: column;
+}
+
+.passport-gov-title span:first-child {
+  font-size: 0.75rem;
+  letter-spacing: 2px;
+  color: #ffd700;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.passport-gov-title span:last-child {
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 3px;
+  color: #ffffff;
+}
+
+.passport-photo-frame {
+  width: 110px;
+  height: 135px;
+  background: #f1f5f9;
+  border: 2px solid #cbd5e1;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
+}
+
+.passport-photo-avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.passport-detail-field {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 8px;
+}
+
+.passport-detail-label {
+  font-size: 0.65rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.passport-detail-val {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.passport-mrz-box {
+  background: #000c1c;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-top: 16px;
+  border: 1px solid rgba(255, 215, 0, 0.2);
+  font-family: "Courier New", Courier, monospace;
+  font-size: 0.75rem;
+  letter-spacing: 2.5px;
+  color: #38bdf8;
+  line-height: 1.6;
+  text-transform: uppercase;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.passport-chip-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 215, 0, 0.15);
+  border: 1px solid rgba(255, 215, 0, 0.4);
+  color: #ffd700;
+  padding: 2px 10px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+}

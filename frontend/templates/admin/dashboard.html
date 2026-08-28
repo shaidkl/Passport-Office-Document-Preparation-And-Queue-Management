@@ -1,0 +1,518 @@
+{% extends "base.html" %}
+
+{% block title %}Super Admin Control Dashboard — Nepal Passport Office{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/admin.css">
+{% endblock %}
+
+{% block content %}
+<div class="admin-layout">
+  
+  <!-- 1. Left Sidebar Navigation -->
+  <aside class="admin-sidebar">
+    
+    <!-- Admin Header -->
+    <div class="flex items-center gap-sm mb-lg pb-md" style="border-bottom: 1px solid var(--outline-variant);">
+      <div class="user-avatar-circle auth-user-avatar" style="width: 40px; height: 40px; font-size: 1rem; background-color: var(--secondary);">AD</div>
+      <div class="flex flex-col">
+        <span class="auth-user-name font-bold text-sm text-primary">System Admin</span>
+        <span class="text-xs admin-badge">Super Admin Access</span>
+      </div>
+    </div>
+
+    <!-- Navigation Links -->
+    <span class="sidebar-title">System Management</span>
+    <a href="/admin-portal/dashboard/" class="sidebar-item active">
+      <span class="material-symbols-outlined">analytics</span>
+      <span>System Overview</span>
+    </a>
+    <a href="#applications-section" class="sidebar-item">
+      <span class="material-symbols-outlined">description</span>
+      <span>All Applications</span>
+    </a>
+    <a href="#staff-section" class="sidebar-item">
+      <span class="material-symbols-outlined">manage_accounts</span>
+      <span>Staff Management</span>
+    </a>
+    <a href="#logs-section" class="sidebar-item">
+      <span class="material-symbols-outlined">history_edu</span>
+      <span>System Activity Logs</span>
+    </a>
+    
+    <span class="sidebar-title mt-lg">Public Portals</span>
+    <a href="/" class="sidebar-item">
+      <span class="material-symbols-outlined">home</span>
+      <span>Public Portal</span>
+    </a>
+    <button type="button" onclick="Auth.logout()" class="sidebar-item text-error mt-auto" style="background: none; border: none; width: 100%; text-align: left; cursor: pointer;">
+      <span class="material-symbols-outlined text-error">logout</span>
+      <span>Sign Out</span>
+    </button>
+  </aside>
+
+  <!-- 2. Main Admin Workspace -->
+  <main class="admin-content">
+    
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-md mb-xl">
+      <div>
+        <div class="flex items-center gap-sm">
+          <h1 style="font-size: 1.75rem; color: var(--primary); margin: 0;">Central Administration Control</h1>
+          <span class="admin-badge">Live System</span>
+        </div>
+        <p class="text-sm text-muted m-0">Real-time metrics, citizen applications supervision, staff roster, and audit logs.</p>
+      </div>
+
+      <div class="flex items-center gap-sm">
+        <button type="button" onclick="openCreateStaffModal()" class="btn btn-primary">
+          <span class="material-symbols-outlined">person_add</span>
+          Add Staff Member
+        </button>
+        <button type="button" onclick="loadAdminDashboardData()" class="btn btn-outline" title="Refresh metrics">
+          <span class="material-symbols-outlined">refresh</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Metric Stat Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-md mb-xl">
+      
+      <!-- Stat 1: Total Applications -->
+      <div class="stat-card">
+        <div>
+          <span class="stat-label">Total Applications</span>
+          <div class="stat-value text-primary" id="admin-stat-total-apps">0</div>
+          <span class="text-xs text-muted">All-time submissions</span>
+        </div>
+        <div class="stat-icon primary">
+          <span class="material-symbols-outlined">inventory_2</span>
+        </div>
+      </div>
+
+      <!-- Stat 2: Pending Reviews -->
+      <div class="stat-card">
+        <div>
+          <span class="stat-label">Pending Reviews</span>
+          <div class="stat-value" id="admin-stat-pending-apps" style="color: var(--warning);">0</div>
+          <span class="text-xs text-warning">Requires processing</span>
+        </div>
+        <div class="stat-icon warning">
+          <span class="material-symbols-outlined">pending_actions</span>
+        </div>
+      </div>
+
+      <!-- Stat 3: Approved Passports -->
+      <div class="stat-card">
+        <div>
+          <span class="stat-label">Approved Passports</span>
+          <div class="stat-value text-success" id="admin-stat-approved-apps">0</div>
+          <span class="text-xs text-success">Verified &amp; Issued</span>
+        </div>
+        <div class="stat-icon success">
+          <span class="material-symbols-outlined">verified</span>
+        </div>
+      </div>
+
+      <!-- Stat 4: Staff Officers -->
+      <div class="stat-card">
+        <div>
+          <span class="stat-label">Active Staff</span>
+          <div class="stat-value" id="admin-stat-active-staff" style="color: var(--secondary);">0</div>
+          <span class="text-xs text-muted">Desk officers on duty</span>
+        </div>
+        <div class="stat-icon secondary">
+          <span class="material-symbols-outlined">badge</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Master Applications Table -->
+    <div class="card mb-xl" id="applications-section">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="material-symbols-outlined text-primary">description</span>
+          Citizen Passport Applications Master List
+        </div>
+        <div class="flex items-center gap-sm">
+          <select id="app-filter-status" onchange="filterApplicationsTable()" class="form-select" style="padding: 4px 10px; font-size: 0.8125rem; width: auto;">
+            <option value="ALL">All Statuses</option>
+            <option value="Pending">Pending</option>
+            <option value="Under Review">Under Review</option>
+            <option value="Approved">Approved</option>
+            <option value="Rejected">Rejected</option>
+            <option value="Completed">Completed</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Application ID</th>
+              <th>Applicant User ID</th>
+              <th>Submitted Date</th>
+              <th>Status</th>
+              <th>Last Updated</th>
+              <th>Admin Actions</th>
+            </tr>
+          </thead>
+          <tbody id="admin-apps-table-body">
+            <tr>
+              <td colspan="6" class="text-center text-muted py-lg">Loading applications...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Staff Roster & Activity Logs Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-xl">
+      
+      <!-- Staff Management Section -->
+      <div class="card" id="staff-section">
+        <div class="card-header">
+          <div class="card-title">
+            <span class="material-symbols-outlined text-primary">groups</span>
+            Staff Officers Roster
+          </div>
+          <button type="button" onclick="openCreateStaffModal()" class="btn btn-outline btn-sm">
+            <span class="material-symbols-outlined" style="font-size: 16px;">add</span> Add Staff
+          </button>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Officer Name</th>
+                <th>Email</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="admin-staff-table-body">
+              <tr>
+                <td colspan="4" class="text-center text-muted py-md">Loading staff roster...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- System Activity Logs -->
+      <div class="card" id="logs-section">
+        <div class="card-header">
+          <div class="card-title">
+            <span class="material-symbols-outlined text-primary">history_edu</span>
+            Audit &amp; System Activity Logs
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Action Recorded</th>
+                <th>Admin ID</th>
+                <th>Timestamp</th>
+              </tr>
+            </thead>
+            <tbody id="admin-logs-table-body">
+              <tr>
+                <td colspan="3" class="text-center text-muted py-md">Loading activity logs...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+</div>
+
+<!-- Modal: Add New Staff Member -->
+<div id="add-staff-modal" class="modal-backdrop">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h3 class="modal-title flex items-center gap-xs">
+        <span class="material-symbols-outlined text-primary">person_add</span>
+        Add New Staff Officer
+      </h3>
+      <button type="button" onclick="UI.closeModal('add-staff-modal')" style="background:none; border:none; cursor:pointer;">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <form id="add-staff-form" onsubmit="handleCreateStaff(event)">
+      <div class="modal-body">
+        <div id="modal-staff-alert" class="alert alert-danger" style="display: none;"></div>
+
+        <div class="form-group">
+          <label class="form-label" for="staff-name">Officer Full Name <span class="required">*</span></label>
+          <input type="text" id="staff-name" class="form-control" placeholder="e.g. Inspector Ramesh Karki" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="staff-email">Official Email <span class="required">*</span></label>
+          <input type="email" id="staff-email" class="form-control" placeholder="officer@passport.gov.np" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="staff-phone">Phone Number <span class="required">*</span></label>
+          <input type="tel" id="staff-phone" class="form-control" placeholder="98XXXXXXXX" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="staff-password">Initial Password <span class="required">*</span></label>
+          <input type="password" id="staff-password" class="form-control" minlength="6" required>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" onclick="UI.closeModal('add-staff-modal')" class="btn btn-outline">Cancel</button>
+        <button type="submit" id="create-staff-submit-btn" class="btn btn-primary">
+          <span class="material-symbols-outlined">how_to_reg</span>
+          Register Staff
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  let allApplications = [];
+  let allStaff = [];
+  let allLogs = [];
+
+  document.addEventListener('DOMContentLoaded', () => {
+    // 1. Guard page for Administrator
+    if (!Auth.requireAuth(['administrator'])) return;
+
+    loadAdminDashboardData();
+  });
+
+  async function loadAdminDashboardData() {
+    UI.showLoading('Loading central administration data...');
+
+    try {
+      // 1. Fetch Applications
+      const apps = await API.get('/applications/');
+      allApplications = Array.isArray(apps) ? apps : (apps.results || []);
+
+      // 2. Fetch Staff
+      try {
+        const staffRes = await API.get('/staff/');
+        allStaff = Array.isArray(staffRes) ? staffRes : (staffRes.results || []);
+      } catch (err) {
+        console.warn('Could not load staff list:', err);
+      }
+
+      // 3. Fetch Activity Logs
+      try {
+        const logsRes = await API.get('/activity-logs/');
+        allLogs = Array.isArray(logsRes) ? logsRes : (logsRes.results || []);
+      } catch (err) {
+        console.warn('Could not load activity logs:', err);
+      }
+
+      renderAdminMetrics();
+      renderApplicationsTable(allApplications);
+      renderStaffTable();
+      renderLogsTable();
+
+    } catch (err) {
+      console.error('Error loading admin dashboard:', err);
+      UI.showToast('Could not load central admin records.', 'error');
+    } finally {
+      UI.hideLoading();
+    }
+  }
+
+  function renderAdminMetrics() {
+    document.getElementById('admin-stat-total-apps').textContent = allApplications.length;
+
+    const pending = allApplications.filter(a => a.status === 'Pending' || a.status === 'Under Review').length;
+    document.getElementById('admin-stat-pending-apps').textContent = pending;
+
+    const approved = allApplications.filter(a => a.status === 'Approved' || a.status === 'Completed').length;
+    document.getElementById('admin-stat-approved-apps').textContent = approved;
+
+    const activeStaff = allStaff.filter(s => s.status === 'Active').length;
+    document.getElementById('admin-stat-active-staff').textContent = activeStaff || allStaff.length;
+  }
+
+  function filterApplicationsTable() {
+    const filter = document.getElementById('app-filter-status').value;
+    if (filter === 'ALL') {
+      renderApplicationsTable(allApplications);
+    } else {
+      const filtered = allApplications.filter(a => a.status === filter);
+      renderApplicationsTable(filtered);
+    }
+  }
+
+  function renderApplicationsTable(apps) {
+    const tbody = document.getElementById('admin-apps-table-body');
+    if (!apps || apps.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="6" class="text-center text-muted py-lg">No application records found.</td>
+        </tr>
+      `;
+      return;
+    }
+
+    tbody.innerHTML = apps.map(app => `
+      <tr>
+        <td>
+          <strong class="text-primary">#NP-${String(app.application_id).padStart(4, '0')}</strong>
+        </td>
+        <td>
+          <span class="text-sm font-semibold">Citizen #${app.applicant}</span>
+        </td>
+        <td class="text-xs text-muted">${UI.formatDate(app.submission_date)}</td>
+        <td>${UI.renderStatusBadge(app.status)}</td>
+        <td class="text-xs text-muted">${UI.formatDateTime(app.last_updated)}</td>
+        <td>
+          <div class="flex items-center gap-xs">
+            <button type="button" onclick="handleAdminStatusChange(${app.application_id}, 'Approved')" class="btn btn-success btn-sm" title="Approve">
+              <span class="material-symbols-outlined" style="font-size: 16px;">check</span>
+            </button>
+            <button type="button" onclick="handleAdminStatusChange(${app.application_id}, 'Under Review')" class="btn btn-outline btn-sm" title="Review">
+              <span class="material-symbols-outlined" style="font-size: 16px;">rate_review</span>
+            </button>
+            <button type="button" onclick="handleAdminStatusChange(${app.application_id}, 'Rejected')" class="btn btn-danger btn-sm" title="Reject">
+              <span class="material-symbols-outlined" style="font-size: 16px;">close</span>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function renderStaffTable() {
+    const tbody = document.getElementById('admin-staff-table-body');
+    if (!allStaff || allStaff.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="4" class="text-center text-muted py-md">No staff officers registered yet.</td>
+        </tr>
+      `;
+      return;
+    }
+
+    tbody.innerHTML = allStaff.map(s => `
+      <tr>
+        <td>
+          <strong class="text-primary text-sm">${s.full_name}</strong>
+        </td>
+        <td class="text-xs text-muted">${s.email}</td>
+        <td>
+          <span class="badge ${s.status === 'Active' ? 'badge-approved' : 'badge-inactive'}">${s.status || 'Active'}</span>
+        </td>
+        <td>
+          <button type="button" onclick="handleToggleStaffStatus(${s.staff_id}, '${s.status}')" class="btn btn-outline btn-sm">
+            ${s.status === 'Active' ? 'Deactivate' : 'Activate'}
+          </button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function renderLogsTable() {
+    const tbody = document.getElementById('admin-logs-table-body');
+    if (!allLogs || allLogs.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="3" class="text-center text-muted py-md">No audit log records available.</td>
+        </tr>
+      `;
+      return;
+    }
+
+    tbody.innerHTML = allLogs.slice(0, 10).map(l => `
+      <tr>
+        <td class="text-sm font-medium text-primary">${l.action_taken}</td>
+        <td class="text-xs text-muted">Admin #${l.administrator}</td>
+        <td class="text-xs text-muted">${UI.formatDateTime(l.timestamp)}</td>
+      </tr>
+    `).join('');
+  }
+
+  async function handleAdminStatusChange(appId, newStatus) {
+    UI.showLoading(`Updating application #NP-${String(appId).padStart(4, '0')} to ${newStatus}...`);
+    try {
+      await API.patch(`/applications/${appId}/`, {
+        status: newStatus
+      });
+      UI.showToast(`Application #NP-${String(appId).padStart(4, '0')} marked as ${newStatus}.`, 'success');
+      loadAdminDashboardData();
+    } catch (err) {
+      console.error('Update status error:', err);
+      UI.showToast(err.message || 'Could not update application status.', 'error');
+    } finally {
+      UI.hideLoading();
+    }
+  }
+
+  async function handleToggleStaffStatus(staffId, currentStatus) {
+    const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
+    UI.showLoading(`Updating staff status to ${newStatus}...`);
+    try {
+      await API.patch(`/staff/${staffId}/`, {
+        status: newStatus
+      });
+      UI.showToast(`Staff officer updated to ${newStatus}.`, 'success');
+      loadAdminDashboardData();
+    } catch (err) {
+      console.error('Toggle staff error:', err);
+      UI.showToast(err.message || 'Could not update staff status.', 'error');
+    } finally {
+      UI.hideLoading();
+    }
+  }
+
+  function openCreateStaffModal() {
+    document.getElementById('modal-staff-alert').style.display = 'none';
+    UI.openModal('add-staff-modal');
+  }
+
+  async function handleCreateStaff(event) {
+    event.preventDefault();
+    const alertBox = document.getElementById('modal-staff-alert');
+    const submitBtn = document.getElementById('create-staff-submit-btn');
+
+    alertBox.style.display = 'none';
+    submitBtn.disabled = true;
+
+    const fullName = document.getElementById('staff-name').value.trim();
+    const email = document.getElementById('staff-email').value.trim();
+    const phone = document.getElementById('staff-phone').value.trim();
+    const password = document.getElementById('staff-password').value;
+
+    try {
+      await Auth.register({
+        role: 'staff',
+        full_name: fullName,
+        email: email,
+        phone: phone,
+        password: password
+      });
+
+      UI.showToast(`Staff officer ${fullName} created successfully!`, 'success');
+      UI.closeModal('add-staff-modal');
+      loadAdminDashboardData();
+    } catch (err) {
+      console.error('Create staff error:', err);
+      alertBox.textContent = err.message || 'Could not create staff account.';
+      alertBox.style.display = 'flex';
+    } finally {
+      submitBtn.disabled = false;
+    }
+  }
+</script>
+{% endblock %}

@@ -9,10 +9,16 @@ class Applicant(models.Model):
     full_name = models.CharField(max_length=150)
     email = models.EmailField(unique=True)
     phone = models.CharField(max_length=20)
+    password = models.CharField(max_length=128)
     date_of_birth = models.DateField()
     gender = models.CharField(max_length=20)
     nationality = models.CharField(max_length=50, default="Nepali")
     address = models.CharField(max_length=255)
+
+    def save(self, *args, **kwargs):
+        if not self.password.startswith("pbkdf2_"):
+            self.password = make_password(self.password)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.full_name
@@ -164,12 +170,32 @@ class DigitalSignature(models.Model):
         max_length=255
     )
 
+    signing_authority = models.CharField(
+        max_length=200,
+        default="Department of Passports, Government of Nepal"
+    )
+
+    certificate_serial = models.CharField(
+        max_length=100,
+        default="NPL-DOP-PKI-2026-001"
+    )
+
+    algorithm = models.CharField(
+        max_length=50,
+        default="RSA-SHA256"
+    )
+
+    signed_at = models.DateTimeField(
+        auto_now_add=True
+    )
+
     is_valid = models.BooleanField(
-        default=False
+        default=True
     )
 
     def __str__(self):
-        return f"Signature #{self.signature_id}"
+        return f"Gov Digital Signature #{self.signature_id} - App #{self.application_id} ({self.signing_authority})"
+
 
 
 # 7. QUEUE TOKEN
@@ -327,6 +353,82 @@ class Notification(models.Model):
     def __str__(self):
         return self.message[:50]
 
+# 11. PAYMENT
+
+class Payment(models.Model):
+
+    STATUS_CHOICES = [
+        ("Pending", "Pending"),
+        ("Completed", "Completed"),
+        ("Failed", "Failed"),
+        ("Refunded", "Refunded"),
+    ]
+
+    METHOD_CHOICES = [
+        ("eSewa", "eSewa"),
+        ("Khalti", "Khalti"),
+        ("ConnectIPS", "ConnectIPS"),
+        ("Bank Transfer", "Bank Transfer"),
+        ("Digital Wallet", "Digital Wallet"),
+    ]
+
+    payment_id = models.AutoField(primary_key=True)
+
+    application = models.ForeignKey(
+        Application,
+        on_delete=models.CASCADE,
+        related_name="payments"
+    )
+
+    applicant = models.ForeignKey(
+        Applicant,
+        on_delete=models.CASCADE,
+        related_name="payments"
+    )
+
+    amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2
+    )
+
+    currency = models.CharField(
+        max_length=10,
+        default="NPR"
+    )
+
+    payment_method = models.CharField(
+        max_length=50,
+        choices=METHOD_CHOICES,
+        default="eSewa"
+    )
+
+    transaction_id = models.CharField(
+        max_length=100,
+        unique=True,
+        null=True,
+        blank=True
+    )
+
+    payment_status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="Pending"
+    )
+
+    payment_date = models.DateTimeField(
+        auto_now_add=True
+    )
+
+    remarks = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True
+    )
+
+    def __str__(self):
+        return f"Payment #{self.payment_id} - App #{self.application_id} - {self.amount} {self.currency} ({self.payment_status})"
+
+
 class AuthToken(models.Model):
     token_id = models.AutoField(primary_key=True)
 
@@ -346,4 +448,4 @@ class AuthToken(models.Model):
     )
 
     def __str__(self):
-        return self.token
+        return self.token

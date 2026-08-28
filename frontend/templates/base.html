@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Nepal Passport Office — Document Preparation & Queue Management{% endblock %}</title>
+
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Google Material Symbols Outlined -->
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+
+  <!-- Design System CSS from frontend/css/ -->
+  <link rel="stylesheet" href="/static/css/base.css">
+  <link rel="stylesheet" href="/static/css/components.css">
+
+  {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+
+  <!-- 1. Government Official Topbar -->
+  <div class="gov-topbar">
+    <div class="container">
+      <div class="flex items-center gap-sm">
+        <span class="material-symbols-outlined" style="font-size: 14px; color: #ffd700;">flag</span>
+        <span data-i18n="gov_motto">Government of Nepal • Ministry of Foreign Affairs • Department of Passports</span>
+      </div>
+      <div class="flex items-center gap-md">
+        <!-- Language Switcher Button -->
+        <div class="lang-switcher" title="Choose Language / भाषा छान्नुहोस्">
+          <button type="button" class="lang-btn lang-btn-en active" onclick="I18n.setLanguage('en')">EN</button>
+          <button type="button" class="lang-btn lang-btn-ne" onclick="I18n.setLanguage('ne')">नेपाली</button>
+        </div>
+        <span>|</span>
+        <span data-i18n="toll_free">Toll Free: 1660-01-00123</span>
+        <span>|</span>
+        <span data-i18n="location">Tripureshwor, Kathmandu</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Main Navigation Header -->
+  <header class="main-header">
+    <div class="container">
+      <div class="header-inner">
+
+        <!-- Brand Logo -->
+        <a href="/" class="brand-logo">
+          <div class="brand-emblem">
+            <img src="/static/css/nepali_govt.jpg" alt="Government of Nepal Emblem">
+          </div>
+          <div class="brand-text">
+            <span class="brand-title" data-i18n="brand_title">Department of Passports</span>
+            <span class="brand-subtitle" data-i18n="brand_subtitle">Government of Nepal • Smart Portal</span>
+          </div>
+        </a>
+
+        <!-- Desktop Navigation -->
+        <ul class="nav-links">
+          <li><a href="/" class="nav-link {% if request.path == '/' %}active{% endif %}" data-i18n="nav_home">Home</a>
+          </li>
+          <li><a href="/#process" class="nav-link" data-i18n="nav_how_to_apply">How to Apply</a></li>
+          <li><a href="/#services" class="nav-link" data-i18n="nav_requirements">Requirements & Fees</a></li>
+          <li><a href="/track/" class="nav-link {% if '/track' in request.path %}active{% endif %}"
+              data-i18n="nav_track">Track Application</a></li>
+
+          <!-- Dynamic Authenticated Portal Link -->
+          <li class="auth-user-only" style="display: none;">
+            <a href="/applicant/dashboard/" id="header-portal-link" class="nav-link" data-i18n="nav_portal">Portal
+              Dashboard</a>
+          </li>
+        </ul>
+
+        <!-- Right Side Auth / User Controls -->
+        <div class="header-actions">
+
+          <!-- Mobile / Compact Language Toggle -->
+          <div class="lang-switcher md:hidden" style="margin-right: 4px;">
+            <button type="button" class="lang-btn lang-btn-en active" onclick="I18n.setLanguage('en')">EN</button>
+            <button type="button" class="lang-btn lang-btn-ne" onclick="I18n.setLanguage('ne')">ने</button>
+          </div>
+
+          <!-- Guest Only Buttons -->
+          <div class="auth-guest-only flex items-center gap-sm">
+            <a href="/track/" class="btn btn-outline btn-sm">
+              <span class="material-symbols-outlined" style="font-size: 16px;">search</span>
+              <span data-i18n="btn_track_status">Track</span>
+            </a>
+            <a href="/login/" class="btn btn-outline-primary btn-sm">
+              <span class="material-symbols-outlined" style="font-size: 16px;">login</span>
+              <span data-i18n="nav_login">Log In</span>
+            </a>
+            <a href="/register/" class="btn btn-primary btn-sm">
+              <span class="material-symbols-outlined" style="font-size: 16px;">how_to_reg</span>
+              <span data-i18n="nav_register">Register</span>
+            </a>
+          </div>
+
+          <!-- Authenticated User Menu -->
+          <div class="auth-user-only items-center gap-sm" style="display: none;">
+            <div class="user-menu-btn" onclick="window.location.href='/applicant/dashboard/'">
+              <div class="user-avatar-circle auth-user-avatar">U</div>
+              <div class="flex flex-col text-left">
+                <span class="auth-user-name font-semibold" style="line-height: 1.2;">User</span>
+                <span class="auth-user-role text-xs text-muted" style="line-height: 1;">ROLE</span>
+              </div>
+            </div>
+            <button type="button" class="btn btn-outline btn-sm" onclick="Auth.logout()" title="Log out">
+              <span class="material-symbols-outlined" style="font-size: 16px;">logout</span>
+            </button>
+          </div>
+
+          <!-- Mobile Hamburger Toggle -->
+          <button type="button" class="mobile-nav-toggle" onclick="UI.toggleMobileNav(true)"
+            aria-label="Toggle navigation">
+            <span class="material-symbols-outlined">menu</span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </header>
+
+  <!-- 3. Mobile Navigation Drawer -->
+  <div id="mobile-drawer-overlay" class="mobile-drawer-overlay" onclick="UI.toggleMobileNav(false)"></div>
+  <aside id="mobile-drawer" class="mobile-drawer">
+    <div class="flex items-center justify-between mb-lg pb-sm" style="border-bottom: 1px solid var(--outline-variant);">
+      <div class="flex items-center gap-sm">
+        <img src="/static/css/nepali_govt.jpg" alt="Nepal Emblem"
+          style="width: 32px; height: 32px; object-fit: contain; border-radius: 2px;">
+        <span class="font-bold text-primary">Passport Nepal</span>
+      </div>
+      <button type="button" style="background:none; border:none; color:var(--on-surface-variant); cursor:pointer;"
+        onclick="UI.toggleMobileNav(false)">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+
+    <!-- Mobile Nav Links -->
+    <div class="flex flex-col gap-xs flex-1">
+      <a href="/" class="sidebar-item"><span class="material-symbols-outlined">home</span> Home</a>
+      <a href="/#process" class="sidebar-item" onclick="UI.toggleMobileNav(false)"><span
+          class="material-symbols-outlined">list_alt</span> How to Apply</a>
+      <a href="/#services" class="sidebar-item" onclick="UI.toggleMobileNav(false)"><span
+          class="material-symbols-outlined">info</span> Requirements & Fees</a>
+      <a href="/track/" class="sidebar-item"><span class="material-symbols-outlined">search</span> Track Application</a>
+
+      <div class="auth-user-only flex flex-col gap-xs" style="display: none;">
+        <span class="sidebar-title">Portals</span>
+        <a href="/applicant/dashboard/" class="sidebar-item"><span class="material-symbols-outlined">person</span>
+          Citizen Portal</a>
+        <a href="/staff/dashboard/" class="sidebar-item"><span class="material-symbols-outlined">badge</span> Staff
+          Portal</a>
+        <a href="/admin-portal/dashboard/" class="sidebar-item"><span
+            class="material-symbols-outlined">admin_panel_settings</span> Admin Portal</a>
+      </div>
+    </div>
+
+    <!-- Mobile Drawer Auth Buttons -->
+    <div class="pt-md" style="border-top: 1px solid var(--outline-variant);">
+      <div class="auth-guest-only flex flex-col gap-xs">
+        <a href="/login/" class="btn btn-outline-primary btn-block">Log In</a>
+        <a href="/register/" class="btn btn-primary btn-block">Register</a>
+      </div>
+      <div class="auth-user-only flex flex-col gap-xs" style="display: none;">
+        <button type="button" class="btn btn-outline btn-block text-error" onclick="Auth.logout()">
+          <span class="material-symbols-outlined">logout</span> Log Out
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- 4. Main Page Content Block -->
+  <main class="flex-1 flex flex-col">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- 5. Government Standard Footer -->
+  <footer
+    style="background-color: var(--primary-dark); color: #cbd5e1; margin-top: auto; border-top: 4px solid var(--secondary);">
+    <div class="container py-xl">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-xl">
+
+        <!-- Col 1: About -->
+        <div class="flex flex-col gap-sm">
+          <div class="flex items-center gap-sm text-white mb-xs">
+            <img src="/static/css/nepali_govt.jpg" alt="Nepal Government Emblem"
+              style="width: 38px; height: 38px; object-fit: contain; border-radius: 2px;">
+            <span class="font-bold text-lg" data-i18n="footer_about_title">Department of Passports</span>
+          </div>
+          <p class="text-sm" style="color: #94a3b8; line-height: 1.6;" data-i18n="footer_about_desc">
+            Official digital application preparation and smart queue management system for e-Passport services in Nepal.
+          </p>
+        </div>
+
+        <!-- Col 2: Citizen Quick Links -->
+        <div class="flex flex-col gap-xs">
+          <h6 style="color: #ffffff; margin-bottom: 8px;" data-i18n="footer_services_title">Citizen Services</h6>
+          <a href="/register/" style="color: #cbd5e1; font-size: 0.875rem;" data-i18n="nav_register">Register as
+            Citizen</a>
+          <a href="/applicant/apply/" style="color: #cbd5e1; font-size: 0.875rem;" data-i18n="btn_apply_now">Apply for
+            e-Passport Online</a>
+          <a href="/track/" style="color: #cbd5e1; font-size: 0.875rem;" data-i18n="nav_track">Live Digital Queue
+            Tracker</a>
+          <a href="/login/" style="color: #cbd5e1; font-size: 0.875rem;" data-i18n="nav_login">Citizen Portal Sign
+            In</a>
+        </div>
+
+        <!-- Col 3: Digital Service Hours -->
+        <div class="flex flex-col gap-xs">
+          <h6 style="color: #ffffff; margin-bottom: 8px;" data-i18n="footer_hours_title">Online Portal Availability</h6>
+          <p class="text-sm" style="color: #94a3b8;"><span class="material-symbols-outlined"
+              style="font-size:14px;vertical-align:middle;">check_circle</span> <span
+              data-i18n="footer_hours_status">Available 24 / 7</span></p>
+          <p class="text-sm" style="color: #94a3b8;" data-i18n="footer_hours_desc">Submit applications, upload
+            documents, and track your queue token
+            anytime from anywhere.</p>
+          <p class="text-sm" style="color: #7dd3a8; font-weight: 600;" data-i18n="footer_hours_badge">✅ 100% Digital
+            &amp; Paperless</p>
+        </div>
+
+        <!-- Col 4: Digital Support -->
+        <div class="flex flex-col gap-xs">
+          <h6 style="color: #ffffff; margin-bottom: 8px;" data-i18n="footer_support_title">Digital Support</h6>
+          <p class="text-sm" style="color: #94a3b8;">📧 support@passport.gov.np</p>
+          <p class="text-sm" style="color: #94a3b8;">💬 Live Chat: Available on Portal</p>
+          <p class="text-sm" style="color: #ffd700; font-weight: 600;" data-i18n="toll_free">Helpline: 1660-01-00123</p>
+        </div>
+
+      </div>
+
+      <div class="mt-xl pt-md flex flex-col md:flex-row items-center justify-between text-xs"
+        style="border-top: 1px solid rgba(255,255,255,0.1); color: #94a3b8;">
+        <span data-i18n="footer_rights">© 2026 Department of Passports, Government of Nepal. All Rights Reserved.</span>
+        <div class="flex gap-md mt-sm md:mt-0">
+          <a href="#" style="color: #94a3b8;">Privacy Policy</a>
+          <a href="#" style="color: #94a3b8;">Terms of Service</a>
+          <a href="#" style="color: #94a3b8;">Security Guidelines</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- 6. Floating UI Elements -->
+  <div id="global-toast-container" class="toast-container"></div>
+
+  <div id="global-loading-overlay" class="loading-overlay">
+    <div class="spinner"></div>
+    <p id="loading-text" style="font-weight: 600; color: var(--primary); font-size: 0.9375rem;">Processing...</p>
+  </div>
+
+  <!-- Global Core Scripts from frontend/js/ -->
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/auth.js"></script>
+  <script src="/static/js/common.js"></script>
+  <script src="/static/js/i18n.js"></script>
+
+  {% block extra_js %}{% endblock %}
+</body>
+
+</html>

@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+
+{% block title %}Citizen Registration — Nepal Passport Portal{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/public.css">
+{% endblock %}
+
+{% block content %}
+<div class="container py-xl flex justify-center">
+  <div class="card"
+    style="width: 100%; max-width: 760px; padding: 0; overflow: hidden; border-radius: var(--radius-xl);">
+
+    <!-- Registration Header -->
+    <div class="p-lg md:p-xl"
+      style="background-color: var(--surface-container-low); border-bottom: 1px solid var(--outline-variant);">
+      <div class="flex items-center gap-md">
+        <div class="stat-icon primary">
+          <span class="material-symbols-outlined" style="font-size: 28px;">person_add</span>
+        </div>
+        <div>
+          <h1 style="font-size: 1.5rem; color: var(--primary); margin: 0;" data-i18n="register_title">Citizen Account
+            Registration</h1>
+          <p class="text-sm text-muted m-0">Create your official citizen account to apply for a passport, upload
+            documents, and track queue tokens.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Alert Container -->
+    <div class="p-lg pb-0">
+      <div id="register-alert" class="alert alert-danger" style="display: none;"></div>
+    </div>
+
+    <!-- Registration Form -->
+    <form id="register-form" onsubmit="handleRegisterSubmit(event)" class="p-lg md:p-xl flex flex-col gap-lg">
+
+      <!-- 1. Personal Details -->
+      <div>
+        <h3 class="text-md font-bold text-primary mb-md flex items-center gap-xs"
+          style="border-bottom: 1px solid var(--outline-variant); padding-bottom: 6px;">
+          <span class="material-symbols-outlined" style="font-size: 20px;">badge</span>
+          1. Personal Information
+        </h3>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-md">
+          <!-- Full Name -->
+          <div class="form-group md:col-span-2">
+            <label class="form-label" for="reg-full-name">
+              <span data-i18n="fullname_label">Full Legal Name (as in Citizenship / NID)</span> <span
+                class="required">*</span>
+            </label>
+            <input type="text" id="reg-full-name" class="form-control" placeholder="e.g. Ram Bahadur Thapa" required>
+          </div>
+
+          <!-- Date of Birth -->
+          <div class="form-group">
+            <label class="form-label" for="reg-dob">
+              <span data-i18n="dob_label">Date of Birth</span> <span class="required">*</span>
+            </label>
+            <input type="date" id="reg-dob" class="form-control" required>
+          </div>
+
+          <!-- Gender -->
+          <div class="form-group">
+            <label class="form-label" for="reg-gender">
+              <span data-i18n="gender_label">Gender</span> <span class="required">*</span>
+            </label>
+            <select id="reg-gender" class="form-select" required>
+              <option value="" disabled selected>Select Gender</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+
+          <!-- Nationality -->
+          <div class="form-group">
+            <label class="form-label" for="reg-nationality">
+              <span data-i18n="vp_label_nationality">Nationality</span> <span class="required">*</span>
+            </label>
+            <input type="text" id="reg-nationality" class="form-control" value="Nepali" required>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Contact & Address Details -->
+      <div>
+        <h3 class="text-md font-bold text-primary mb-md flex items-center gap-xs"
+          style="border-bottom: 1px solid var(--outline-variant); padding-bottom: 6px;">
+          <span class="material-symbols-outlined" style="font-size: 20px;">contact_mail</span>
+          2. Contact &amp; Permanent Address
+        </h3>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-md">
+          <!-- Email -->
+          <div class="form-group">
+            <label class="form-label" for="reg-email">
+              <span data-i18n="email_label">Email Address</span> <span class="required">*</span>
+            </label>
+            <input type="email" id="reg-email" class="form-control" placeholder="citizen@example.com" required>
+            <span class="form-helper">This will be your login identifier.</span>
+          </div>
+
+          <!-- Phone -->
+          <div class="form-group">
+            <label class="form-label" for="reg-phone">
+              <span data-i18n="phone_label">Mobile Phone Number</span> <span class="required">*</span>
+            </label>
+            <input type="tel" id="reg-phone" class="form-control" placeholder="e.g. 9841234567" required>
+            <span class="form-helper">SMS queue updates will be sent here.</span>
+          </div>
+
+          <!-- Permanent Address -->
+          <div class="form-group md:col-span-2">
+            <label class="form-label" for="reg-address">
+              <span data-i18n="address_label">Permanent Address</span> <span class="required">*</span>
+            </label>
+            <input type="text" id="reg-address" class="form-control"
+              placeholder="e.g. Ward No. 4, Kathmandu, Bagmati Province" required>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Security Password -->
+      <div>
+        <h3 class="text-md font-bold text-primary mb-md flex items-center gap-xs"
+          style="border-bottom: 1px solid var(--outline-variant); padding-bottom: 6px;">
+          <span class="material-symbols-outlined" style="font-size: 20px;">lock</span>
+          3. Account Security
+        </h3>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-md">
+          <!-- Password -->
+          <div class="form-group">
+            <label class="form-label" for="reg-password">
+              Password <span class="required">*</span>
+            </label>
+            <input type="password" id="reg-password" class="form-control" placeholder="Minimum 6 characters"
+              minlength="6" required>
+          </div>
+
+          <!-- Confirm Password -->
+          <div class="form-group">
+            <label class="form-label" for="reg-confirm-password">
+              Confirm Password <span class="required">*</span>
+            </label>
+            <input type="password" id="reg-confirm-password" class="form-control" placeholder="Re-enter your password"
+              minlength="6" required>
+          </div>
+        </div>
+      </div>
+
+      <!-- Declarations & Terms -->
+      <div class="pt-sm" style="border-top: 1px solid var(--outline-variant);">
+        <label class="flex items-start gap-sm text-sm text-muted" style="cursor: pointer;">
+          <input type="checkbox" id="reg-terms" required style="margin-top: 3px;">
+          <span>
+            I declare that the details provided above are true, complete, and accurate according to my official
+            government identity records.
+          </span>
+        </label>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-md mt-sm">
+        <p class="text-sm text-muted m-0">
+          Already registered? <a href="/login/" class="font-bold text-primary hover:underline">Sign In</a>
+        </p>
+        <button type="submit" id="register-submit-btn" class="btn btn-primary btn-lg" style="min-width: 220px;">
+          <span class="material-symbols-outlined">how_to_reg</span>
+          <span id="register-btn-text">Create Account</span>
+        </button>
+      </div>
+
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  async function handleRegisterSubmit(event) {
+    event.preventDefault();
+    const alertBox = document.getElementById('register-alert');
+    const submitBtn = document.getElementById('register-submit-btn');
+    const btnText = document.getElementById('register-btn-text');
+
+    alertBox.style.display = 'none';
+
+    const fullName = document.getElementById('reg-full-name').value.trim();
+    const dob = document.getElementById('reg-dob').value;
+    const gender = document.getElementById('reg-gender').value;
+    const nationality = document.getElementById('reg-nationality').value.trim() || 'Nepali';
+    const email = document.getElementById('reg-email').value.trim();
+    const phone = document.getElementById('reg-phone').value.trim();
+    const address = document.getElementById('reg-address').value.trim();
+    const password = document.getElementById('reg-password').value;
+    const confirmPassword = document.getElementById('reg-confirm-password').value;
+    const terms = document.getElementById('reg-terms').checked;
+
+    if (!terms) {
+      alertBox.textContent = 'You must confirm the accuracy of your details.';
+      alertBox.style.display = 'flex';
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      alertBox.textContent = 'Passwords do not match. Please re-enter your password.';
+      alertBox.style.display = 'flex';
+      return;
+    }
+
+    const payload = {
+      role: 'citizen',
+      full_name: fullName,
+      date_of_birth: dob,
+      gender: gender,
+      nationality: nationality,
+      email: email,
+      phone: phone,
+      address: address,
+      password: password
+    };
+
+    submitBtn.disabled = true;
+    btnText.textContent = 'Registering account...';
+
+    try {
+      const res = await Auth.register(payload);
+      UI.showToast('Registration successful! Redirecting to login...', 'success');
+      setTimeout(() => {
+        window.location.href = '/login/?msg=registered';
+      }, 800);
+    } catch (err) {
+      console.error('Registration failed:', err);
+      alertBox.textContent = err.message || 'Registration failed. Email or phone number might already be in use.';
+      alertBox.style.display = 'flex';
+      submitBtn.disabled = false;
+      btnText.textContent = 'Create Account';
+    }
+  }
+</script>
+{% endblock %}

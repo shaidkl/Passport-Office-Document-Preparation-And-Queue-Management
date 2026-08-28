@@ -12,7 +12,10 @@ from .views import (
     ReportViewSet,
     ActivityLogViewSet,
     NotificationViewSet,
-    login_view
+    PaymentViewSet,
+    login_view,
+    register_view,
+    track_application_view
 )
 
 
@@ -68,6 +71,13 @@ router.register(
     basename='queue-token'
 )
 
+# Payment
+router.register(
+    r'payments',
+    PaymentViewSet,
+    basename='payment'
+)
+
 # Report
 router.register(
     r'reports',
@@ -93,4 +103,6 @@ router.register(
 urlpatterns = [
     path('', include(router.urls)),
     path('login/', login_view, name='login'),
-]
+    path('register/', register_view, name='register'),
+    path('track/', track_application_view, name='track'),
+]

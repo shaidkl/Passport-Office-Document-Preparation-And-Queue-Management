@@ -1,0 +1,601 @@
+{% extends "base.html" %}
+
+{% block title %}Citizen Portal Dashboard — Nepal Passport Office{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/applicant.css">
+{% endblock %}
+
+{% block content %}
+<div class="portal-wrapper">
+  
+  <!-- 1. Left Sidebar Navigation -->
+  <aside class="portal-sidebar">
+    
+    <!-- Citizen Mini Profile -->
+    <div class="flex items-center gap-sm mb-lg pb-md" style="border-bottom: 1px solid var(--outline-variant);">
+      <div class="user-avatar-circle auth-user-avatar" style="width: 40px; height: 40px; font-size: 1rem;">U</div>
+      <div class="flex flex-col">
+        <span class="auth-user-name font-bold text-sm text-primary">Citizen User</span>
+        <span class="text-xs text-muted">Citizen Account</span>
+      </div>
+    </div>
+
+    <!-- Navigation Items -->
+    <span class="sidebar-title">Citizen Services</span>
+    <a href="/applicant/dashboard/" class="sidebar-item active">
+      <span class="material-symbols-outlined">dashboard</span>
+      <span>Dashboard</span>
+    </a>
+    <a href="#virtual-passport-section" onclick="scrollToVirtualPassport()" class="sidebar-item">
+      <span class="material-symbols-outlined text-secondary">badge</span>
+      <span>Virtual e-Passport</span>
+    </a>
+    <a href="#" onclick="openNewApplicationModal()" class="sidebar-item">
+      <span class="material-symbols-outlined">note_add</span>
+      <span>New Application</span>
+    </a>
+    <a href="/track/" class="sidebar-item">
+      <span class="material-symbols-outlined">hourglass_top</span>
+      <span>Track Queue Status</span>
+    </a>
+    
+    <span class="sidebar-title mt-lg">Account</span>
+    <a href="/" class="sidebar-item">
+      <span class="material-symbols-outlined">home</span>
+      <span>Back to Home</span>
+    </a>
+    <button type="button" onclick="Auth.logout()" class="sidebar-item text-error mt-auto" style="background: none; border: none; width: 100%; text-align: left; cursor: pointer;">
+      <span class="material-symbols-outlined text-error">logout</span>
+      <span>Sign Out</span>
+    </button>
+  </aside>
+
+  <!-- 2. Main Portal Content -->
+  <main class="portal-content">
+    
+    <!-- Welcome Header & Quick Actions -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-md mb-xl">
+      <div>
+        <h1 style="font-size: 1.75rem; color: var(--primary); margin: 0;">
+          Namaste, <span id="dash-user-name" class="auth-user-name">Citizen</span>
+        </h1>
+        <p class="text-sm text-muted m-0">Welcome to your official digital e-Passport and queue management dashboard.</p>
+      </div>
+
+      <div class="flex items-center gap-sm">
+        <button type="button" onclick="openNewApplicationModal()" class="btn btn-primary">
+          <span class="material-symbols-outlined">add</span>
+          New Application
+        </button>
+        <button type="button" onclick="loadApplicantData()" class="btn btn-outline" title="Refresh data">
+          <span class="material-symbols-outlined">refresh</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Metric Stat Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-md mb-xl">
+      
+      <!-- Stat 1: Application Status -->
+      <div class="stat-card">
+        <div>
+          <span class="stat-label">Active Application</span>
+          <div class="stat-value" id="stat-active-status">None</div>
+          <span class="text-xs text-muted" id="stat-app-id">No active requests</span>
+        </div>
+        <div class="stat-icon primary">
+          <span class="material-symbols-outlined">assignment</span>
+        </div>
+      </div>
+
+      <!-- Stat 2: Document Verification -->
+      <div class="stat-card">
+        <div>
+          <span class="stat-label">Verification Status</span>
+          <div class="stat-value" id="stat-doc-count">0</div>
+          <span class="text-xs text-success" id="stat-doc-status">Digital Review</span>
+        </div>
+        <div class="stat-icon success">
+          <span class="material-symbols-outlined">verified</span>
+        </div>
+      </div>
+
+      <!-- Stat 3: Queue Token -->
+      <div class="stat-card">
+        <div>
+          <span class="stat-label">Assigned Token</span>
+          <div class="stat-value" id="stat-queue-token" style="color: var(--secondary);">--</div>
+          <span class="text-xs text-muted" id="stat-queue-status">Token unassigned</span>
+        </div>
+        <div class="stat-icon secondary">
+          <span class="material-symbols-outlined">confirmation_number</span>
+        </div>
+      </div>
+
+      <!-- Stat 4: Virtual e-Passport Status -->
+      <div class="stat-card">
+        <div>
+          <span class="stat-label">Virtual Passport</span>
+          <div class="stat-value text-primary" id="stat-passport-status">Inactive</div>
+          <span class="text-xs text-muted" id="stat-passport-desc">Issued on verification</span>
+        </div>
+        <div class="stat-icon primary">
+          <span class="material-symbols-outlined">badge</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 3. Virtual e-Passport Section (Showcased When Active/Approved) -->
+    <div id="virtual-passport-section" class="mb-xl" style="display: none;">
+      <div class="card p-0" style="overflow: hidden; border: 1px solid var(--outline-variant); border-radius: var(--radius-xl);">
+        <div class="p-md px-lg flex items-center justify-between" style="background-color: var(--surface-container-low); border-bottom: 1px solid var(--outline-variant);">
+          <div class="flex items-center gap-xs">
+            <span class="material-symbols-outlined text-secondary" style="font-size: 24px;">verified_user</span>
+            <h3 style="font-size: 1.125rem; color: var(--primary); margin: 0;">Official Virtual e-Passport</h3>
+          </div>
+          <div class="flex items-center gap-sm">
+            <span class="passport-chip-badge">
+              <span class="material-symbols-outlined" style="font-size: 14px;">contactless</span>
+              ICAO 9303
+            </span>
+            <button type="button" onclick="window.print()" class="btn btn-outline btn-sm">
+              <span class="material-symbols-outlined">print</span>
+              Print / Save
+            </button>
+          </div>
+        </div>
+
+        <div class="p-lg md:p-xl">
+          <!-- Virtual Passport Visual Card -->
+          <div class="virtual-passport-card" id="passport-render-box">
+            
+            <!-- Watermark Emblem in Background -->
+            <img src="/static/css/nepali_govt.jpg" class="passport-watermark" alt="Watermark">
+
+            <!-- Card Header -->
+            <div class="passport-header-bar">
+              <div class="flex items-center gap-md">
+                <img src="/static/css/nepali_govt.jpg" style="width: 44px; height: 44px; object-fit: contain; border-radius: 4px;" alt="Nepal Seal">
+                <div class="passport-gov-title">
+                  <span>Government of Nepal • नेपाल सरकार</span>
+                  <span>PASSPORT • राहदानी</span>
+                </div>
+              </div>
+              <div class="text-right">
+                <span class="passport-chip-badge">VIRTUAL e-PASSPORT</span>
+              </div>
+            </div>
+
+            <!-- Card Body (Photo & Credentials Grid) -->
+            <div class="flex flex-col md:flex-row gap-lg items-start relative" style="z-index: 2;">
+              
+              <!-- Left: Photo Frame & Micro QR -->
+              <div class="flex flex-col items-center gap-sm shrink-0">
+                <div class="passport-photo-frame">
+                  <span class="material-symbols-outlined text-primary" style="font-size: 54px;">person</span>
+                </div>
+                <div class="flex items-center gap-xs text-xs" style="color: #ffd700;">
+                  <span class="material-symbols-outlined" style="font-size: 14px;">verified</span>
+                  <span>Biometrically Verified</span>
+                </div>
+              </div>
+
+              <!-- Right: Detailed Citizen Info -->
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-md flex-1">
+                
+                <div class="passport-detail-field sm:col-span-2">
+                  <span class="passport-detail-label">Full Name / पूरा नाम</span>
+                  <span class="passport-detail-val auth-user-name" id="vp-full-name">Ram Bahadur Thapa</span>
+                </div>
+
+                <div class="passport-detail-field">
+                  <span class="passport-detail-label">Passport No. / राहदानी नं.</span>
+                  <span class="passport-detail-val" style="color: #ffd700;" id="vp-passport-no">NP-2026-0001</span>
+                </div>
+
+                <div class="passport-detail-field">
+                  <span class="passport-detail-label">Nationality / राष्ट्रियता</span>
+                  <span class="passport-detail-val" id="vp-nationality">NEPALI</span>
+                </div>
+
+                <div class="passport-detail-field">
+                  <span class="passport-detail-label">Date of Birth / जन्म मिति</span>
+                  <span class="passport-detail-val" id="vp-dob">1995-05-15</span>
+                </div>
+
+                <div class="passport-detail-field">
+                  <span class="passport-detail-label">Gender / लिङ्ग</span>
+                  <span class="passport-detail-val" id="vp-gender">MALE</span>
+                </div>
+
+                <div class="passport-detail-field">
+                  <span class="passport-detail-label">Date of Issue / जारी मिति</span>
+                  <span class="passport-detail-val" id="vp-issue-date">2026-08-27</span>
+                </div>
+
+                <div class="passport-detail-field">
+                  <span class="passport-detail-label">Date of Expiry / म्याद सकिने मिति</span>
+                  <span class="passport-detail-val" id="vp-expiry-date">2036-08-26</span>
+                </div>
+
+                <div class="passport-detail-field">
+                  <span class="passport-detail-label">Authority / जारी गर्ने निकाय</span>
+                  <span class="passport-detail-val text-xs">DEPT OF PASSPORTS</span>
+                </div>
+
+              </div>
+
+            </div>
+
+            <!-- Machine Readable Zone (MRZ) -->
+            <div class="passport-mrz-box" id="vp-mrz-code">
+              P&lt;NPLTHAPA&lt;&lt;RAM&lt;BAHADUR&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;<br>
+              NP2026001&lt;9NPL9505156M3608272&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;04
+            </div>
+
+            <!-- Official Government Digital Signature Seal -->
+            <div class="mt-md p-sm rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-xs" style="background: rgba(0, 12, 28, 0.7); border: 1px dashed rgba(255, 215, 0, 0.4); font-size: 0.75rem;">
+              <div class="flex items-center gap-sm">
+                <span class="material-symbols-outlined text-success" style="font-size: 24px;">draw</span>
+                <div>
+                  <div style="color: #ffd700; font-weight: 700;">Digitally Signed &amp; Certified by Government of Nepal</div>
+                  <div style="color: #94a3b8; font-size: 0.6875rem;">Department of Passports • Cert: NPL-DOP-PKI-2026-001 • Alg: RSA-SHA256</div>
+                </div>
+              </div>
+              <span class="badge badge-approved" style="font-size: 0.65rem;">VALID SIGNATURE</span>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active Application Banner & Queue Card -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-xl mb-xl">
+      
+      <!-- Col 1 & 2: Active Application Overview -->
+      <div class="card lg:col-span-2">
+        <div class="card-header">
+          <div class="card-title">
+            <span class="material-symbols-outlined text-primary">description</span>
+            Current Application Overview
+          </div>
+          <span id="banner-status-badge"></span>
+        </div>
+
+        <div id="active-app-container">
+          <div class="empty-state py-md">
+            <span class="material-symbols-outlined empty-state-icon">note_stack</span>
+            <h4 class="empty-state-title">No Active Passport Application</h4>
+            <p class="empty-state-desc">You have not submitted a passport application yet. Click below to start your digital application form.</p>
+            <button type="button" onclick="openNewApplicationModal()" class="btn btn-primary btn-sm">
+              <span class="material-symbols-outlined">add</span>
+              Create Application
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Col 3: Live Queue Token Ticket -->
+      <div class="card queue-card flex flex-col justify-between text-center" id="queue-ticket-card">
+        <div>
+          <span class="text-xs uppercase font-bold" style="letter-spacing: 0.05em; color: #cbd5e1;">Official Digital Queue Ticket</span>
+          <div class="queue-token-number" id="ticket-token-num">--</div>
+          <h4 id="ticket-status" style="color: #ffffff; margin-bottom: 4px;">Queue Waiting</h4>
+          <span id="ticket-slot" class="text-xs" style="color: #e2e8f0;">Date: Today</span>
+        </div>
+        <div class="mt-lg pt-md" style="border-top: 1px solid rgba(255,255,255,0.15);">
+          <p class="text-xs" style="color: #cbd5e1; margin-bottom: 8px;">Your verification is processed electronically.</p>
+          <a href="/track/" class="btn btn-sm" style="background: rgba(255,255,255,0.2); color: #fff; width: 100%;">Track Queue Status</a>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Applications History Table -->
+    <div class="card mb-xl">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="material-symbols-outlined text-primary">history</span>
+          My Application History
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Application Ref</th>
+              <th>Submission Date</th>
+              <th>Status</th>
+              <th>Last Updated</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="applications-table-body">
+            <tr>
+              <td colspan="5" class="text-center text-muted py-lg">Loading applications...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Modal: New Application -->
+<div id="new-app-modal" class="modal-backdrop">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h3 class="modal-title flex items-center gap-xs">
+        <span class="material-symbols-outlined text-primary">add_circle</span>
+        New Passport Application
+      </h3>
+      <button type="button" onclick="UI.closeModal('new-app-modal')" style="background:none; border:none; cursor:pointer;">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <form id="new-app-form" onsubmit="handleCreateApplication(event)">
+      <div class="modal-body">
+        <div id="modal-app-alert" class="alert alert-danger" style="display: none;"></div>
+        
+        <p class="text-sm text-muted mb-md">Submit a new e-Passport application under your registered citizen profile. All verifications are conducted electronically.</p>
+        
+        <div class="form-group">
+          <label class="form-label" for="app-category">Passport Category <span class="required">*</span></label>
+          <select id="app-category" class="form-select" required>
+            <option value="Ordinary (34 Pages)" selected>Ordinary (34 Pages) — NPR 5,000</option>
+            <option value="Ordinary (66 Pages)">Ordinary (66 Pages) — NPR 10,000</option>
+            <option value="Express Urgent">Express Urgent Service — NPR 12,000</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="app-service-type">Application Reason <span class="required">*</span></label>
+          <select id="app-service-type" class="form-select" required>
+            <option value="New Passport" selected>New Virtual e-Passport</option>
+            <option value="Renewal">Renewal of Expired Passport</option>
+            <option value="Replacement">Replacement for Lost / Damaged Passport</option>
+          </select>
+        </div>
+
+        <div class="p-md rounded-lg" style="background-color: var(--surface-container-low); border: 1px solid var(--outline-variant);">
+          <span class="text-xs text-muted block">
+            ℹ️ Upon creating your application, an initial status of <strong>Pending</strong> will be assigned, and an automated Queue Token will be scheduled for electronic review. Once approved, your <strong>Virtual e-Passport</strong> will be accessible immediately in this portal.
+          </span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" onclick="UI.closeModal('new-app-modal')" class="btn btn-outline">Cancel</button>
+        <button type="submit" id="create-app-submit-btn" class="btn btn-primary">
+          <span class="material-symbols-outlined">send</span>
+          Submit Application
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  let currentApplicant = null;
+  let applicationsList = [];
+
+  document.addEventListener('DOMContentLoaded', () => {
+    // 1. Guard page for Citizen
+    if (!Auth.requireAuth(['citizen', 'applicant'])) return;
+
+    loadApplicantData();
+  });
+
+  async function loadApplicantData() {
+    const user = Auth.getUser();
+    if (!user || !user.user_id) return;
+
+    UI.showLoading('Loading citizen dashboard...');
+
+    try {
+      // 1. Fetch Applicant Details
+      try {
+        currentApplicant = await API.get(`/applicants/${user.user_id}/`);
+        if (currentApplicant) {
+          document.querySelectorAll('.auth-user-name').forEach(el => el.textContent = currentApplicant.full_name || user.name);
+          if (currentApplicant.date_of_birth) document.getElementById('vp-dob').textContent = currentApplicant.date_of_birth;
+          if (currentApplicant.gender) document.getElementById('vp-gender').textContent = currentApplicant.gender.toUpperCase();
+          if (currentApplicant.nationality) document.getElementById('vp-nationality').textContent = currentApplicant.nationality.toUpperCase();
+        }
+      } catch (err) {
+        console.warn('Could not fetch applicant profile details:', err);
+      }
+
+      // 2. Fetch Applications
+      const apps = await API.get('/applications/');
+      applicationsList = Array.isArray(apps) ? apps.filter(a => a.applicant === user.user_id || a.applicant?.applicant_id === user.user_id || a.applicant_id === user.user_id) : (apps.results || []);
+
+      if (applicationsList.length === 0 && Array.isArray(apps) && apps.length > 0) {
+        applicationsList = apps.filter(a => String(a.applicant) === String(user.user_id));
+      }
+
+      renderDashboardStats();
+      renderApplicationsTable();
+
+    } catch (err) {
+      console.error('Error loading applicant data:', err);
+      UI.showToast('Could not load dashboard information. Please try again.', 'error');
+    } finally {
+      UI.hideLoading();
+    }
+  }
+
+  function renderDashboardStats() {
+    const totalApps = applicationsList.length;
+    const latestApp = totalApps > 0 ? applicationsList[0] : null;
+
+    const passportSection = document.getElementById('virtual-passport-section');
+
+    if (latestApp) {
+      document.getElementById('stat-active-status').textContent = latestApp.status;
+      document.getElementById('stat-app-id').textContent = `Application #NP-${String(latestApp.application_id).padStart(4, '0')}`;
+      document.getElementById('banner-status-badge').innerHTML = UI.renderStatusBadge(latestApp.status);
+
+      // Render Active Application Container
+      document.getElementById('active-app-container').innerHTML = `
+        <div class="flex flex-col gap-md">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-md p-md rounded-lg" style="background-color: var(--surface-container-low); border: 1px solid var(--outline-variant);">
+            <div>
+              <span class="text-xs text-muted block">Application ID</span>
+              <strong class="text-primary font-bold">#NP-${String(latestApp.application_id).padStart(4, '0')}</strong>
+            </div>
+            <div>
+              <span class="text-xs text-muted block">Submitted Date</span>
+              <span class="text-sm font-medium">${UI.formatDate(latestApp.submission_date)}</span>
+            </div>
+            <div>
+              <span class="text-xs text-muted block">Last Updated</span>
+              <span class="text-sm font-medium">${UI.formatDateTime(latestApp.last_updated)}</span>
+            </div>
+          </div>
+          <div class="flex items-center justify-between pt-sm">
+            <span class="text-xs text-muted">Status: <strong>${latestApp.status}</strong> — ${latestApp.status === 'Approved' || latestApp.status === 'Completed' ? 'Your Virtual e-Passport has been issued and is ready for use.' : 'Staff is currently reviewing submitted documentation.'}</span>
+            <a href="/track/?id=${latestApp.application_id}" class="btn btn-outline btn-sm">
+              <span class="material-symbols-outlined">search</span> Track Live
+            </a>
+          </div>
+        </div>
+      `;
+
+      // Update Queue Ticket
+      document.getElementById('ticket-token-num').textContent = `T-${String(latestApp.application_id).padStart(3, '0')}`;
+      document.getElementById('ticket-status').textContent = latestApp.status === 'Completed' || latestApp.status === 'Approved' ? 'Verified' : 'Review in Progress';
+      document.getElementById('ticket-slot').textContent = `Token ID: #${latestApp.application_id}`;
+
+      document.getElementById('stat-queue-token').textContent = `T-${String(latestApp.application_id).padStart(3, '0')}`;
+      document.getElementById('stat-queue-status').textContent = 'Electronic Review';
+
+      // Check if application is Approved or Completed -> Display Virtual e-Passport
+      if (latestApp.status === 'Approved' || latestApp.status === 'Completed') {
+        passportSection.style.display = 'block';
+        document.getElementById('stat-passport-status').textContent = 'Active';
+        document.getElementById('stat-passport-status').className = 'stat-value text-success';
+        document.getElementById('stat-passport-desc').textContent = 'Verified & Ready to Use';
+
+        // Fill Virtual Passport details
+        const passNum = `NP-${new Date(latestApp.submission_date || Date.now()).getFullYear()}-${String(latestApp.application_id).padStart(4, '0')}`;
+        document.getElementById('vp-passport-no').textContent = passNum;
+        
+        const issueDate = latestApp.submission_date ? latestApp.submission_date.substring(0, 10) : new Date().toISOString().substring(0, 10);
+        document.getElementById('vp-issue-date').textContent = issueDate;
+        
+        const expYear = parseInt(issueDate.substring(0, 4)) + 10;
+        const expiryDate = `${expYear}${issueDate.substring(4)}`;
+        document.getElementById('vp-expiry-date').textContent = expiryDate;
+
+        // Clean name for MRZ
+        const cleanName = (currentApplicant?.full_name || 'RAM BAHADUR THAPA').toUpperCase().replace(/[^A-Z ]/g, '');
+        const nameParts = cleanName.split(' ');
+        const surname = nameParts.length > 1 ? nameParts[nameParts.length - 1] : nameParts[0];
+        const given = nameParts.length > 1 ? nameParts.slice(0, -1).join('<') : '';
+        
+        const mrzLine1 = `P<NPL${surname}<<${given}`.padEnd(44, '<').substring(0, 44);
+        const mrzLine2 = `${passNum.replace('-', '')}<0NPL9505156M${expYear.toString().substring(2)}08272<<<<<<<<<<<<<<04`.padEnd(44, '<').substring(0, 44);
+        
+        document.getElementById('vp-mrz-code').innerHTML = `${mrzLine1}<br>${mrzLine2}`;
+      } else {
+        passportSection.style.display = 'none';
+        document.getElementById('stat-passport-status').textContent = 'Pending';
+        document.getElementById('stat-passport-desc').textContent = 'Issued on approval';
+      }
+
+    } else {
+      document.getElementById('stat-active-status').textContent = 'None';
+      document.getElementById('stat-app-id').textContent = 'No applications';
+      document.getElementById('ticket-token-num').textContent = '--';
+      document.getElementById('ticket-status').textContent = 'No Active Queue';
+      passportSection.style.display = 'none';
+    }
+  }
+
+  function scrollToVirtualPassport() {
+    const el = document.getElementById('virtual-passport-section');
+    if (el.style.display === 'none') {
+      UI.showToast('Your Virtual e-Passport will be displayed here once your application is approved by the verification officer.', 'info');
+    } else {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+
+  function renderApplicationsTable() {
+    const tbody = document.getElementById('applications-table-body');
+    if (!applicationsList || applicationsList.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="5" class="text-center text-muted py-lg">
+            No applications submitted yet. Click "New Application" to begin.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tbody.innerHTML = applicationsList.map(app => `
+      <tr>
+        <td>
+          <strong class="text-primary">#NP-${String(app.application_id).padStart(4, '0')}</strong>
+        </td>
+        <td>${UI.formatDate(app.submission_date)}</td>
+        <td>${UI.renderStatusBadge(app.status)}</td>
+        <td class="text-xs text-muted">${UI.formatDateTime(app.last_updated)}</td>
+        <td>
+          <div class="flex items-center gap-xs">
+            <a href="/track/?id=${app.application_id}" class="btn btn-outline btn-sm" title="Track Live">
+              <span class="material-symbols-outlined" style="font-size: 16px;">search</span> Track
+            </a>
+            ${app.status === 'Approved' || app.status === 'Completed' ? `
+              <button type="button" onclick="scrollToVirtualPassport()" class="btn btn-success btn-sm" title="View Virtual e-Passport">
+                <span class="material-symbols-outlined" style="font-size: 16px;">badge</span> View e-Passport
+              </button>
+            ` : ''}
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function openNewApplicationModal() {
+    document.getElementById('modal-app-alert').style.display = 'none';
+    UI.openModal('new-app-modal');
+  }
+
+  async function handleCreateApplication(event) {
+    event.preventDefault();
+    const user = Auth.getUser();
+    const alertBox = document.getElementById('modal-app-alert');
+    const submitBtn = document.getElementById('create-app-submit-btn');
+
+    alertBox.style.display = 'none';
+    submitBtn.disabled = true;
+
+    try {
+      const payload = {
+        applicant: user.user_id,
+        status: 'Pending'
+      };
+
+      const newApp = await API.post('/applications/', payload);
+      UI.showToast('Application created successfully!', 'success');
+      UI.closeModal('new-app-modal');
+      loadApplicantData();
+    } catch (err) {
+      console.error('Create application error:', err);
+      alertBox.textContent = err.message || 'Could not create application. Please try again.';
+      alertBox.style.display = 'flex';
+    } finally {
+      submitBtn.disabled = false;
+    }
+  }
+</script>
+{% endblock %}
