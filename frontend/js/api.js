@@ -3,7 +3,10 @@
  * Handles authentication headers, error catching, multipart uploads, and JSON serialization.
  */
 
-const API_BASE_URL = '/api';
+// Resolve API base URL: always use relative /api when hosted by Django, or current origin
+const API_BASE_URL = (typeof window !== 'undefined' && window.location && window.location.origin && !window.location.origin.startsWith('file'))
+  ? `${window.location.origin}/api`
+  : '/api';
 
 class ApiClient {
   /**
@@ -30,7 +33,7 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    // Set JSON content-type if body is an object and not FormData
+    // Set JSON content-type only if body is a plain object and NOT FormData
     let body = options.body;
     if (body && !(body instanceof FormData) && typeof body === 'object') {
       headers['Content-Type'] = 'application/json';
@@ -63,8 +66,25 @@ class ApiClient {
       const data = await response.json().catch(() => null);
 
       if (!response.ok) {
-        const errorMessage = (data && (data.error || data.detail || data.message || Object.values(data)[0])) || `Request failed with status ${response.status}`;
-        const error = new Error(typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage));
+        let errorMessage = `Request failed with status ${response.status}`;
+        if (data) {
+          if (typeof data.error === 'string') errorMessage = data.error;
+          else if (typeof data.detail === 'string') errorMessage = data.detail;
+          else if (typeof data.message === 'string') errorMessage = data.message;
+          else if (typeof data === 'object') {
+            // DRF field validation error dictionary
+            const firstKey = Object.keys(data)[0];
+            const firstVal = data[firstKey];
+            if (Array.isArray(firstVal)) {
+              errorMessage = `${firstKey}: ${firstVal[0]}`;
+            } else if (typeof firstVal === 'string') {
+              errorMessage = `${firstKey}: ${firstVal}`;
+            } else {
+              errorMessage = JSON.stringify(data);
+            }
+          }
+        }
+        const error = new Error(errorMessage);
         error.status = response.status;
         error.data = data;
         throw error;
@@ -72,7 +92,7 @@ class ApiClient {
 
       return data;
     } catch (err) {
-      console.error(`API Error [${options.method || 'GET'} ${url}]:`, err);
+      console.error(`API Error [${options.method || 'GET'} ${url}]:`, err.message);
       throw err;
     }
   }

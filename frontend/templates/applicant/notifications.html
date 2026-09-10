@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+
+{% block title %}Notifications — Nepal Passport Portal{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/applicant.css">
+<style>
+  .notif-item {
+    display: flex;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    border-bottom: 1px solid var(--outline-variant);
+    cursor: pointer;
+    transition: background 0.15s;
+    position: relative;
+  }
+  .notif-item:last-child { border-bottom: none; }
+  .notif-item:hover { background: var(--surface-container-low); }
+  .notif-item.unread { background: var(--primary-container); }
+  .notif-item.unread:hover { background: #d0dff5; }
+  .notif-unread-dot {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--primary);
+  }
+  .notif-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .notif-icon.info { background: var(--primary-container); color: var(--primary); }
+  .notif-icon.success { background: #dcfce7; color: var(--success); }
+  .notif-icon.warning { background: #fef9c3; color: var(--warning); }
+  .notif-icon.error { background: #fee2e2; color: var(--error); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="portal-wrapper">
+
+  <!-- Sidebar -->
+  <aside class="portal-sidebar">
+    <div class="flex items-center gap-sm mb-lg pb-md" style="border-bottom:1px solid var(--outline-variant);">
+      <div class="user-avatar-circle auth-user-avatar" style="width:40px;height:40px;font-size:1rem;">U</div>
+      <div class="flex flex-col">
+        <span class="auth-user-name font-bold text-sm text-primary">Citizen User</span>
+        <span class="text-xs text-muted" data-i18n="portal_citizen">Citizen Account</span>
+      </div>
+    </div>
+    <span class="sidebar-title" data-i18n="side_citizen_services">Citizen Services</span>
+    <a href="/applicant/dashboard/" class="sidebar-item"><span class="material-symbols-outlined">dashboard</span><span data-i18n="side_dashboard">Dashboard</span></a>
+    <a href="/applicant/apply/" class="sidebar-item"><span class="material-symbols-outlined">note_add</span><span data-i18n="side_my_application">My Applications</span></a>
+    <a href="/applicant/documents/" class="sidebar-item"><span class="material-symbols-outlined">upload_file</span><span data-i18n="side_documents">Documents</span></a>
+    <a href="/applicant/queue/" class="sidebar-item"><span class="material-symbols-outlined">confirmation_number</span><span data-i18n="side_queue_token">Queue Token</span></a>
+    <a href="/applicant/notifications/" class="sidebar-item active">
+      <span class="material-symbols-outlined">notifications</span>
+      <span data-i18n="side_notifications">Notifications</span>
+      <span id="sidebar-notif-badge" class="badge badge-rejected" style="margin-left:auto;min-width:20px;text-align:center;display:none;"></span>
+    </a>
+    <a href="/applicant/profile/" class="sidebar-item"><span class="material-symbols-outlined">person</span><span data-i18n="side_my_profile">Profile</span></a>
+    <span class="sidebar-title mt-lg" data-i18n="side_account">Account</span>
+    <a href="/" class="sidebar-item"><span class="material-symbols-outlined">home</span><span data-i18n="side_back_home">Home</span></a>
+    <button type="button" onclick="Auth.logout()" class="sidebar-item text-error mt-auto" style="background:none;border:none;width:100%;text-align:left;cursor:pointer;">
+      <span class="material-symbols-outlined text-error">logout</span><span data-i18n="side_logout">Sign Out</span>
+    </button>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="portal-content">
+
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-md mb-xl">
+      <div>
+        <h1 style="font-size:1.75rem;color:var(--primary);margin:0;" data-i18n="side_notifications">Notifications</h1>
+        <p class="text-sm text-muted m-0" data-i18n="notif_page_subtitle">Updates and alerts about your passport application.</p>
+      </div>
+      <div class="flex gap-sm">
+        <button type="button" onclick="markAllRead()" class="btn btn-outline btn-sm">
+          <span class="material-symbols-outlined">done_all</span> <span data-i18n="notif_mark_all_read">Mark All Read</span>
+        </button>
+        <button type="button" onclick="loadNotifications()" class="btn btn-outline btn-sm" title="Refresh">
+          <span class="material-symbols-outlined">refresh</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Filter Tabs -->
+    <div class="flex gap-sm mb-lg flex-wrap">
+      <button type="button" id="filter-all" class="btn btn-primary btn-sm" onclick="filterNotifications('all')" data-i18n="label_all">All</button>
+      <button type="button" id="filter-unread" class="btn btn-outline btn-sm" onclick="filterNotifications('unread')" data-i18n="notif_unread">Unread</button>
+      <button type="button" id="filter-read" class="btn btn-outline btn-sm" onclick="filterNotifications('read')" data-i18n="notif_read">Read</button>
+    </div>
+
+    <!-- Notifications Card -->
+    <div class="card">
+      <div id="notifications-container">
+        <div class="text-center p-xl">
+          <span class="material-symbols-outlined" style="font-size:40px;color:var(--outline);display:block;margin-bottom:8px;">hourglass_top</span>
+          <p class="text-muted" data-i18n="label_loading">Loading notifications...</p>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  let allNotifications = [];
+  let currentFilter = 'all';
+
+  document.addEventListener('DOMContentLoaded', () => {
+    if (!Auth.requireAuth(['citizen', 'applicant'])) return;
+    loadNotifications();
+  });
+
+  // Re-render on language change
+  window.addEventListener('languageChanged', () => {
+    if (typeof I18n !== 'undefined') I18n.applyTranslations();
+    renderNotifications();
+  });
+
+  function t(key, fallback) {
+    if (typeof I18n !== 'undefined' && I18n.t) return I18n.t(key, fallback);
+    return fallback || key;
+  }
+
+  async function loadNotifications() {
+    const user = Auth.getUser();
+    const container = document.getElementById('notifications-container');
+    container.innerHTML = `<div class="text-center p-xl"><span class="material-symbols-outlined" style="font-size:40px;color:var(--outline);display:block;margin-bottom:8px;">hourglass_top</span><p class="text-muted">${t('label_loading', 'Loading...')}</p></div>`;
+
+    try {
+      const data = await API.get('/notifications/');
+      const all = Array.isArray(data) ? data : (data.results || []);
+      allNotifications = all.filter(n => String(n.applicant) === String(user.user_id)).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+      updateUnreadBadge();
+      renderNotifications();
+    } catch (err) {
+      container.innerHTML = `<div class="empty-state p-xl">
+        <span class="material-symbols-outlined empty-state-icon">error</span>
+        <h4 class="empty-state-title">${t('notif_load_error', 'Could not load notifications')}</h4>
+        <p class="empty-state-desc">${t('notif_retry_hint', 'Please check your connection and try again.')}</p>
+        <button type="button" onclick="loadNotifications()" class="btn btn-outline btn-sm">${t('btn_refresh', 'Retry')}</button>
+      </div>`;
+    }
+  }
+
+  function updateUnreadBadge() {
+    const unread = allNotifications.filter(n => n.status === 'Unread').length;
+    const badge = document.getElementById('sidebar-notif-badge');
+    if (unread > 0) {
+      badge.textContent = unread;
+      badge.style.display = 'inline-block';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  function filterNotifications(filter) {
+    currentFilter = filter;
+    ['all','unread','read'].forEach(f => {
+      document.getElementById(`filter-${f}`).className = f === filter ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
+    });
+    renderNotifications();
+  }
+
+  function renderNotifications() {
+    const container = document.getElementById('notifications-container');
+    let filtered = allNotifications;
+    if (currentFilter === 'unread') filtered = allNotifications.filter(n => n.status === 'Unread');
+    if (currentFilter === 'read') filtered = allNotifications.filter(n => n.status === 'Read');
+
+    if (filtered.length === 0) {
+      const emptyMsg = currentFilter === 'unread'
+        ? t('notif_no_unread', 'No unread notifications.')
+        : currentFilter === 'read'
+          ? t('notif_no_read', 'No read notifications.')
+          : t('notif_none_yet', 'No notifications yet.');
+      container.innerHTML = `<div class="empty-state p-xl">
+        <span class="material-symbols-outlined empty-state-icon">notifications_none</span>
+        <h4 class="empty-state-title">${emptyMsg}</h4>
+        <p class="empty-state-desc">${t('notif_appear_here', 'Notification alerts about your application will appear here.')}</p>
+      </div>`;
+      return;
+    }
+
+    const unreadLabel = t('notif_unread', 'Unread');
+    const readLabel = t('notif_read', 'Read');
+
+    container.innerHTML = filtered.map(n => {
+      const isUnread = n.status === 'Unread';
+      let iconClass = 'info', iconName = 'info';
+      const type = (n.type || '').toLowerCase();
+      if (type.includes('approv') || type.includes('verif') || type.includes('complet')) { iconClass = 'success'; iconName = 'check_circle'; }
+      else if (type.includes('reject')) { iconClass = 'error'; iconName = 'cancel'; }
+      else if (type.includes('queue') || type.includes('token')) { iconClass = 'warning'; iconName = 'confirmation_number'; }
+
+      return `
+        <div class="notif-item ${isUnread ? 'unread' : ''}" onclick="markRead(${n.notification_id})">
+          ${isUnread ? '<div class="notif-unread-dot"></div>' : ''}
+          <div class="notif-icon ${iconClass}">
+            <span class="material-symbols-outlined" style="font-size:20px;">${iconName}</span>
+          </div>
+          <div style="flex:1;">
+            <div class="flex items-center gap-sm mb-xs flex-wrap">
+              <span class="badge badge-${isUnread ? 'review' : 'inactive'}" style="font-size:0.65rem;">${isUnread ? unreadLabel : readLabel}</span>
+              ${n.type ? `<span class="text-xs text-muted">${n.type}</span>` : ''}
+            </div>
+            <p class="text-sm font-medium m-0" style="color:var(--on-surface);">${n.message}</p>
+            <span class="text-xs text-muted block mt-xs">${UI.formatDateTime(n.created_at)}</span>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  async function markRead(notifId) {
+    const notif = allNotifications.find(n => n.notification_id === notifId);
+    if (!notif || notif.status === 'Read') return;
+    try {
+      await API.patch(`/notifications/${notifId}/`, { status: 'Read' });
+      notif.status = 'Read';
+      updateUnreadBadge();
+      renderNotifications();
+    } catch (err) {
+      console.warn('Could not mark notification as read:', err);
+    }
+  }
+
+  async function markAllRead() {
+    const unread = allNotifications.filter(n => n.status === 'Unread');
+    if (unread.length === 0) { UI.showToast(t('notif_all_already_read', 'All notifications are already read.'), 'info'); return; }
+    try {
+      await API.post('/notifications/mark-all-read/', {});
+      allNotifications.forEach(n => { n.status = 'Read'; });
+      updateUnreadBadge();
+      renderNotifications();
+      UI.showToast(t('notif_marked_all_read', 'All notifications marked as read.'), 'success');
+    } catch (err) {
+      console.warn('mark-all-read fallback:', err);
+      try {
+        await Promise.all(unread.map(n => API.patch(`/notifications/${n.notification_id}/`, { status: 'Read' })));
+        unread.forEach(n => { n.status = 'Read'; });
+        updateUnreadBadge();
+        renderNotifications();
+        UI.showToast(t('notif_marked_all_read', 'All notifications marked as read.'), 'success');
+      } catch (e) {
+        UI.showToast(t('notif_mark_all_error', 'Could not mark all as read. Please try again.'), 'error');
+      }
+    }
+  }
+
+  window.addEventListener('languageChanged', () => {
+    renderNotifications();
+    if (typeof I18n !== 'undefined') I18n.applyTranslations();
+  });
+</script>
+{% endblock %}

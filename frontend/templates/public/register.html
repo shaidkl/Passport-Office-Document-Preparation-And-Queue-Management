@@ -19,10 +19,8 @@
           <span class="material-symbols-outlined" style="font-size: 28px;">person_add</span>
         </div>
         <div>
-          <h1 style="font-size: 1.5rem; color: var(--primary); margin: 0;" data-i18n="register_title">Citizen Account
-            Registration</h1>
-          <p class="text-sm text-muted m-0">Create your official citizen account to apply for a passport, upload
-            documents, and track queue tokens.</p>
+          <h1 style="font-size: 1.5rem; color: var(--primary); margin: 0;" data-i18n="register_title">Citizen Account Registration</h1>
+          <p class="text-sm text-muted m-0" data-i18n="register_subtitle">Create your official citizen account to apply for a passport, upload documents, and track queue tokens.</p>
         </div>
       </div>
     </div>
@@ -40,7 +38,7 @@
         <h3 class="text-md font-bold text-primary mb-md flex items-center gap-xs"
           style="border-bottom: 1px solid var(--outline-variant); padding-bottom: 6px;">
           <span class="material-symbols-outlined" style="font-size: 20px;">badge</span>
-          1. Personal Information
+          <span data-i18n="register_section_personal">1. Personal Information</span>
         </h3>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-md">
@@ -67,10 +65,10 @@
               <span data-i18n="gender_label">Gender</span> <span class="required">*</span>
             </label>
             <select id="reg-gender" class="form-select" required>
-              <option value="" disabled selected>Select Gender</option>
-              <option value="Male">Male</option>
-              <option value="Female">Female</option>
-              <option value="Other">Other</option>
+              <option value="" disabled selected data-i18n="gender_label">Select Gender</option>
+              <option value="Male" data-i18n="gender_male">Male</option>
+              <option value="Female" data-i18n="gender_female">Female</option>
+              <option value="Other" data-i18n="gender_other">Other</option>
             </select>
           </div>
 
@@ -89,7 +87,7 @@
         <h3 class="text-md font-bold text-primary mb-md flex items-center gap-xs"
           style="border-bottom: 1px solid var(--outline-variant); padding-bottom: 6px;">
           <span class="material-symbols-outlined" style="font-size: 20px;">contact_mail</span>
-          2. Contact &amp; Permanent Address
+          <span data-i18n="register_section_contact">2. Contact &amp; Permanent Address</span>
         </h3>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-md">
@@ -127,26 +125,46 @@
         <h3 class="text-md font-bold text-primary mb-md flex items-center gap-xs"
           style="border-bottom: 1px solid var(--outline-variant); padding-bottom: 6px;">
           <span class="material-symbols-outlined" style="font-size: 20px;">lock</span>
-          3. Account Security
+          <span data-i18n="register_section_security">3. Account Security</span>
         </h3>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-md">
           <!-- Password -->
           <div class="form-group">
             <label class="form-label" for="reg-password">
-              Password <span class="required">*</span>
+              <span data-i18n="password_label">Password</span> <span class="required">*</span>
             </label>
-            <input type="password" id="reg-password" class="form-control" placeholder="Minimum 6 characters"
-              minlength="6" required>
+            <div style="position: relative;">
+              <input type="password" id="reg-password" class="form-control" placeholder="Minimum 6 characters"
+                minlength="6" required autocomplete="new-password">
+              <button 
+                type="button" 
+                onclick="togglePasswordVisibility('reg-password', this)"
+                style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--outline); cursor: pointer;"
+                title="Toggle password visibility"
+              >
+                <span class="material-symbols-outlined" style="font-size: 18px;">visibility</span>
+              </button>
+            </div>
           </div>
 
           <!-- Confirm Password -->
           <div class="form-group">
             <label class="form-label" for="reg-confirm-password">
-              Confirm Password <span class="required">*</span>
+              <span data-i18n="confirm_password_label">Confirm Password</span> <span class="required">*</span>
             </label>
-            <input type="password" id="reg-confirm-password" class="form-control" placeholder="Re-enter your password"
-              minlength="6" required>
+            <div style="position: relative;">
+              <input type="password" id="reg-confirm-password" class="form-control" placeholder="Re-enter your password"
+                data-i18n-placeholder="confirm_password_label" minlength="6" required autocomplete="new-password">
+              <button 
+                type="button" 
+                onclick="togglePasswordVisibility('reg-confirm-password', this)"
+                style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--outline); cursor: pointer;"
+                title="Toggle password visibility"
+              >
+                <span class="material-symbols-outlined" style="font-size: 18px;">visibility</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -155,7 +173,7 @@
       <div class="pt-sm" style="border-top: 1px solid var(--outline-variant);">
         <label class="flex items-start gap-sm text-sm text-muted" style="cursor: pointer;">
           <input type="checkbox" id="reg-terms" required style="margin-top: 3px;">
-          <span>
+          <span data-i18n="app_declaration">
             I declare that the details provided above are true, complete, and accurate according to my official
             government identity records.
           </span>
@@ -165,11 +183,11 @@
       <!-- Action Buttons -->
       <div class="flex flex-col sm:flex-row items-center justify-between gap-md mt-sm">
         <p class="text-sm text-muted m-0">
-          Already registered? <a href="/login/" class="font-bold text-primary hover:underline">Sign In</a>
+          <span data-i18n="already_have_account">Already registered?</span> <a href="/login/" class="font-bold text-primary hover:underline" data-i18n="login_here">Sign In here</a>
         </p>
         <button type="submit" id="register-submit-btn" class="btn btn-primary btn-lg" style="min-width: 220px;">
           <span class="material-symbols-outlined">how_to_reg</span>
-          <span id="register-btn-text">Create Account</span>
+          <span id="register-btn-text" data-i18n="register_btn">Create Account</span>
         </button>
       </div>
 
@@ -180,11 +198,61 @@
 
 {% block extra_js %}
 <script>
+  document.addEventListener('DOMContentLoaded', () => {
+    // If citizen is already logged in, redirect to dashboard
+    if (Auth.isAuthenticated()) {
+      const role = Auth.getRole();
+      if (role === 'citizen' || role === 'applicant') {
+        window.location.href = '/applicant/dashboard/';
+      } else if (role === 'staff') {
+        window.location.href = '/staff/dashboard/';
+      } else if (role === 'administrator') {
+        window.location.href = '/admin-portal/dashboard/';
+      }
+    }
+
+    // Set maximum Date of Birth to today to prevent selecting future dates
+    const dobInput = document.getElementById('reg-dob');
+    if (dobInput) {
+      const today = new Date().toISOString().split('T')[0];
+      dobInput.setAttribute('max', today);
+    }
+  });
+
+  window.addEventListener('languageChanged', () => {
+    if (typeof I18n !== 'undefined') I18n.applyTranslations();
+  });
+
+  function togglePasswordVisibility(inputId, btn) {
+    const input = document.getElementById(inputId);
+    const icon = btn.querySelector('.material-symbols-outlined');
+    if (!input || !icon) return;
+
+    if (input.type === 'password') {
+      input.type = 'text';
+      icon.textContent = 'visibility_off';
+    } else {
+      input.type = 'password';
+      icon.textContent = 'visibility';
+    }
+  }
+
+  function showRegisterError(message) {
+    const alertBox = document.getElementById('register-alert');
+    const isNe = (typeof I18n !== 'undefined' && I18n.currentLang === 'ne');
+    const trMsg = (typeof I18n !== 'undefined' && I18n.translateError) ? I18n.translateError(message) : message;
+    alertBox.textContent = trMsg;
+    alertBox.style.display = 'flex';
+    alertBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    UI.showToast(trMsg, 'error');
+  }
+
   async function handleRegisterSubmit(event) {
     event.preventDefault();
     const alertBox = document.getElementById('register-alert');
     const submitBtn = document.getElementById('register-submit-btn');
     const btnText = document.getElementById('register-btn-text');
+    const isNe = (typeof I18n !== 'undefined' && I18n.currentLang === 'ne');
 
     alertBox.style.display = 'none';
 
@@ -200,14 +268,25 @@
     const terms = document.getElementById('reg-terms').checked;
 
     if (!terms) {
-      alertBox.textContent = 'You must confirm the accuracy of your details.';
-      alertBox.style.display = 'flex';
+      showRegisterError(isNe ? 'कृपया विवरणको सत्यता पुष्टि गर्नुहोस्।' : 'You must confirm the accuracy of your details.');
+      return;
+    }
+
+    if (password.length < 6) {
+      showRegisterError(isNe ? 'पासवर्ड कम्तिमा ६ अक्षरको हुनुपर्छ।' : 'Password must be at least 6 characters long.');
       return;
     }
 
     if (password !== confirmPassword) {
-      alertBox.textContent = 'Passwords do not match. Please re-enter your password.';
-      alertBox.style.display = 'flex';
+      showRegisterError(isNe ? 'पासवर्ड मेल खाएन। कृपया पुनः प्रविष्ट गर्नुहोस्।' : 'Passwords do not match. Please re-enter your password.');
+      return;
+    }
+
+    // Validate Nepali mobile format: 10 digits starting with 98, 97, 96
+    const cleanPhone = phone.replace(/[\s\-+]/g, '').replace(/^977/, '');
+    const phoneRegex = /^9[678]\d{8}$/;
+    if (!phoneRegex.test(cleanPhone)) {
+      showRegisterError(isNe ? 'कृपया १० अंकको मान्य नेपाली मोबाइल नम्बर प्रविष्ट गर्नुहोस् (उदा: ९८XXXXXXXX)।' : 'Please enter a valid 10-digit Nepali mobile number (e.g., 98XXXXXXXX).');
       return;
     }
 
@@ -218,26 +297,26 @@
       gender: gender,
       nationality: nationality,
       email: email,
-      phone: phone,
+      phone: cleanPhone,
       address: address,
       password: password
     };
 
     submitBtn.disabled = true;
-    btnText.textContent = 'Registering account...';
+    btnText.textContent = isNe ? 'दर्ता हुँदैछ...' : 'Registering account...';
 
     try {
-      const res = await Auth.register(payload);
-      UI.showToast('Registration successful! Redirecting to login...', 'success');
+      await Auth.register(payload);
+      UI.showToast(isNe ? 'नागरिक खाता दर्ता सफल भयो! लग-इन पृष्ठमा जाँदै...' : 'Registration successful! Redirecting to login...', 'success');
       setTimeout(() => {
         window.location.href = '/login/?msg=registered';
       }, 800);
     } catch (err) {
       console.error('Registration failed:', err);
-      alertBox.textContent = err.message || 'Registration failed. Email or phone number might already be in use.';
-      alertBox.style.display = 'flex';
+      const errMsg = err.message || (isNe ? 'दर्ता असफल भयो। इमेल वा मोबाइल नम्बर पहिले नै प्रयोगमा हुन सक्छ।' : 'Registration failed. Email or phone number might already be in use.');
+      showRegisterError(errMsg);
       submitBtn.disabled = false;
-      btnText.textContent = 'Create Account';
+      btnText.textContent = isNe ? 'नयाँ खाता खोल्नुहोस्' : 'Create Account';
     }
   }
 </script>

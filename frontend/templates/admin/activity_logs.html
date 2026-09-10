@@ -1,0 +1,297 @@
+{% extends "base.html" %}
+
+{% block title %}Activity Logs — Central Administration{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/admin.css">
+<style>
+  .admin-layout { display: flex; min-height: calc(100vh - var(--header-height) - var(--topbar-height) - 160px); }
+  .admin-sidebar { width: var(--sidebar-width); background: var(--surface-container-low); border-right: 1px solid var(--outline-variant); padding: var(--spacing-lg) var(--spacing-md); display: flex; flex-direction: column; gap: var(--spacing-xs); flex-shrink: 0; }
+  @media(max-width:900px){ .admin-sidebar{ display:none; } }
+  .admin-content { flex: 1; padding: var(--spacing-xl); background: var(--background); overflow-y: auto; }
+  @media(max-width:600px){ .admin-content{ padding: var(--spacing-md); } }
+  .admin-badge { background-color: var(--secondary-container); color: var(--secondary); font-size: 0.75rem; font-weight: 700; padding: 3px 8px; border-radius: var(--radius-full); }
+  .timeline-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--primary); flex-shrink: 0; margin-top: 6px; }
+  .log-row { display: flex; gap: var(--spacing-md); padding: var(--spacing-md) 0; border-bottom: 1px solid var(--outline-variant); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-layout">
+
+  <!-- Sidebar -->
+  <aside class="admin-sidebar">
+    <div class="flex items-center gap-sm mb-lg pb-md" style="border-bottom: 1px solid var(--outline-variant);">
+      <div class="user-avatar-circle auth-user-avatar" style="width: 40px; height: 40px; font-size: 1rem; background-color: var(--secondary);">AD</div>
+      <div class="flex flex-col">
+        <span class="auth-user-name font-bold text-sm text-primary">System Admin</span>
+        <span class="text-xs admin-badge" data-i18n="admin_super_admin">Super Admin Access</span>
+      </div>
+    </div>
+    <span class="sidebar-title" data-i18n="admin_sidebar_system">System Management</span>
+    <a href="/admin-portal/dashboard/" class="sidebar-item"><span class="material-symbols-outlined">analytics</span><span data-i18n="admin_sidebar_overview">System Overview</span></a>
+    <a href="/admin-portal/applications/" class="sidebar-item"><span class="material-symbols-outlined">description</span><span data-i18n="admin_nav_apps">All Applications</span></a>
+    <a href="/admin-portal/payments/" class="sidebar-item"><span class="material-symbols-outlined">payments</span><span data-i18n="admin_nav_payments">Fee Payments</span></a>
+    <a href="/admin-portal/staff/" class="sidebar-item"><span class="material-symbols-outlined">manage_accounts</span><span data-i18n="admin_nav_staff">Staff Management</span></a>
+    <a href="/admin-portal/reports/" class="sidebar-item"><span class="material-symbols-outlined">bar_chart</span><span data-i18n="admin_nav_reports">System Reports</span></a>
+    <a href="/admin-portal/activity-logs/" class="sidebar-item active"><span class="material-symbols-outlined">history_edu</span><span data-i18n="admin_nav_logs">System Activity Logs</span></a>
+    <span class="sidebar-title mt-lg" data-i18n="admin_sidebar_portals">Public Portals</span>
+    <a href="/" class="sidebar-item"><span class="material-symbols-outlined">home</span><span data-i18n="side_back_home">Public Portal</span></a>
+    <button type="button" onclick="Auth.logout()" class="sidebar-item text-error mt-auto" style="background: none; border: none; width: 100%; text-align: left; cursor: pointer;">
+      <span class="material-symbols-outlined text-error">logout</span><span data-i18n="side_logout">Sign Out</span>
+    </button>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="admin-content">
+
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-md mb-xl">
+      <div>
+        <div class="flex items-center gap-sm">
+          <h1 style="font-size: 1.75rem; color: var(--primary); margin: 0;" data-i18n="admin_logs_title">Central System Activity & Audit Logs</h1>
+          <span class="admin-badge" data-i18n="admin_audit_trail">Audit Trail</span>
+        </div>
+        <p class="text-sm text-muted m-0" data-i18n="admin_logs_subtitle">Permanent, chronological audit logs of administrative actions, status transitions, and security events.</p>
+      </div>
+      <div class="flex items-center gap-sm">
+        <button type="button" onclick="openCreateLogModal()" class="btn btn-primary">
+          <span class="material-symbols-outlined">add_circle</span> <span data-i18n="admin_record_manual_note">Record Manual Audit Note</span>
+        </button>
+        <button type="button" onclick="loadLogsData()" class="btn btn-outline" title="Refresh Logs">
+          <span class="material-symbols-outlined">refresh</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-md mb-xl">
+      <div class="stat-card">
+        <div><span class="stat-label" data-i18n="admin_nav_logs">Total Logged Events</span><div class="stat-value text-primary" id="stat-total-logs">0</div></div>
+        <div class="stat-icon primary"><span class="material-symbols-outlined">history_edu</span></div>
+      </div>
+      <div class="stat-card">
+        <div><span class="stat-label" data-i18n="queue_today">Logged Today</span><div class="stat-value text-info" id="stat-today-logs">0</div></div>
+        <div class="stat-icon info"><span class="material-symbols-outlined">today</span></div>
+      </div>
+      <div class="stat-card">
+        <div><span class="stat-label" data-i18n="label_status">Latest Action</span><div class="stat-value text-sm font-semibold text-truncate" id="stat-latest-log" style="max-width:200px;">None</div></div>
+        <div class="stat-icon success"><span class="material-symbols-outlined">schedule</span></div>
+      </div>
+    </div>
+
+    <!-- Search Card -->
+    <div class="card mb-xl">
+      <div class="card-body">
+        <label class="form-label" for="search-logs" data-i18n="label_search">Search Audit Log Entries</label>
+        <div class="input-icon-wrapper">
+          <span class="material-symbols-outlined input-icon">search</span>
+          <input type="text" id="search-logs" class="form-control with-icon" placeholder="Search by action text, admin ID, keyword..." data-i18n-placeholder="label_search" oninput="filterLogs()">
+        </div>
+      </div>
+    </div>
+
+    <!-- Logs Table -->
+    <div class="card">
+      <div class="card-header flex justify-between items-center">
+        <div>
+          <h2 class="card-title" data-i18n="admin_audit_trail">Activity Trail</h2>
+          <p class="text-xs text-muted m-0" id="logs-count-text">Showing 0 log records</p>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table">
+          <thead>
+            <tr>
+              <th data-i18n="label_reference">Log Ref</th>
+              <th data-i18n="portal_admin">Administrator</th>
+              <th data-i18n="label_details">Action Recorded</th>
+              <th data-i18n="label_date">Timestamp</th>
+            </tr>
+          </thead>
+          <tbody id="logs-table-body">
+            <tr>
+              <td colspan="4" class="text-center text-muted py-lg" data-i18n="label_loading">Loading activity audit records...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Record Manual Log Modal -->
+<div id="create-log-modal" class="modal-backdrop" style="display: none;">
+  <div class="modal-container" style="max-width: 500px;">
+    <div class="modal-header">
+      <h3 class="modal-title flex items-center gap-sm">
+        <span class="material-symbols-outlined text-primary">edit_note</span>
+        <span data-i18n="admin_record_manual_note">Record Audit Log Entry</span>
+      </h3>
+      <button type="button" onclick="UI.closeModal('create-log-modal')" class="modal-close-btn">&times;</button>
+    </div>
+    <form id="create-log-form" onsubmit="handleCreateLog(event)">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label" for="log-action-text"><span data-i18n="label_details">Action Description</span> <span class="required">*</span></label>
+          <textarea id="log-action-text" class="form-control" rows="3" placeholder="e.g. Conducted weekly passport verification queue audit and reviewed server load." required></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" onclick="UI.closeModal('create-log-modal')" class="btn btn-outline" data-i18n="btn_cancel">Cancel</button>
+        <button type="submit" id="btn-save-log" class="btn btn-primary">
+          <span class="material-symbols-outlined">save</span> <span data-i18n="btn_save">Record Entry</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  let allLogs = [];
+
+  document.addEventListener('DOMContentLoaded', () => {
+    // Administrator Auth Guard
+    if (!Auth.requireAuth(['administrator'])) return;
+
+    loadLogsData();
+  });
+
+  window.addEventListener('languageChanged', () => {
+    if (typeof I18n !== 'undefined') I18n.applyTranslations();
+    loadLogsData();
+  });
+
+  async function loadLogsData() {
+    UI.showLoading('Loading activity audit trail...');
+    try {
+      const logsRes = await API.get('/activity-logs/');
+      allLogs = Array.isArray(logsRes) ? logsRes : (logsRes.results || []);
+
+      // Sort newest first
+      allLogs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+      updateStats();
+      filterLogs();
+    } catch (err) {
+      console.error('Logs fetch error:', err);
+      UI.showToast(err.message || 'Could not load audit logs.', 'error');
+      document.getElementById('logs-table-body').innerHTML = `
+        <tr><td colspan="4" class="text-center text-error py-lg">Error loading logs: ${err.message}</td></tr>
+      `;
+    } finally {
+      UI.hideLoading();
+    }
+  }
+
+  function updateStats() {
+    const total = allLogs.length;
+    document.getElementById('stat-total-logs').textContent = total;
+
+    const todayStr = new Date().toDateString();
+    const todayLogs = allLogs.filter(l => l.timestamp && new Date(l.timestamp).toDateString() === todayStr).length;
+    document.getElementById('stat-today-logs').textContent = todayLogs;
+
+    if (allLogs.length && allLogs[0].action_taken) {
+      document.getElementById('stat-latest-log').textContent = allLogs[0].action_taken;
+      document.getElementById('stat-latest-log').title = allLogs[0].action_taken;
+    }
+  }
+
+  function filterLogs() {
+    const query = (document.getElementById('search-logs').value || '').toLowerCase().trim();
+
+    const filtered = allLogs.filter(l => {
+      return !query ||
+        String(l.log_id).includes(query) ||
+        String(l.administrator).includes(query) ||
+        (l.action_taken && l.action_taken.toLowerCase().includes(query));
+    });
+
+    renderLogsTable(filtered);
+  }
+
+  function renderLogsTable(logs) {
+    const tbody = document.getElementById('logs-table-body');
+    document.getElementById('logs-count-text').textContent = `Showing ${logs.length} of ${allLogs.length} audit entries`;
+
+    if (!logs.length) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="4" class="text-center py-xl">
+            <span class="material-symbols-outlined text-muted" style="font-size:3rem;">history_toggle_off</span>
+            <p class="text-muted mt-sm mb-0" data-i18n="label_no_data">No activity log entries found.</p>
+          </td>
+        </tr>
+      `;
+      if (typeof I18n !== 'undefined') I18n.applyTranslations(tbody);
+      return;
+    }
+
+    tbody.innerHTML = logs.map(l => {
+      const timeStr = l.timestamp ? UI.formatDateTime(l.timestamp) : '--';
+      return `
+        <tr>
+          <td class="font-bold text-primary">#LOG-${String(l.log_id).padStart(4, '0')}</td>
+          <td>
+            <div class="flex items-center gap-xs">
+              <span class="material-symbols-outlined text-muted" style="font-size:1rem;">admin_panel_settings</span>
+              <span class="text-xs font-semibold">Admin #ADM-${l.administrator}</span>
+            </div>
+          </td>
+          <td class="text-sm font-medium" style="max-width:450px;">
+            ${l.action_taken}
+          </td>
+          <td class="text-xs text-muted font-mono">${timeStr}</td>
+        </tr>
+      `;
+    }).join('');
+
+    if (typeof I18n !== 'undefined') {
+      I18n.applyTranslations();
+    }
+  }
+
+  window.addEventListener('languageChanged', () => {
+    filterLogs();
+  });
+
+  function openCreateLogModal() {
+    document.getElementById('create-log-form').reset();
+    UI.openModal('create-log-modal');
+  }
+
+  async function handleCreateLog(event) {
+    event.preventDefault();
+    const actionText = document.getElementById('log-action-text').value.trim();
+    if (!actionText) return;
+
+    const currentUser = Auth.getUser();
+    const adminId = currentUser ? (currentUser.user_id || currentUser.id) : 1;
+    const submitBtn = document.getElementById('btn-save-log');
+
+    submitBtn.disabled = true;
+    UI.showLoading('Recording audit log entry...');
+
+    try {
+      await API.post('/activity-logs/', {
+        administrator: adminId,
+        action_taken: actionText
+      });
+
+      UI.showToast('Audit entry recorded.', 'success');
+      UI.closeModal('create-log-modal');
+      await loadLogsData();
+    } catch (err) {
+      console.error('Create log error:', err);
+      UI.showToast(err.message || 'Could not record log entry.', 'error');
+    } finally {
+      submitBtn.disabled = false;
+      UI.hideLoading();
+    }
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,309 @@
+{% extends "base.html" %}
+
+{% block title %}My Profile — Nepal Passport Portal{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/applicant.css">
+{% endblock %}
+
+{% block content %}
+<div class="portal-wrapper">
+
+  <!-- Sidebar -->
+  <aside class="portal-sidebar">
+    <div class="flex items-center gap-sm mb-lg pb-md" style="border-bottom:1px solid var(--outline-variant);">
+      <div class="user-avatar-circle auth-user-avatar" style="width:40px;height:40px;font-size:1rem;">U</div>
+      <div class="flex flex-col">
+        <span class="auth-user-name font-bold text-sm text-primary">Citizen User</span>
+        <span class="text-xs text-muted" data-i18n="portal_citizen">Citizen Account</span>
+      </div>
+    </div>
+    <span class="sidebar-title" data-i18n="side_citizen_services">Citizen Services</span>
+    <a href="/applicant/dashboard/" class="sidebar-item"><span class="material-symbols-outlined">dashboard</span><span data-i18n="side_dashboard">Dashboard</span></a>
+    <a href="/applicant/apply/" class="sidebar-item"><span class="material-symbols-outlined">note_add</span><span data-i18n="side_my_application">My Applications</span></a>
+    <a href="/applicant/documents/" class="sidebar-item"><span class="material-symbols-outlined">upload_file</span><span data-i18n="side_documents">Documents</span></a>
+    <a href="/applicant/queue/" class="sidebar-item"><span class="material-symbols-outlined">confirmation_number</span><span data-i18n="side_queue_token">Queue Token</span></a>
+    <a href="/applicant/notifications/" class="sidebar-item"><span class="material-symbols-outlined">notifications</span><span data-i18n="side_notifications">Notifications</span></a>
+    <a href="/applicant/profile/" class="sidebar-item active"><span class="material-symbols-outlined">person</span><span data-i18n="side_my_profile">Profile</span></a>
+    <span class="sidebar-title mt-lg" data-i18n="side_account">Account</span>
+    <a href="/" class="sidebar-item"><span class="material-symbols-outlined">home</span><span data-i18n="side_back_home">Home</span></a>
+    <button type="button" onclick="Auth.logout()" class="sidebar-item text-error mt-auto" style="background:none;border:none;width:100%;text-align:left;cursor:pointer;">
+      <span class="material-symbols-outlined text-error">logout</span><span data-i18n="side_logout">Sign Out</span>
+    </button>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="portal-content">
+
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-md mb-xl">
+      <div>
+        <h1 style="font-size:1.75rem;color:var(--primary);margin:0;" data-i18n="profile_page_title">My Profile</h1>
+        <p class="text-sm text-muted m-0" data-i18n="profile_page_subtitle">View and update your citizen account information.</p>
+      </div>
+    </div>
+
+    <!-- Profile Header Card -->
+    <div class="card mb-xl" style="background:linear-gradient(135deg,var(--primary) 0%,#1a3a6e 100%);color:#fff;padding:var(--spacing-xl);">
+      <div class="flex items-center gap-lg flex-wrap">
+        <div style="width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.2);border:3px solid rgba(255,255,255,0.4);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <span class="auth-user-avatar" style="font-size:2rem;color:#fff;font-weight:700;">U</span>
+        </div>
+        <div>
+          <h2 id="profile-display-name" style="color:#fff;margin:0;font-size:1.5rem;">Loading...</h2>
+          <p style="color:rgba(255,255,255,0.7);margin:4px 0 0;" data-i18n="portal_citizen">Citizen Account</p>
+          <p id="profile-display-email" style="color:rgba(255,255,255,0.6);margin:2px 0 0;font-size:0.875rem;">—</p>
+        </div>
+        <div class="ml-auto">
+          <span class="badge badge-approved" style="font-size:0.75rem;" data-i18n="profile_active_citizen">Active Citizen</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Alert -->
+    <div id="profile-alert" class="alert" style="display:none;"></div>
+
+    <!-- Profile Form -->
+    <div class="card mb-xl">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="material-symbols-outlined text-primary">person</span>
+          <span data-i18n="profile_personal_info">Personal Information</span>
+        </div>
+        <button type="button" id="edit-toggle-btn" onclick="toggleEditMode()" class="btn btn-outline btn-sm">
+          <span class="material-symbols-outlined" style="font-size:16px;">edit</span>
+          <span data-i18n="btn_edit">Edit Profile</span>
+        </button>
+      </div>
+
+      <form id="profile-form" onsubmit="handleProfileUpdate(event)" class="p-lg">
+        <div id="profile-loading" class="text-center py-lg">
+          <span class="material-symbols-outlined" style="font-size:40px;color:var(--outline);">hourglass_top</span>
+          <p class="text-muted mt-sm" data-i18n="profile_loading">Loading profile...</p>
+        </div>
+
+        <div id="profile-fields" style="display:none;">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-md">
+
+            <div class="form-group md:col-span-2">
+              <label class="form-label" data-i18n="fullname_label">Full Legal Name</label>
+              <input type="text" id="pf-full-name" class="form-control" disabled>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" data-i18n="email_label">Email Address</label>
+              <input type="email" id="pf-email" class="form-control" disabled>
+              <span class="form-helper" data-i18n="profile_email_helper">Used for login — contact office to change.</span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" data-i18n="phone_label">Phone Number</label>
+              <input type="tel" id="pf-phone" class="form-control" disabled>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" data-i18n="dob_label">Date of Birth</label>
+              <input type="date" id="pf-dob" class="form-control" disabled>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" data-i18n="gender_label">Gender</label>
+              <select id="pf-gender" class="form-select" disabled>
+                <option value="Male" data-i18n="gender_male">Male</option>
+                <option value="Female" data-i18n="gender_female">Female</option>
+                <option value="Other" data-i18n="gender_other">Other</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" data-i18n="label_nationality">Nationality</label>
+              <input type="text" id="pf-nationality" class="form-control" disabled>
+            </div>
+
+            <div class="form-group md:col-span-2">
+              <label class="form-label" data-i18n="address_label">Permanent Address</label>
+              <input type="text" id="pf-address" class="form-control" disabled>
+            </div>
+
+          </div>
+
+          <!-- Action buttons (hidden until edit mode) -->
+          <div id="profile-actions" class="flex gap-sm mt-lg" style="display:none !important;">
+            <button type="submit" id="profile-save-btn" class="btn btn-primary">
+              <span class="material-symbols-outlined">save</span>
+              <span id="profile-save-text" data-i18n="profile_save_changes">Save Changes</span>
+            </button>
+            <button type="button" onclick="cancelEdit()" class="btn btn-outline" data-i18n="btn_cancel">Cancel</button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- Account Security -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="material-symbols-outlined text-primary">lock</span>
+          <span data-i18n="profile_account_security">Account Security</span>
+        </div>
+      </div>
+      <div class="p-lg flex flex-col gap-sm">
+        <div class="p-md rounded-lg" style="background:var(--surface-container-low);border:1px solid var(--outline-variant);">
+          <div class="flex items-center justify-between gap-md flex-wrap">
+            <div class="flex items-center gap-sm">
+              <span class="material-symbols-outlined text-primary">password</span>
+              <div>
+                <strong class="text-sm block" data-i18n="profile_password_label">Password</strong>
+                <span class="text-xs text-muted" data-i18n="profile_password_last_changed">Last changed: Not available</span>
+              </div>
+            </div>
+            <button type="button" onclick="showChangePasswordHint()" class="btn btn-outline btn-sm" data-i18n="profile_change_password">Change Password</button>
+          </div>
+        </div>
+
+        <div class="p-md rounded-lg" style="background:var(--surface-container-low);border:1px solid var(--outline-variant);">
+          <div class="flex items-center gap-sm">
+            <span class="material-symbols-outlined text-success">verified_user</span>
+            <div>
+              <strong class="text-sm block" data-i18n="profile_verified_label">Citizen Account Verified</strong>
+              <span class="text-xs text-muted" data-i18n="profile_verified_desc">Account registered and active in the Nepal Passport System</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  let currentProfile = null;
+  let isEditMode = false;
+
+  document.addEventListener('DOMContentLoaded', () => {
+    if (!Auth.requireAuth(['citizen', 'applicant'])) return;
+    loadProfile();
+  });
+
+  // Re-apply translations on language change
+  window.addEventListener('languageChanged', () => {
+    if (typeof I18n !== 'undefined') I18n.applyTranslations();
+    // Update toggle button text based on mode
+    updateEditBtnText();
+  });
+
+  function t(key, fallback) {
+    if (typeof I18n !== 'undefined' && I18n.t) return I18n.t(key, fallback);
+    return fallback || key;
+  }
+
+  function updateEditBtnText() {
+    const editBtn = document.getElementById('edit-toggle-btn');
+    if (!editBtn) return;
+    if (isEditMode) {
+      editBtn.innerHTML = `<span class="material-symbols-outlined" style="font-size:16px;">close</span> ${t('profile_cancel_edit', 'Cancel Edit')}`;
+    } else {
+      editBtn.innerHTML = `<span class="material-symbols-outlined" style="font-size:16px;">edit</span> ${t('btn_edit', 'Edit Profile')}`;
+    }
+  }
+
+  function showChangePasswordHint() {
+    UI.showToast(t('profile_change_password_hint', 'To change your password, please contact the helpline: 1660-01-00123.'), 'info');
+  }
+
+  async function loadProfile() {
+    const user = Auth.getUser();
+    if (!user) return;
+
+    try {
+      currentProfile = await API.get(`/applicants/${user.user_id}/`);
+      renderProfile(currentProfile);
+    } catch (err) {
+      UI.showToast(t('profile_load_error', 'Could not load profile information.'), 'error');
+      document.getElementById('profile-loading').innerHTML = `<p class="text-error">${t('profile_load_error', 'Could not load profile. Please refresh.')}</p>`;
+    }
+  }
+
+  function renderProfile(profile) {
+    document.getElementById('profile-loading').style.display = 'none';
+    document.getElementById('profile-fields').style.display = 'block';
+
+    document.getElementById('profile-display-name').textContent = profile.full_name || '—';
+    document.getElementById('profile-display-email').textContent = profile.email || '—';
+    document.querySelectorAll('.auth-user-avatar').forEach(el => {
+      el.textContent = (profile.full_name || 'U').split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
+    });
+
+    document.getElementById('pf-full-name').value = profile.full_name || '';
+    document.getElementById('pf-email').value = profile.email || '';
+    document.getElementById('pf-phone').value = profile.phone || '';
+    document.getElementById('pf-dob').value = profile.date_of_birth || '';
+    document.getElementById('pf-gender').value = profile.gender || 'Male';
+    document.getElementById('pf-nationality').value = profile.nationality || 'Nepali';
+    document.getElementById('pf-address').value = profile.address || '';
+  }
+
+  function toggleEditMode() {
+    isEditMode = !isEditMode;
+    const fields = ['pf-full-name', 'pf-phone', 'pf-dob', 'pf-gender', 'pf-nationality', 'pf-address'];
+    const actionsEl = document.getElementById('profile-actions');
+    const editBtn = document.getElementById('edit-toggle-btn');
+
+    if (isEditMode) {
+      fields.forEach(id => document.getElementById(id).disabled = false);
+      actionsEl.setAttribute('style', 'display:flex;');
+      editBtn.innerHTML = `<span class="material-symbols-outlined" style="font-size:16px;">close</span> ${t('profile_cancel_edit', 'Cancel Edit')}`;
+      editBtn.className = 'btn btn-outline-primary btn-sm';
+    } else {
+      cancelEdit();
+    }
+  }
+
+  function cancelEdit() {
+    isEditMode = false;
+    if (currentProfile) renderProfile(currentProfile);
+    const fields = ['pf-full-name', 'pf-phone', 'pf-dob', 'pf-gender', 'pf-nationality', 'pf-address'];
+    fields.forEach(id => document.getElementById(id).disabled = true);
+    document.getElementById('profile-actions').setAttribute('style', 'display:none !important;');
+    const editBtn = document.getElementById('edit-toggle-btn');
+    editBtn.innerHTML = `<span class="material-symbols-outlined" style="font-size:16px;">edit</span> ${t('btn_edit', 'Edit Profile')}`;
+    editBtn.className = 'btn btn-outline btn-sm';
+  }
+
+  async function handleProfileUpdate(event) {
+    event.preventDefault();
+    const user = Auth.getUser();
+    const alertBox = document.getElementById('profile-alert');
+    const saveBtn = document.getElementById('profile-save-btn');
+    const saveText = document.getElementById('profile-save-text');
+
+    alertBox.style.display = 'none';
+    saveBtn.disabled = true;
+    saveText.textContent = t('profile_saving', 'Saving...');
+
+    const payload = {
+      full_name: document.getElementById('pf-full-name').value.trim(),
+      phone: document.getElementById('pf-phone').value.trim(),
+      date_of_birth: document.getElementById('pf-dob').value,
+      gender: document.getElementById('pf-gender').value,
+      nationality: document.getElementById('pf-nationality').value.trim(),
+      address: document.getElementById('pf-address').value.trim(),
+    };
+
+    try {
+      currentProfile = await API.patch(`/applicants/${user.user_id}/`, payload);
+      UI.showToast(t('profile_updated', 'Profile updated successfully!'), 'success');
+      renderProfile(currentProfile);
+      cancelEdit();
+    } catch (err) {
+      alertBox.textContent = err.message || t('profile_update_error', 'Could not update profile. Please try again.');
+      alertBox.className = 'alert alert-danger';
+      alertBox.style.display = 'flex';
+    } finally {
+      saveBtn.disabled = false;
+      saveText.textContent = t('profile_save_changes', 'Save Changes');
+    }
+  }
+</script>
+{% endblock %}

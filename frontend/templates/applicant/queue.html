@@ -1,0 +1,347 @@
+{% extends "base.html" %}
+
+{% block title %}Queue Token — Nepal Passport Portal{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/applicant.css">
+<style>
+  .queue-big-display {
+    background: linear-gradient(135deg, var(--primary) 0%, #1a3a6e 100%);
+    color: #fff;
+    border-radius: var(--radius-xl);
+    padding: var(--spacing-xl);
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+  }
+  .queue-big-display::before {
+    content: '';
+    position: absolute;
+    top: -40%;
+    right: -20%;
+    width: 300px;
+    height: 300px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+  .queue-token-big {
+    font-size: 5rem;
+    font-weight: 900;
+    color: #ffd700;
+    line-height: 1;
+    letter-spacing: -2px;
+    text-shadow: 0 4px 24px rgba(255,215,0,0.3);
+    display: block;
+    margin: var(--spacing-md) 0;
+  }
+  .queue-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-lg);
+  }
+  .queue-info-cell {
+    background: rgba(255,255,255,0.1);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    text-align: center;
+  }
+  .queue-info-cell .label { font-size:0.7rem; text-transform:uppercase; letter-spacing:1px; color:rgba(255,255,255,0.6); }
+  .queue-info-cell .value { font-size:1rem; font-weight:700; color:#fff; margin-top:4px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="portal-wrapper">
+
+  <!-- Sidebar -->
+  <aside class="portal-sidebar">
+    <div class="flex items-center gap-sm mb-lg pb-md" style="border-bottom:1px solid var(--outline-variant);">
+      <div class="user-avatar-circle auth-user-avatar" style="width:40px;height:40px;font-size:1rem;">U</div>
+      <div class="flex flex-col">
+        <span class="auth-user-name font-bold text-sm text-primary">Citizen User</span>
+        <span class="text-xs text-muted" data-i18n="portal_citizen">Citizen Account</span>
+      </div>
+    </div>
+    <span class="sidebar-title" data-i18n="side_citizen_services">Citizen Services</span>
+    <a href="/applicant/dashboard/" class="sidebar-item"><span class="material-symbols-outlined">dashboard</span><span data-i18n="side_dashboard">Dashboard</span></a>
+    <a href="/applicant/apply/" class="sidebar-item"><span class="material-symbols-outlined">note_add</span><span data-i18n="side_my_application">My Applications</span></a>
+    <a href="/applicant/documents/" class="sidebar-item"><span class="material-symbols-outlined">upload_file</span><span data-i18n="side_documents">Documents</span></a>
+    <a href="/applicant/queue/" class="sidebar-item active"><span class="material-symbols-outlined">confirmation_number</span><span data-i18n="side_queue_token">Queue Token</span></a>
+    <a href="/applicant/notifications/" class="sidebar-item"><span class="material-symbols-outlined">notifications</span><span data-i18n="side_notifications">Notifications</span></a>
+    <a href="/applicant/profile/" class="sidebar-item"><span class="material-symbols-outlined">person</span><span data-i18n="side_my_profile">Profile</span></a>
+    <span class="sidebar-title mt-lg" data-i18n="side_account">Account</span>
+    <a href="/" class="sidebar-item"><span class="material-symbols-outlined">home</span><span data-i18n="side_back_home">Home</span></a>
+    <button type="button" onclick="Auth.logout()" class="sidebar-item text-error mt-auto" style="background:none;border:none;width:100%;text-align:left;cursor:pointer;">
+      <span class="material-symbols-outlined text-error">logout</span><span data-i18n="side_logout">Sign Out</span>
+    </button>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="portal-content">
+
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-md mb-xl">
+      <div>
+        <h1 style="font-size:1.75rem;color:var(--primary);margin:0;" data-i18n="queue_page_title">Queue Token Status</h1>
+        <p class="text-sm text-muted m-0" data-i18n="queue_page_subtitle">Track your digital queue position and appointment slot.</p>
+      </div>
+      <button type="button" onclick="loadQueueData()" class="btn btn-outline" title="Refresh queue status">
+        <span class="material-symbols-outlined">refresh</span> <span data-i18n="btn_refresh">Refresh</span>
+      </button>
+    </div>
+
+    <!-- Loading / Content Area -->
+    <div id="queue-loading" class="card text-center p-xl">
+      <span class="material-symbols-outlined" style="font-size:40px;color:var(--outline);display:block;margin-bottom:8px;">hourglass_top</span>
+      <p class="text-muted" data-i18n="label_loading">Loading queue information...</p>
+    </div>
+
+    <!-- No Token State -->
+    <div id="queue-empty" class="card text-center p-xl" style="display:none;">
+      <div class="empty-state">
+        <span class="material-symbols-outlined empty-state-icon">confirmation_number</span>
+        <h4 class="empty-state-title" data-i18n="queue_no_token_yet">No Queue Token Assigned</h4>
+        <p class="empty-state-desc" data-i18n="queue_no_token_desc">A queue token will be assigned to your application once staff initiates the review process. Please ensure your documents are uploaded.</p>
+        <div class="flex gap-sm justify-center flex-wrap mt-sm">
+          <a href="/applicant/documents/" class="btn btn-primary btn-sm">
+            <span class="material-symbols-outlined">upload_file</span> <span data-i18n="btn_upload_document">Upload Documents</span>
+          </a>
+          <a href="/applicant/apply/" class="btn btn-outline btn-sm">
+            <span class="material-symbols-outlined">note_add</span> <span data-i18n="side_my_application">View Applications</span>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Token Display -->
+    <div id="queue-content" style="display:none;">
+
+      <!-- Big Token Card -->
+      <div class="queue-big-display mb-xl">
+        <p style="color:rgba(255,255,255,0.7);font-size:0.75rem;text-transform:uppercase;letter-spacing:2px;margin:0;" data-i18n="queue_current_ticket">Official Digital Queue Token</p>
+        <span class="queue-token-big" id="q-token-number">—</span>
+        <div id="q-status-badge" style="display:flex;justify-content:center;margin-bottom:var(--spacing-sm);"></div>
+
+        <div class="queue-info-grid" style="grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));">
+          <div class="queue-info-cell">
+            <div class="label" data-i18n="label_application_id">Application</div>
+            <div class="value" id="q-app-id">—</div>
+          </div>
+          <div class="queue-info-cell">
+            <div class="label" data-i18n="label_passport_category">Passport Package</div>
+            <div class="value" id="q-pkg-name">—</div>
+          </div>
+          <div class="queue-info-cell">
+            <div class="label" data-i18n="queue_info_pages_fee">Pages &amp; Fee</div>
+            <div class="value" id="q-pkg-pages">—</div>
+          </div>
+          <div class="queue-info-cell">
+            <div class="label" data-i18n="queue_info_token_date">Token Date</div>
+            <div class="value" id="q-token-date">—</div>
+          </div>
+          <div class="queue-info-cell">
+            <div class="label" data-i18n="queue_info_time_slot">Time Slot</div>
+            <div class="value" id="q-time-slot">—</div>
+          </div>
+          <div class="queue-info-cell">
+            <div class="label" data-i18n="queue_info_called_at">Called At</div>
+            <div class="value" id="q-called-time">—</div>
+          </div>
+        </div>
+
+        <p style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin-top:var(--spacing-lg);margin-bottom:0;" data-i18n="queue_attend_note">Please attend the passport office at your scheduled time slot and present this token number.</p>
+      </div>
+
+      <!-- Status Timeline -->
+      <div class="card mb-xl">
+        <div class="card-header">
+          <div class="card-title">
+            <span class="material-symbols-outlined text-primary">timeline</span>
+            <span data-i18n="queue_stage_progress">Queue Stage Progress</span>
+          </div>
+        </div>
+        <div class="p-lg">
+          <div class="track-timeline">
+            <div id="qs-waiting" class="track-timeline-step">
+              <div class="track-timeline-bullet"><span class="material-symbols-outlined" style="font-size:12px;">schedule</span></div>
+              <strong class="text-sm text-primary" data-i18n="status_waiting">Waiting</strong>
+              <span class="text-xs text-muted" data-i18n="queue_step_waiting_desc">Token issued, awaiting your turn</span>
+            </div>
+            <div id="qs-called" class="track-timeline-step">
+              <div class="track-timeline-bullet"><span class="material-symbols-outlined" style="font-size:12px;">volume_up</span></div>
+              <strong class="text-sm text-primary" data-i18n="status_called">Called</strong>
+              <span class="text-xs text-muted" data-i18n="queue_step_called_desc">Your token has been called</span>
+            </div>
+            <div id="qs-serving" class="track-timeline-step">
+              <div class="track-timeline-bullet"><span class="material-symbols-outlined" style="font-size:12px;">person_search</span></div>
+              <strong class="text-sm text-primary" data-i18n="status_serving">Serving</strong>
+              <span class="text-xs text-muted" data-i18n="queue_step_serving_desc">Currently being processed by staff</span>
+            </div>
+            <div id="qs-completed" class="track-timeline-step">
+              <div class="track-timeline-bullet"><span class="material-symbols-outlined" style="font-size:12px;">check</span></div>
+              <strong class="text-sm text-primary" data-i18n="status_completed">Completed</strong>
+              <span class="text-xs text-muted" data-i18n="queue_step_completed_desc">Processing complete</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- All My Tokens Table -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <span class="material-symbols-outlined text-primary">history</span>
+            <span data-i18n="queue_all_tokens">All Queue Tokens</span>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="table">
+            <thead>
+              <tr>
+                <th data-i18n="label_token_number">Token Number</th>
+                <th data-i18n="label_application_id">Application</th>
+                <th data-i18n="label_date">Date</th>
+                <th data-i18n="queue_info_time_slot">Time Slot</th>
+                <th data-i18n="label_status">Status</th>
+                <th data-i18n="queue_info_called_at">Called At</th>
+              </tr>
+            </thead>
+            <tbody id="tokens-table-body">
+              <tr><td colspan="6" class="text-center text-muted py-md" data-i18n="label_loading">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  async function initQueuePage() {
+    if (!Auth.requireAuth(['citizen', 'applicant'])) return;
+    const canAccess = await WorkflowManager.guardPage('queue');
+    if (!canAccess) return;
+    loadQueueData();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initQueuePage);
+  } else {
+    initQueuePage();
+  }
+
+  // Re-render on language change
+  window.addEventListener('languageChanged', () => {
+    if (typeof I18n !== 'undefined') I18n.applyTranslations();
+    loadQueueData();
+  });
+
+  async function loadQueueData() {
+    const user = Auth.getUser();
+    const myId = user ? (user.user_id || user.id || user.applicant_id) : null;
+    document.getElementById('queue-loading').style.display = 'block';
+    document.getElementById('queue-empty').style.display = 'none';
+    document.getElementById('queue-content').style.display = 'none';
+
+    try {
+      // Get my applications first
+      const appsData = await API.get('/applications/');
+      const allApps = Array.isArray(appsData) ? appsData : (appsData.results || []);
+      const myApps = allApps.filter(a => String(a.applicant) === String(myId));
+      const myAppIds = myApps.map(a => a.application_id);
+
+      if (myAppIds.length === 0) {
+        document.getElementById('queue-loading').style.display = 'none';
+        document.getElementById('queue-empty').style.display = 'block';
+        return;
+      }
+
+      // Get queue tokens
+      const tokenData = await API.get('/queue-tokens/');
+      const allTokens = Array.isArray(tokenData) ? tokenData : (tokenData.results || []);
+      const myTokens = allTokens.filter(t => myAppIds.includes(t.application));
+
+      document.getElementById('queue-loading').style.display = 'none';
+
+      if (myTokens.length === 0) {
+        document.getElementById('queue-empty').style.display = 'block';
+        return;
+      }
+
+      // Show the most recent active token
+      const activeStatuses = ['Waiting', 'Called', 'Serving'];
+      const activeToken = myTokens.find(t => activeStatuses.includes(t.queue_status)) || myTokens[0];
+
+      document.getElementById('queue-content').style.display = 'block';
+      renderTokenDisplay(activeToken, myApps);
+      renderTokensTable(myTokens, myApps);
+    } catch (err) {
+      document.getElementById('queue-loading').style.display = 'none';
+      document.getElementById('queue-empty').style.display = 'block';
+      UI.showToast(t('queue_load_error', 'Could not load queue information. Please try again.'), 'error');
+    }
+  }
+
+  function t(key, fallback) {
+    if (typeof I18n !== 'undefined' && I18n.t) return I18n.t(key, fallback);
+    return fallback || key;
+  }
+
+  function renderTokenDisplay(token, apps = []) {
+    document.getElementById('q-token-number').textContent = `T-${String(token.token_number).padStart(3,'0')}`;
+    document.getElementById('q-app-id').textContent = `#NP-${String(token.application).padStart(4,'0')}`;
+
+    const app = apps.find(a => a.application_id === token.application);
+    const pName = app?.passport_category || 'Ordinary (34 Pages)';
+    const pPages = app?.passport_pages || (pName.includes('66') ? '66 Pages' : '34 Pages');
+    const pFee = app?.fee_amount ? `NPR ${Number(app.fee_amount).toLocaleString()}` : (pName.includes('66') ? 'NPR 10,000' : 'NPR 5,000');
+
+    const pkgNameEl = document.getElementById('q-pkg-name');
+    if (pkgNameEl) pkgNameEl.textContent = pName;
+    const pkgPagesEl = document.getElementById('q-pkg-pages');
+    if (pkgPagesEl) pkgPagesEl.textContent = `${pPages} • ${pFee}`;
+
+    document.getElementById('q-token-date').textContent = token.token_date ? UI.formatDate(token.token_date) : t('queue_today', 'Today');
+    document.getElementById('q-time-slot').textContent = token.time_slot || t('queue_standard_queue', 'Standard Queue');
+    document.getElementById('q-called-time').textContent = token.called_time ? UI.formatDateTime(token.called_time) : t('queue_not_yet_called', 'Not yet called');
+    document.getElementById('q-status-badge').innerHTML = UI.renderStatusBadge(token.queue_status);
+
+    // Update timeline
+    const steps = ['qs-waiting','qs-called','qs-serving','qs-completed'];
+    steps.forEach(id => document.getElementById(id).className = 'track-timeline-step');
+
+    const st = (token.queue_status || '').toLowerCase();
+    if (st === 'waiting') { document.getElementById('qs-waiting').classList.add('active'); }
+    else if (st === 'called') { document.getElementById('qs-waiting').classList.add('completed'); document.getElementById('qs-called').classList.add('active'); }
+    else if (st === 'serving') { ['qs-waiting','qs-called'].forEach(id => document.getElementById(id).classList.add('completed')); document.getElementById('qs-serving').classList.add('active'); }
+    else if (st === 'completed') { steps.forEach(id => document.getElementById(id).classList.add('completed')); }
+    else if (st === 'skipped') { document.getElementById('qs-waiting').classList.add('completed'); }
+  }
+
+  function renderTokensTable(tokens, apps) {
+    const tbody = document.getElementById('tokens-table-body');
+    tbody.innerHTML = tokens.map(t => {
+      const app = apps.find(a => a.application_id === t.application);
+      return `
+        <tr>
+          <td><strong class="text-primary">T-${String(t.token_number).padStart(3,'0')}</strong></td>
+          <td>#NP-${String(t.application).padStart(4,'0')}</td>
+          <td>${t.token_date ? UI.formatDate(t.token_date) : '—'}</td>
+          <td>${t.time_slot || 'Standard'}</td>
+          <td>${UI.renderStatusBadge(t.queue_status)}</td>
+          <td class="text-xs text-muted">${t.called_time ? UI.formatDateTime(t.called_time) : '—'}</td>
+        </tr>`;
+    }).join('');
+
+    if (typeof I18n !== 'undefined') {
+      I18n.applyTranslations();
+    }
+  }
+</script>
+{% endblock %}

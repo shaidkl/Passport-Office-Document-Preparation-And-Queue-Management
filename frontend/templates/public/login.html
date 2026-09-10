@@ -25,19 +25,20 @@
     <!-- Login Form -->
     <form id="login-form" onsubmit="handleLoginSubmit(event)">
       
-      <!-- Email / Identifier -->
+      <!-- Email / Username Identifier -->
       <div class="form-group">
         <label class="form-label" for="login-email">
-          <span data-i18n="email_label">Email Address</span> <span class="required">*</span>
+          <span data-i18n="login_identifier_label">Email Address or Username</span> <span class="required">*</span>
         </label>
         <div style="position: relative;">
           <input 
-            type="email" 
+            type="text" 
             id="login-email" 
             class="form-control" 
-            placeholder="e.g. citizen@example.com" 
+            placeholder="e.g. citizen@example.com or officer_username" 
+            data-i18n-placeholder="login_identifier_placeholder"
             required 
-            autocomplete="email"
+            autocomplete="username"
             autofocus
           >
         </div>
@@ -49,7 +50,7 @@
           <label class="form-label m-0" for="login-password">
             <span data-i18n="password_label">Password</span> <span class="required">*</span>
           </label>
-          <a href="#" onclick="UI.showToast('Please contact office helpline 1660-01-00123 for credential assistance.', 'info')" class="text-xs text-primary font-medium hover:underline">Forgot password?</a>
+          <a href="#" onclick="UI.showToast((typeof I18n !== 'undefined' && I18n.currentLang === 'ne') ? 'कृपया सहायताको लागि १६६०-०१-००१२३ मा सम्पर्क गर्नुहोस्।' : 'Please contact office helpline 1660-01-00123 for credential assistance.', 'info')" class="text-xs text-primary font-medium hover:underline" data-i18n="forgot_password">Forgot password?</a>
         </div>
         <div style="position: relative;">
           <input 
@@ -57,6 +58,7 @@
             id="login-password" 
             class="form-control" 
             placeholder="Enter your account password" 
+            data-i18n-placeholder="password_placeholder"
             required
             autocomplete="current-password"
           >
@@ -75,7 +77,7 @@
       <div class="flex justify-between items-center mb-md">
         <label class="flex items-center gap-xs text-sm text-muted" style="cursor: pointer;">
           <input type="checkbox" id="remember-me" checked>
-          <span>Remember me on this device</span>
+          <span data-i18n="remember_me">Remember me on this device</span>
         </label>
       </div>
 
@@ -88,7 +90,7 @@
       <!-- Citizen Registration CTA -->
       <div class="mt-lg pt-md text-center" style="border-top: 1px solid var(--outline-variant);">
         <p class="text-sm text-muted m-0">
-          Don't have a citizen account yet?
+          <span data-i18n="no_account_yet">Don't have a citizen account yet?</span>
           <a href="/register/" class="font-bold text-primary hover:underline" data-i18n="nav_register">Register here</a>
         </p>
       </div>
@@ -104,14 +106,15 @@
   document.addEventListener('DOMContentLoaded', () => {
     const urlParams = new URLSearchParams(window.location.search);
     const msg = urlParams.get('msg');
+    const isNe = (typeof I18n !== 'undefined' && I18n.currentLang === 'ne');
     if (msg === 'session_expired') {
       const alertBox = document.getElementById('login-alert');
-      alertBox.textContent = 'Your session has expired. Please sign in again.';
+      alertBox.textContent = isNe ? 'तपाईंको सत्र समाप्त भएको छ। कृपया पुनः लग-इन गर्नुहोस्।' : 'Your session has expired. Please sign in again.';
       alertBox.style.display = 'flex';
     } else if (msg === 'logged_out') {
-      UI.showToast('You have been signed out safely.', 'info');
+      UI.showToast(isNe ? 'तपाईं सुरक्षित रूपमा लग-आउट हुनुभएको छ।' : 'You have been signed out safely.', 'info');
     } else if (msg === 'registered') {
-      UI.showToast('Account created successfully! Please sign in with your credentials.', 'success');
+      UI.showToast(isNe ? 'नागरिक खाता सफलतापूर्वक तयार भयो! कृपया आफ्नो विवरणबाट लग-इन गर्नुहोस्।' : 'Account created successfully! Please sign in with your credentials.', 'success');
     }
 
     // If user is already logged in, redirect them to their portal
@@ -146,24 +149,26 @@
     const alertBox = document.getElementById('login-alert');
     const submitBtn = document.getElementById('login-submit-btn');
     const btnText = document.getElementById('login-btn-text');
+    const isNe = (typeof I18n !== 'undefined' && I18n.currentLang === 'ne');
 
     alertBox.style.display = 'none';
     const email = emailInput.value.trim();
     const password = passwordInput.value;
 
     if (!email || !password) {
-      alertBox.textContent = 'Please enter both your email address and password.';
+      alertBox.textContent = isNe ? 'कृपया आफ्नो इमेल/प्रयोगकर्ता नाम र पासवर्ड दुबै प्रविष्ट गर्नुहोस्।' : 'Please enter both your email address and password.';
       alertBox.style.display = 'flex';
       return;
     }
 
     // Button loading state
     submitBtn.disabled = true;
-    btnText.textContent = 'Signing in...';
+    btnText.textContent = isNe ? 'प्रवेश हुँदैछ...' : 'Signing in...';
 
     try {
       const res = await Auth.login(email, password);
-      UI.showToast(`Welcome back, ${res.name || 'Citizen'}!`, 'success');
+      const welcomeName = res.name || (isNe ? 'नागरिक' : 'Citizen');
+      UI.showToast(isNe ? `स्वागत छ, ${welcomeName}!` : `Welcome back, ${welcomeName}!`, 'success');
 
       // Check next param
       const urlParams = new URLSearchParams(window.location.search);
@@ -186,10 +191,11 @@
 
     } catch (err) {
       console.error('Login error:', err);
-      alertBox.textContent = err.message || 'Invalid email or password. Please try again.';
+      const errMsg = (typeof I18n !== 'undefined' && I18n.translateError) ? I18n.translateError(err.message) : err.message;
+      alertBox.textContent = errMsg || (isNe ? 'अमान्य इमेल वा पासवर्ड। कृपया पुनः प्रयास गर्नुहोस्।' : 'Invalid email or password. Please try again.');
       alertBox.style.display = 'flex';
       submitBtn.disabled = false;
-      btnText.textContent = 'Sign In to Account';
+      btnText.textContent = isNe ? 'खातामा प्रवेश गर्नुहोस्' : 'Sign In to Account';
     }
   }
 </script>

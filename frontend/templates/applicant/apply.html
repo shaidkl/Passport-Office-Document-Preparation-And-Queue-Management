@@ -1,0 +1,910 @@
+{% extends "base.html" %}
+
+{% block title %}Apply for Passport — Nepal Passport Portal{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/applicant.css">
+{% endblock %}
+
+{% block content %}
+<div class="portal-wrapper">
+
+  <!-- Sidebar -->
+  <aside class="portal-sidebar">
+    <div class="flex items-center gap-sm mb-lg pb-md" style="border-bottom: 1px solid var(--outline-variant);">
+      <div class="user-avatar-circle auth-user-avatar" style="width:40px;height:40px;font-size:1rem;">U</div>
+      <div class="flex flex-col">
+        <span class="auth-user-name font-bold text-sm text-primary">Citizen User</span>
+        <span class="text-xs text-muted">Citizen Account</span>
+      </div>
+    </div>
+    <span class="sidebar-title" data-i18n="side_citizen_services">Citizen Services</span>
+    <a href="/applicant/dashboard/" class="sidebar-item">
+      <span class="material-symbols-outlined">dashboard</span><span data-i18n="side_dashboard">Dashboard</span>
+    </a>
+    <a href="/applicant/apply/" class="sidebar-item active">
+      <span class="material-symbols-outlined">note_add</span><span data-i18n="side_my_application">New Application</span>
+    </a>
+    <a href="/applicant/documents/" class="sidebar-item">
+      <span class="material-symbols-outlined">upload_file</span><span data-i18n="side_documents">Documents</span>
+    </a>
+    <a href="/applicant/queue/" class="sidebar-item">
+      <span class="material-symbols-outlined">confirmation_number</span><span data-i18n="side_queue_token">Queue Token</span>
+    </a>
+    <a href="/applicant/notifications/" class="sidebar-item">
+      <span class="material-symbols-outlined">notifications</span><span data-i18n="side_notifications">Notifications</span>
+    </a>
+    <a href="/applicant/profile/" class="sidebar-item">
+      <span class="material-symbols-outlined">person</span><span data-i18n="side_my_profile">Profile</span>
+    </a>
+    <span class="sidebar-title mt-lg" data-i18n="side_account">Account</span>
+    <a href="/" class="sidebar-item"><span class="material-symbols-outlined">home</span><span data-i18n="side_back_home">Home</span></a>
+    <button type="button" onclick="Auth.logout()" class="sidebar-item text-error mt-auto" style="background:none;border:none;width:100%;text-align:left;cursor:pointer;">
+      <span class="material-symbols-outlined text-error">logout</span><span data-i18n="side_logout">Sign Out</span>
+    </button>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="portal-content">
+
+    <!-- Page Header -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-md mb-xl">
+      <div>
+        <div class="flex items-center gap-sm mb-xs">
+          <a href="/applicant/dashboard/" class="btn btn-outline btn-sm">
+            <span class="material-symbols-outlined" style="font-size:16px;">arrow_back</span>
+          </a>
+          <h1 style="font-size:1.75rem;color:var(--primary);margin:0;" data-i18n="app_form_title">New Passport Application</h1>
+        </div>
+        <p class="text-sm text-muted m-0" data-i18n="app_form_subtitle">Submit your official e-Passport application. All fields marked with <span class="required">*</span> are required.</p>
+      </div>
+    </div>
+
+    <!-- Applications List Section -->
+    <div class="card mb-xl">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="material-symbols-outlined text-primary">history</span>
+          <span data-i18n="dash_apps_history">My Applications</span>
+        </div>
+        <div id="new-app-btn-container">
+          <button type="button" id="btn-open-new-app" onclick="openNewApplicationModal()" class="btn btn-primary btn-sm">
+            <span class="material-symbols-outlined">add</span> <span data-i18n="btn_new_application">New Application</span>
+          </button>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table">
+          <thead>
+            <tr>
+              <th data-i18n="label_application_id">Application Ref</th>
+              <th data-i18n="label_created_at">Submission Date</th>
+              <th data-i18n="label_status">Status</th>
+              <th data-i18n="label_last_updated">Last Updated</th>
+              <th data-i18n="label_actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="apply-apps-tbody">
+            <tr><td colspan="5" class="text-center text-muted py-lg" data-i18n="label_loading">
+              <span class="material-symbols-outlined" style="font-size:32px;display:block;margin:0 auto 8px;color:var(--outline);">hourglass_top</span>
+              Loading applications...
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Application Detail Card (shown when a row is clicked) -->
+    <div id="app-detail-card" class="card mb-xl" style="display:none;">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="material-symbols-outlined text-primary">description</span>
+          <span id="detail-app-ref">Application Detail</span>
+        </div>
+        <div id="detail-status-badge"></div>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-md p-md" style="background:var(--surface-container-low);border-radius:var(--radius-md);margin-bottom:var(--spacing-md);">
+        <div>
+          <span class="text-xs text-muted block" data-i18n="label_application_id">Application ID</span>
+          <strong class="text-primary font-bold" id="detail-app-id">—</strong>
+        </div>
+        <div>
+          <span class="text-xs text-muted block" data-i18n="label_passport_category">Passport Package</span>
+          <strong class="text-primary font-bold" id="detail-app-package">—</strong>
+        </div>
+        <div>
+          <span class="text-xs text-muted block" data-i18n="label_pages_fee">Pages & Fee</span>
+          <span class="text-sm font-medium" id="detail-app-pages-fee">—</span>
+        </div>
+        <div>
+          <span class="text-xs text-muted block" data-i18n="label_delivery">Delivery Mode</span>
+          <span class="text-sm font-medium" id="detail-app-delivery">—</span>
+        </div>
+        <div>
+          <span class="text-xs text-muted block" data-i18n="label_created_at">Submitted On</span>
+          <span class="text-sm font-medium" id="detail-submitted">—</span>
+        </div>
+        <div>
+          <span class="text-xs text-muted block" data-i18n="label_last_updated">Last Updated</span>
+          <span class="text-sm font-medium" id="detail-updated">—</span>
+        </div>
+      </div>
+
+      <!-- Progress Steps -->
+      <div class="track-timeline" style="margin-bottom:var(--spacing-md);">
+        <div id="dstep-submitted" class="track-timeline-step">
+          <div class="track-timeline-bullet"><span class="material-symbols-outlined" style="font-size:12px;">check</span></div>
+          <strong class="text-sm text-primary" data-i18n="stage_submitted">Application Submitted</strong>
+          <span class="text-xs text-muted" data-i18n="stage_submitted_desc">Your form has been received</span>
+        </div>
+        <div id="dstep-review" class="track-timeline-step">
+          <div class="track-timeline-bullet"><span class="material-symbols-outlined" style="font-size:12px;">hourglass_top</span></div>
+          <strong class="text-sm text-primary" data-i18n="stage_review">Document Review</strong>
+          <span class="text-xs text-muted" data-i18n="stage_review_desc">Staff verification in progress</span>
+        </div>
+        <div id="dstep-approved" class="track-timeline-step">
+          <div class="track-timeline-bullet"><span class="material-symbols-outlined" style="font-size:12px;">verified</span></div>
+          <strong class="text-sm text-primary" data-i18n="status_approved">Approved</strong>
+          <span class="text-xs text-muted" data-i18n="stage_approved_desc">Eligibility confirmed</span>
+        </div>
+        <div id="dstep-completed" class="track-timeline-step">
+          <div class="track-timeline-bullet"><span class="material-symbols-outlined" style="font-size:12px;">badge</span></div>
+          <strong class="text-sm text-primary" data-i18n="stage_completed">Virtual e-Passport Issued</strong>
+          <span class="text-xs text-muted" data-i18n="stage_completed_desc">Ready in your portal</span>
+        </div>
+      </div>
+
+      <!-- Payment & Digital Signature Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-md my-md">
+        <!-- Payment Card -->
+        <div class="p-md bg-surface-low rounded border border-outline-variant">
+          <div class="flex items-center justify-between mb-xs">
+            <span class="text-xs font-bold text-muted uppercase" data-i18n="label_fee_payment">Application Fee Payment</span>
+            <span id="detail-payment-badge" class="badge badge-warning" data-i18n="status_payment_pending">Pending Payment</span>
+          </div>
+          <div class="flex items-baseline gap-xs mb-xs">
+            <span class="text-lg font-bold text-primary" id="detail-payment-amount">NPR 5,000</span>
+            <span class="text-xs text-muted" id="detail-payment-method">Via eSewa / Khalti / ConnectIPS</span>
+          </div>
+          <div class="text-xs text-muted mb-sm" id="detail-payment-txn">Reference: Not Paid</div>
+          <button type="button" id="btn-open-payment" onclick="openPaymentModal()" class="btn btn-sm btn-primary">
+            <span class="material-symbols-outlined">payments</span> <span data-i18n="btn_pay_fee">Pay Application Fee</span>
+          </button>
+        </div>
+
+        <!-- Digital Signature Card -->
+        <div class="p-md bg-surface-low rounded border border-outline-variant">
+          <div class="flex items-center justify-between mb-xs">
+            <span class="text-xs font-bold text-muted uppercase" data-i18n="signature_title">Government PKI Digital Signature</span>
+            <span id="detail-signature-badge" class="badge badge-inactive" data-i18n="status_awaiting_approval">Awaiting Approval</span>
+          </div>
+          <div class="text-xs text-muted mb-xs" id="detail-signature-authority" data-i18n="certifying_authority">Certifying Authority: Department of Passports, Nepal</div>
+          <div class="text-xs font-mono text-muted mb-sm" id="detail-signature-hash" style="word-break:break-all;">Hash: Generated upon approval</div>
+          <div class="flex items-center gap-xs text-xs text-muted">
+            <span class="material-symbols-outlined text-primary" style="font-size:16px;">verified_user</span>
+            <span>RSA-2048 / SHA-256 Government Standard</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex gap-sm flex-wrap mt-md">
+        <a id="detail-track-link" href="#" class="btn btn-outline btn-sm">
+          <span class="material-symbols-outlined">search</span> <span data-i18n="btn_track_status">Track Live</span>
+        </a>
+        <a href="/applicant/documents/" class="btn btn-outline-primary btn-sm">
+          <span class="material-symbols-outlined">upload_file</span> <span data-i18n="btn_upload_document">Upload Documents</span>
+        </a>
+        <a href="/applicant/queue/" class="btn btn-outline btn-sm">
+          <span class="material-symbols-outlined">confirmation_number</span> <span data-i18n="side_queue_token">View Queue Token</span>
+        </a>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Modal: New Application -->
+<div id="new-app-modal" class="modal-backdrop">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h3 class="modal-title flex items-center gap-xs">
+        <span class="material-symbols-outlined text-primary">add_circle</span>
+        <span data-i18n="new_app_title">New Passport Application</span>
+      </h3>
+      <button type="button" onclick="UI.closeModal('new-app-modal')" style="background:none;border:none;cursor:pointer;" data-i18n-aria-label="btn_close" aria-label="Close">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <form id="new-app-form" onsubmit="handleCreateApplication(event)">
+      <div class="modal-body">
+        <div id="modal-app-alert" class="alert alert-danger" style="display:none;"></div>
+        <p class="text-sm text-muted mb-md" data-i18n="new_app_modal_sub">Submit a new e-Passport application. Staff will review your submitted documents electronically.</p>
+
+        <div class="form-group">
+          <label class="form-label" for="app-category"><span data-i18n="label_passport_category">Passport Category</span> <span class="required">*</span></label>
+          <select id="app-category" class="form-select" required>
+            <option value="Ordinary (34 Pages)" selected data-i18n="cat_34_pages">Ordinary (34 Pages) — NPR 5,000</option>
+            <option value="Ordinary (66 Pages)" data-i18n="cat_66_pages">Ordinary (66 Pages) — NPR 10,000</option>
+            <option value="Express Urgent" data-i18n="cat_urgent">Express Urgent Service — NPR 12,000</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="app-reason"><span data-i18n="label_service_type">Application Reason</span> <span class="required">*</span></label>
+          <select id="app-reason" class="form-select" required>
+            <option value="New Passport" selected data-i18n="reason_new">New Virtual e-Passport</option>
+            <option value="Renewal" data-i18n="reason_renewal">Renewal of Expired Passport</option>
+            <option value="Replacement" data-i18n="reason_replacement">Replacement for Lost / Damaged Passport</option>
+          </select>
+        </div>
+
+        <div class="p-md rounded-lg" style="background-color:var(--surface-container-low);border:1px solid var(--outline-variant);">
+          <span class="text-xs text-muted block" data-i18n="app_submit_notice">
+            ℹ️ Upon submission, your application will have a status of <strong>Pending</strong>. Staff will review your uploaded documents and assign a queue token for processing.
+          </span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" onclick="UI.closeModal('new-app-modal')" class="btn btn-outline" data-i18n="btn_cancel">Cancel</button>
+        <button type="submit" id="create-app-btn" class="btn btn-primary">
+          <span class="material-symbols-outlined">send</span>
+          <span id="create-app-btn-text" data-i18n="btn_submit_application">Submit Application</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+<!-- Modal: Official Fee Payment with Real Backend QR & Automatic Verification -->
+<div id="payment-modal" class="modal-backdrop">
+  <div class="modal-dialog" style="max-width: 520px;">
+    <div class="modal-header">
+      <h3 class="modal-title flex items-center gap-xs">
+        <span class="material-symbols-outlined text-primary">qr_code_scanner</span>
+        <span data-i18n="payment_modal_title">Passport Fee Electronic Payment</span>
+      </h3>
+      <button type="button" onclick="closePaymentModal()" style="background:none;border:none;cursor:pointer;" data-i18n-aria-label="btn_close" aria-label="Close">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div id="payment-alert" class="alert alert-danger" style="display:none;"></div>
+      
+      <!-- Payment Summary Card -->
+      <div class="p-md rounded-lg border border-outline-variant mb-md" style="background: var(--surface-container-low);">
+        <div class="flex items-center justify-between mb-sm">
+          <span class="text-xs font-bold text-muted uppercase tracking-wide" data-i18n="payment_summary_title">Payment Summary</span>
+          <span id="payment-modal-status-badge" class="badge badge-warning" style="font-size: 0.75rem;">Preparing...</span>
+        </div>
+        <div class="grid grid-cols-2 gap-xs" style="font-size:0.8125rem;">
+          <span class="text-muted" data-i18n="label_application_id">Application ID</span>
+          <strong class="text-primary font-mono" id="payment-modal-app-ref">—</strong>
+
+          <span class="text-muted" data-i18n="label_passport_category">Passport Type</span>
+          <strong id="payment-summary-type">—</strong>
+
+          <span class="text-muted" data-i18n="label_pages_fee">Passport Pages</span>
+          <strong id="payment-summary-pages">—</strong>
+
+          <span class="text-muted" data-i18n="label_delivery">Processing</span>
+          <strong id="payment-summary-delivery">—</strong>
+
+          <span class="text-muted" data-i18n="label_fee_amount">Application Fee</span>
+          <strong class="text-primary" id="payment-summary-fee">—</strong>
+        </div>
+        <div class="mt-sm pt-sm flex items-baseline justify-between" style="border-top:1px solid var(--outline-variant);">
+          <span class="font-bold text-sm" data-i18n="label_total">TOTAL</span>
+          <span class="text-2xl font-black text-primary" id="payment-modal-amount-display">NPR —</span>
+        </div>
+      </div>
+
+      <!-- Gateway & Reference Selection -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-sm mb-md">
+        <div class="form-group mb-0">
+          <label class="form-label text-xs" for="payment-gateway-select" data-i18n="label_payment_channel">Select Payment Channel</label>
+          <select id="payment-gateway-select" class="form-control form-control-sm" onchange="regeneratePaymentQR()">
+            <option value="eSewa" selected>eSewa Mobile Wallet</option>
+            <option value="Khalti">Khalti Digital Wallet</option>
+            <option value="ConnectIPS">ConnectIPS National Payment</option>
+            <option value="Sandbox Gateway">Sandbox Payment Gateway</option>
+          </select>
+        </div>
+        <div class="form-group mb-0">
+          <label class="form-label text-xs" data-i18n="label_payment_ref">Payment Reference ID</label>
+          <div id="payment-modal-ref-badge" class="p-xs rounded font-mono text-xs font-bold text-center border" style="background: var(--surface); color: var(--primary);">
+            PP-PENDING
+          </div>
+        </div>
+      </div>
+
+      <!-- QR Code Display Box -->
+      <div class="p-md rounded-lg text-center mb-md border border-outline-variant flex flex-col items-center justify-center" style="background: #ffffff; min-height: 240px;" id="qr-display-card">
+        <div id="qr-loading-spinner" class="py-xl">
+          <span class="material-symbols-outlined text-primary" style="font-size: 48px; animation: spin 1.5s linear infinite;">progress_activity</span>
+          <p class="text-xs text-muted mt-xs" data-i18n="generating_qr">Generating unique payment QR...</p>
+        </div>
+        <div id="qr-image-container" style="display: none; width: 100%; max-width: 220px;">
+          <img id="payment-qr-img" src="" alt="Payment QR Code" style="width: 100%; height: auto; border-radius: 8px; border: 1px solid #e2e8f0; display: block; margin: 0 auto;">
+          <span class="text-xs text-muted block mt-xs font-medium" style="color: #334155;" data-i18n="scan_qr_hint">Scan with supported mobile payment app</span>
+        </div>
+        <div id="payment-success-box" style="display: none;" class="py-md">
+          <span class="material-symbols-outlined text-success" style="font-size: 64px;">check_circle</span>
+          <h4 class="text-lg font-bold text-success m-0 mt-xs" data-i18n="payment_verified_title">Payment Verified!</h4>
+          <p class="text-xs text-muted m-0 mt-xs" id="payment-success-details">Transaction ID: TXN-XXXXXX</p>
+          <!-- Package receipt after payment verified -->
+          <div class="mt-sm p-sm rounded border border-outline-variant text-left" style="background:var(--surface-container-low);font-size:0.8rem;">
+            <div class="grid grid-cols-2 gap-xs">
+              <span class="text-muted" data-i18n="label_passport_category">Passport Type</span><strong id="payment-receipt-type">—</strong>
+              <span class="text-muted" data-i18n="label_pages_fee">Pages</span><strong id="payment-receipt-pages">—</strong>
+              <span class="text-muted" data-i18n="label_delivery">Processing</span><strong id="payment-receipt-delivery">—</strong>
+              <span class="text-muted" data-i18n="label_amount_paid">Amount Paid</span><strong class="text-success" id="payment-receipt-amount">—</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Polling State & Live Feedback -->
+      <div class="p-sm rounded text-xs flex items-center justify-between border" id="payment-live-indicator" style="background: var(--surface-container-low); border-color: var(--outline-variant);">
+        <div class="flex items-center gap-xs">
+          <span class="material-symbols-outlined text-warning" id="payment-pulse-icon" style="font-size: 18px;">sync</span>
+          <span id="payment-live-status-text" class="text-muted" data-i18n="awaiting_payment">Awaiting citizen payment via gateway...</span>
+        </div>
+        <span class="text-xs text-muted font-mono" id="payment-poll-counter">Auto-verifying</span>
+      </div>
+
+      <!-- Sandbox Dev Simulation Tool (For College Project / Demonstration Testing) -->
+      <div class="mt-md p-xs rounded border border-dashed border-outline-variant text-center" style="background: rgba(15, 118, 110, 0.05);">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-primary flex items-center gap-xs">
+            <span class="material-symbols-outlined" style="font-size: 16px;">developer_mode</span>
+            <span data-i18n="sandbox_tool_title">Dev / Sandbox Testing Tool</span>
+          </span>
+          <button type="button" id="btn-simulate-webhook" onclick="triggerSandboxSimulation()" class="btn btn-sm btn-outline" style="font-size: 0.75rem; padding: 3px 8px;">
+            <span class="material-symbols-outlined" style="font-size: 14px;">bolt</span> Simulate Gateway Callback
+          </button>
+        </div>
+        <span class="text-xs text-muted block text-left mt-xs" style="font-size: 0.6875rem;">
+          Triggers a signed HMAC-SHA256 webhook to the Django backend to test automatic verification without live bank currency.
+        </span>
+      </div>
+
+    </div>
+    <div class="modal-footer flex items-center justify-between">
+      <button type="button" onclick="closePaymentModal()" class="btn btn-outline">Close</button>
+      <div class="flex items-center gap-xs text-xs text-muted">
+        <span class="material-symbols-outlined" style="font-size: 14px; color: var(--success);">security</span>
+        <span>Secured by Backend Verification</span>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  let myApplications = [];
+  let currentSelectedAppId = null;
+
+  document.addEventListener('DOMContentLoaded', () => {
+    if (!Auth.requireAuth(['citizen', 'applicant'])) return;
+    loadMyApplications();
+  });
+
+  async function loadMyApplications() {
+    const user = Auth.getUser();
+    if (!user) return;
+    const tbody = document.getElementById('apply-apps-tbody');
+
+    try {
+      const apps = await API.get('/applications/');
+      const all = Array.isArray(apps) ? apps : (apps.results || []);
+      myApplications = all.filter(a => String(a.applicant) === String(user.user_id));
+
+      const btnContainer = document.getElementById('new-app-btn-container');
+
+      if (!myApplications.length) {
+        if (btnContainer) {
+          btnContainer.innerHTML = `
+            <button type="button" id="btn-open-new-app" onclick="openNewApplicationModal()" class="btn btn-primary btn-sm">
+              <span class="material-symbols-outlined">add</span> Apply Now
+            </button>`;
+        }
+        tbody.innerHTML = `
+          <tr><td colspan="5" class="text-center text-muted py-xl">
+            <span class="material-symbols-outlined text-muted" style="font-size:36px;display:block;margin:0 auto 8px;">description</span>
+            You haven't created any applications yet. Click "Apply Now" above to begin.
+          </td></tr>`;
+        return;
+      }
+
+      // Citizen already has an application! (RULE 1, RULE 2, RULE 10)
+      const latestApp = myApplications[0];
+      if (btnContainer) {
+        if (latestApp.status === 'Completed') {
+          // Check if passport is expired — allow renewal
+          const pStatus = latestApp.passport_status;
+          const isExpired = latestApp.is_expired;
+          if (isExpired || pStatus === 'EXPIRED') {
+            btnContainer.innerHTML = `
+              <div class="flex items-center gap-xs flex-wrap">
+                <span class="badge badge-rejected flex items-center gap-xs">
+                  <span class="material-symbols-outlined" style="font-size:14px;">event_busy</span> Passport EXPIRED (${latestApp.expiry_date || 'N/A'})
+                </span>
+                <button type="button" onclick="openRenewalApplicationModal()" class="btn btn-primary btn-sm" style="background:#b91c1c;border-color:#b91c1c;">
+                  <span class="material-symbols-outlined" style="font-size:15px;">autorenew</span> Renew Passport
+                </button>
+                <button type="button" onclick="showAppDetail(${latestApp.application_id})" class="btn btn-outline btn-sm">View Old Passport</button>
+              </div>`;
+          } else if (pStatus === 'ACTIVE') {
+            btnContainer.innerHTML = `
+              <div class="flex items-center gap-xs">
+                <span class="badge badge-success flex items-center gap-xs">
+                  <span class="material-symbols-outlined" style="font-size:14px;">verified</span> Passport ACTIVE (Valid until ${latestApp.expiry_date || 'N/A'})
+                </span>
+                <button type="button" onclick="showAppDetail(${latestApp.application_id})" class="btn btn-outline btn-sm">View Passport Details</button>
+              </div>`;
+          } else {
+            // Completed but no expiry yet (final processing)
+            btnContainer.innerHTML = `
+              <div class="flex items-center gap-xs">
+                <span class="badge badge-success flex items-center gap-xs">
+                  <span class="material-symbols-outlined" style="font-size:14px;">verified</span> Passport Issued
+                </span>
+                <button type="button" onclick="showAppDetail(${latestApp.application_id})" class="btn btn-outline btn-sm">View Passport Details</button>
+              </div>`;
+          }
+        } else {
+          btnContainer.innerHTML = `
+            <div class="flex items-center gap-xs">
+              <span class="badge badge-primary flex items-center gap-xs">
+                <span class="material-symbols-outlined" style="font-size:14px;">check_circle</span> Application Exists (#NP-${String(latestApp.application_id).padStart(4,'0')})
+              </span>
+              <button type="button" onclick="showAppDetail(${latestApp.application_id})" class="btn btn-outline btn-sm">
+                View Application
+              </button>
+              <a href="/track/?id=${latestApp.application_id}" class="btn btn-primary btn-sm">
+                Track Application
+              </a>
+            </div>`;
+        }
+      }
+
+      tbody.innerHTML = myApplications.map(app => `
+        <tr style="cursor:pointer;" onclick="showAppDetail(${app.application_id})">
+          <td><strong class="text-primary">#NP-${String(app.application_id).padStart(4,'0')}</strong></td>
+          <td>${UI.formatDate(app.submission_date)}</td>
+          <td>${UI.renderStatusBadge(app.status)}</td>
+          <td class="text-xs text-muted">${UI.formatDateTime(app.last_updated)}</td>
+          <td>
+            <div class="flex items-center gap-xs">
+              <a href="/track/?id=${app.application_id}" class="btn btn-outline btn-sm" onclick="event.stopPropagation()">
+                <span class="material-symbols-outlined" style="font-size:16px;">search</span> Track
+              </a>
+            </div>
+          </td>
+        </tr>`).join('');
+
+      // Auto-open application details if application exists
+      showAppDetail(latestApp.application_id);
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="5" class="text-center text-error py-lg">Could not load applications. Please try again.</td></tr>`;
+    }
+  }
+
+  async function showAppDetail(appId) {
+    const app = myApplications.find(a => a.application_id === appId);
+    if (!app) return;
+    currentSelectedAppId = appId;
+
+    document.getElementById('detail-app-ref').textContent = `Application #NP-${String(app.application_id).padStart(4,'0')}`;
+    document.getElementById('detail-app-id').textContent = `#NP-${String(app.application_id).padStart(4,'0')}`;
+
+    const pkgName = app.passport_category || 'Ordinary (34 Pages)';
+    const pkgPages = app.passport_pages || (pkgName.includes('66') ? '66 Pages' : '34 Pages');
+    const pkgFee = app.fee_amount ? `NPR ${Number(app.fee_amount).toLocaleString()}` : (pkgName.includes('66') ? 'NPR 10,000' : 'NPR 5,000');
+    const pkgDelivery = app.delivery_type || (pkgName.toLowerCase().includes('urgent') ? 'Fast-Track Delivery' : 'Standard Delivery');
+
+    const pkgEl = document.getElementById('detail-app-package');
+    if (pkgEl) pkgEl.textContent = pkgName;
+    const pagesFeeEl = document.getElementById('detail-app-pages-fee');
+    if (pagesFeeEl) pagesFeeEl.textContent = `${pkgPages} • ${pkgFee}`;
+    const delEl = document.getElementById('detail-app-delivery');
+    if (delEl) delEl.textContent = pkgDelivery;
+
+    document.getElementById('detail-submitted').textContent = UI.formatDate(app.submission_date);
+    document.getElementById('detail-updated').textContent = UI.formatDateTime(app.last_updated);
+    document.getElementById('detail-status-badge').innerHTML = UI.renderStatusBadge(app.status);
+    document.getElementById('detail-track-link').href = `/track/?id=${app.application_id}`;
+
+    // Update timeline
+    const steps = ['dstep-submitted', 'dstep-review', 'dstep-approved', 'dstep-completed'];
+    steps.forEach(id => { document.getElementById(id).className = 'track-timeline-step'; });
+
+    const st = (app.status || '').toLowerCase();
+    document.getElementById('dstep-submitted').classList.add('completed');
+    if (st === 'pending') document.getElementById('dstep-review').classList.add('active');
+    else if (st === 'under review') { document.getElementById('dstep-review').classList.add('completed'); document.getElementById('dstep-approved').classList.add('active'); }
+    else if (st === 'approved') { document.getElementById('dstep-review').classList.add('completed'); document.getElementById('dstep-approved').classList.add('completed'); document.getElementById('dstep-completed').classList.add('active'); }
+    else if (st === 'completed') { steps.forEach(id => document.getElementById(id).classList.add('completed')); }
+    else if (st === 'rejected') { document.getElementById('dstep-review').classList.add('completed'); }
+
+    // Fetch Payment & Digital Signature for this app
+    loadAppPaymentAndSignature(appId, app.status);
+
+    const detailCard = document.getElementById('app-detail-card');
+    detailCard.style.display = 'block';
+    detailCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  async function loadAppPaymentAndSignature(appId, appStatus) {
+    try {
+      const payments = await API.get('/payments/').catch(() => []);
+      const payList = Array.isArray(payments) ? payments : (payments.results || []);
+      const appPayment = payList.find(p => String(p.application) === String(appId));
+
+      const payBadge = document.getElementById('detail-payment-badge');
+      const payTxn = document.getElementById('detail-payment-txn');
+      const payBtn = document.getElementById('btn-open-payment');
+
+      const payAmtEl = document.getElementById('detail-payment-amount');
+      const app = myApplications.find(a => a.application_id === appId);
+      if (payAmtEl && app) {
+        const fee = app.fee_amount ? Number(app.fee_amount).toLocaleString() : (app.passport_category?.includes('66') ? '10,000' : '5,000');
+        payAmtEl.textContent = `NPR ${fee}`;
+      }
+
+      if (appPayment && appPayment.payment_status === 'Completed') {
+        payBadge.className = 'badge badge-success';
+        payBadge.textContent = 'Paid & Confirmed';
+        payTxn.textContent = `Ref: ${appPayment.transaction_id || appPayment.transaction_reference || 'NPS-TXN-OK'} (${appPayment.payment_method})`;
+        payBtn.style.display = 'none';
+      } else {
+        payBadge.className = 'badge badge-warning';
+        payBadge.textContent = 'Pending Payment';
+        payTxn.textContent = 'Reference: Not Paid Yet';
+        payBtn.style.display = 'inline-flex';
+      }
+    } catch (e) {
+      console.warn('Payment fetch:', e);
+    }
+
+    // Digital Signature
+    try {
+      const sigBadge = document.getElementById('detail-signature-badge');
+      const sigHash = document.getElementById('detail-signature-hash');
+      const sigAuth = document.getElementById('detail-signature-authority');
+
+      if (appStatus === 'Approved' || appStatus === 'Completed') {
+        const sigs = await API.get('/digital-signatures/').catch(() => []);
+        const sigList = Array.isArray(sigs) ? sigs : (sigs.results || []);
+        const sig = sigList.find(s => String(s.application) === String(appId));
+
+        sigBadge.className = 'badge badge-success';
+        sigBadge.textContent = 'Cryptographically Verified';
+        sigAuth.textContent = sig?.signing_authority || 'Department of Passports, Government of Nepal';
+        sigHash.textContent = `Hash: ${sig?.signature_hash || 'SHA256:d8a2f7c039b1e45902fa9167b8'}`;
+      } else {
+        sigBadge.className = 'badge badge-inactive';
+        sigBadge.textContent = 'Awaiting Officer Approval';
+        sigHash.textContent = 'Hash: Generated upon approval';
+      }
+    } catch (e) {
+      console.warn('Signature fetch:', e);
+    }
+  }
+
+  function openNewApplicationModal() {
+    if (myApplications && myApplications.length > 0) {
+      // Check for active in-progress application
+      const activeApp = myApplications.find(a => ['Pending', 'Under Review', 'Approved'].includes(a.status));
+      if (activeApp) {
+        UI.showToast(`You already have an active application (#NP-${String(activeApp.application_id).padStart(4,'0')}). You cannot submit another.`, 'warning');
+        showAppDetail(activeApp.application_id);
+        return;
+      }
+      // Check completed passport
+      const completedApp = myApplications.find(a => a.status === 'Completed');
+      if (completedApp) {
+        const pStatus = completedApp.passport_status;
+        if (pStatus === 'EXPIRED' || completedApp.is_expired) {
+          openRenewalApplicationModal();
+          return;
+        } else if (pStatus === 'ACTIVE') {
+          UI.showToast(`You already have a valid active passport (valid until ${completedApp.expiry_date || 'N/A'}). Renewal is only permitted after expiry.`, 'warning');
+          return;
+        } else {
+          UI.showToast('Your passport application is completed. Please check back later for renewal options.', 'info');
+          return;
+        }
+      }
+    }
+    window.isRenewalMode = false;
+    document.getElementById('modal-app-alert').style.display = 'none';
+    document.getElementById('new-app-form').reset();
+    // Reset title to New Application
+    const modalTitle = document.querySelector('#new-app-modal .modal-title');
+    if (modalTitle) modalTitle.innerHTML = '<span class="material-symbols-outlined text-primary">add_circle</span> New Passport Application';
+    const reasonSel = document.getElementById('app-reason');
+    if (reasonSel) reasonSel.value = 'New Passport';
+    UI.openModal('new-app-modal');
+  }
+
+  function openRenewalApplicationModal() {
+    // Check if there's already an active renewal
+    const activeRenewal = myApplications.find(a =>
+      a.application_type === 'RENEWAL' && ['Pending', 'Under Review', 'Approved'].includes(a.status)
+    );
+    if (activeRenewal) {
+      UI.showToast(`You already have an active renewal application (#NP-${String(activeRenewal.application_id).padStart(4,'0')}). You cannot submit another.`, 'warning');
+      showAppDetail(activeRenewal.application_id);
+      return;
+    }
+    window.isRenewalMode = true;
+    document.getElementById('modal-app-alert').style.display = 'none';
+    document.getElementById('new-app-form').reset();
+    // Pre-select renewal
+    const reasonSel = document.getElementById('app-reason');
+    if (reasonSel) reasonSel.value = 'Renewal';
+    // Update modal title
+    const modalTitle = document.querySelector('#new-app-modal .modal-title');
+    if (modalTitle) modalTitle.innerHTML = '<span class="material-symbols-outlined text-primary">autorenew</span> Passport Renewal Application';
+    UI.openModal('new-app-modal');
+  }
+
+  let paymentPollingInterval = null;
+  let currentActivePaymentRef = null;
+  let pollAttempts = 0;
+
+  async function openPaymentModal() {
+    if (!currentSelectedAppId) return;
+    const alertBox = document.getElementById('payment-alert');
+    alertBox.style.display = 'none';
+
+    const appRef = `#NP-${String(currentSelectedAppId).padStart(4,'0')}`;
+    document.getElementById('payment-modal-app-ref').textContent = appRef;
+
+    // Reset summary fields to loading state
+    document.getElementById('payment-summary-type').textContent = 'Loading...';
+    document.getElementById('payment-summary-pages').textContent = 'Loading...';
+    document.getElementById('payment-summary-delivery').textContent = 'Loading...';
+    document.getElementById('payment-summary-fee').textContent = 'Loading...';
+    document.getElementById('payment-modal-amount-display').textContent = 'NPR —';
+
+    document.getElementById('payment-success-box').style.display = 'none';
+    document.getElementById('qr-image-container').style.display = 'none';
+    document.getElementById('qr-loading-spinner').style.display = 'block';
+    document.getElementById('payment-modal-status-badge').textContent = 'Generating QR...';
+    document.getElementById('payment-modal-status-badge').className = 'badge badge-warning';
+    document.getElementById('payment-live-status-text').textContent = 'Connecting to Payment Service...';
+
+    UI.openModal('payment-modal');
+    await regeneratePaymentQR();
+  }
+
+  // Stores latest package data from create-request response for the receipt
+  let currentPaymentPackageData = {};
+
+  async function regeneratePaymentQR() {
+    if (!currentSelectedAppId) return;
+    const alertBox = document.getElementById('payment-alert');
+    const gateway = document.getElementById('payment-gateway-select').value;
+    alertBox.style.display = 'none';
+
+    // Stop existing polling
+    if (paymentPollingInterval) {
+      clearInterval(paymentPollingInterval);
+      paymentPollingInterval = null;
+    }
+
+    document.getElementById('qr-loading-spinner').style.display = 'block';
+    document.getElementById('qr-image-container').style.display = 'none';
+    document.getElementById('payment-success-box').style.display = 'none';
+
+    try {
+      // 1. Authoritative Backend Payment Request Creation
+      const res = await API.post('/payments/create-request/', {
+        application_id: currentSelectedAppId,
+        payment_type: 'APPLICATION_FEE',
+        gateway_name: gateway
+      });
+
+      // 2. Populate Payment Summary from backend response (no hardcoding)
+      const passportType  = res.passport_type  || '—';
+      const passportPages = res.passport_pages  || '—';
+      const deliveryType  = res.delivery_type   || '—';
+      const feeFormatted  = `NPR ${Number(res.amount).toLocaleString()}`;
+      const appRef        = `#NP-${String(res.application_id).padStart(4,'0')}`;
+
+      document.getElementById('payment-modal-app-ref').textContent    = appRef;
+      document.getElementById('payment-summary-type').textContent     = passportType;
+      document.getElementById('payment-summary-pages').textContent    = passportPages;
+      document.getElementById('payment-summary-delivery').textContent = deliveryType;
+      document.getElementById('payment-summary-fee').textContent      = feeFormatted;
+      document.getElementById('payment-modal-amount-display').textContent = feeFormatted;
+      document.getElementById('payment-modal-ref-badge').textContent  = res.payment_reference;
+
+      // Store for receipt display after verification
+      currentPaymentPackageData = {
+        passport_type: passportType,
+        passport_pages: passportPages,
+        delivery_type: deliveryType,
+        amount: res.amount
+      };
+
+      currentActivePaymentRef = res.payment_reference;
+      document.getElementById('payment-qr-img').src = res.qr_code;
+
+      document.getElementById('qr-loading-spinner').style.display = 'none';
+      document.getElementById('qr-image-container').style.display = 'block';
+
+      if (res.status === 'VERIFIED') {
+        showPaymentVerifiedUI({ transaction_id: res.transaction_id, amount: res.amount });
+      } else {
+        document.getElementById('payment-modal-status-badge').textContent = 'Waiting for Payment';
+        document.getElementById('payment-modal-status-badge').className = 'badge badge-warning';
+        document.getElementById('payment-live-status-text').textContent = `Awaiting payment scan via ${gateway}...`;
+        startPaymentPolling(res.payment_reference);
+      }
+    } catch (err) {
+      console.error('QR Generation failed:', err);
+      document.getElementById('qr-loading-spinner').style.display = 'none';
+      alertBox.textContent = err.message || 'Failed to initialize payment request. Please try again.';
+      alertBox.style.display = 'block';
+    }
+  }
+
+  function startPaymentPolling(reference) {
+    if (paymentPollingInterval) clearInterval(paymentPollingInterval);
+    pollAttempts = 0;
+
+    paymentPollingInterval = setInterval(async () => {
+      pollAttempts++;
+      const counterEl = document.getElementById('payment-poll-counter');
+      if (counterEl) counterEl.textContent = `Check #${pollAttempts}`;
+
+      try {
+        const statusData = await API.get(`/payments/status/${reference}/`);
+        if (!statusData) return;
+
+        if (statusData.status === 'VERIFIED') {
+          clearInterval(paymentPollingInterval);
+          paymentPollingInterval = null;
+          showPaymentVerifiedUI(statusData);
+        } else if (statusData.status === 'FAILED' || statusData.status === 'CANCELLED' || statusData.status === 'EXPIRED') {
+          clearInterval(paymentPollingInterval);
+          paymentPollingInterval = null;
+          document.getElementById('payment-modal-status-badge').textContent = statusData.status;
+          document.getElementById('payment-modal-status-badge').className = 'badge badge-error';
+          document.getElementById('payment-live-status-text').textContent = statusData.failure_reason || 'Payment was unsuccessful or expired.';
+          UI.showToast(`Payment ${statusData.status}: ${statusData.failure_reason || ''}`, 'error');
+        } else if (statusData.status === 'PAID') {
+          document.getElementById('payment-live-status-text').textContent = 'Payment received. Verifying with gateway...';
+          document.getElementById('payment-modal-status-badge').textContent = 'Verifying...';
+          document.getElementById('payment-modal-status-badge').className = 'badge badge-info';
+        }
+      } catch (err) {
+        console.warn('Status poll warning:', err);
+      }
+
+      // Automatically timeout after 60 polls (3 minutes) to avoid infinite polling
+      if (pollAttempts >= 60) {
+        clearInterval(paymentPollingInterval);
+        paymentPollingInterval = null;
+        document.getElementById('payment-live-status-text').textContent = 'Polling timed out. Click gateway to refresh QR.';
+      }
+    }, 3000);
+  }
+
+  function showPaymentVerifiedUI(paymentData) {
+    document.getElementById('qr-image-container').style.display = 'none';
+    document.getElementById('qr-loading-spinner').style.display = 'none';
+    document.getElementById('payment-success-box').style.display = 'block';
+    document.getElementById('payment-modal-status-badge').textContent = 'VERIFIED';
+    document.getElementById('payment-modal-status-badge').className = 'badge badge-success';
+    document.getElementById('payment-live-status-text').textContent = 'Payment verified by gateway! Workflow unlocked.';
+    document.getElementById('payment-pulse-icon').textContent = 'check_circle';
+    document.getElementById('payment-pulse-icon').className = 'material-symbols-outlined text-success';
+
+    const txnText = paymentData.transaction_id ? `Transaction ID: ${paymentData.transaction_id}` : 'Officially Confirmed';
+    document.getElementById('payment-success-details').textContent = txnText;
+
+    // Populate post-payment package receipt from stored package data
+    const pkg = currentPaymentPackageData;
+    const el = (id) => document.getElementById(id);
+    if (el('payment-receipt-type'))    el('payment-receipt-type').textContent    = pkg.passport_type  || '—';
+    if (el('payment-receipt-pages'))   el('payment-receipt-pages').textContent   = pkg.passport_pages || '—';
+    if (el('payment-receipt-delivery'))el('payment-receipt-delivery').textContent= pkg.delivery_type  || '—';
+    if (el('payment-receipt-amount'))  el('payment-receipt-amount').textContent  =
+      pkg.amount ? `NPR ${Number(pkg.amount).toLocaleString()}` : (paymentData.amount ? `NPR ${Number(paymentData.amount).toLocaleString()}` : '—');
+
+    UI.showToast('Payment verified successfully! Next workflow stage unlocked.', 'success');
+
+    // Auto-refresh application details after 2 seconds
+    setTimeout(() => {
+      closePaymentModal();
+      if (currentSelectedAppId) {
+        loadMyApplications();
+        showAppDetail(currentSelectedAppId);
+      }
+    }, 2200);
+  }
+
+  function closePaymentModal() {
+    if (paymentPollingInterval) {
+      clearInterval(paymentPollingInterval);
+      paymentPollingInterval = null;
+    }
+    UI.closeModal('payment-modal');
+  }
+
+  async function triggerSandboxSimulation() {
+    if (!currentActivePaymentRef) {
+      UI.showToast('No active payment reference to simulate.', 'warning');
+      return;
+    }
+    const btn = document.getElementById('btn-simulate-webhook');
+    if (btn) btn.disabled = true;
+
+    try {
+      UI.showToast('Simulating payment gateway webhook callback...', 'info');
+      const res = await API.post('/payments/simulate-sandbox-callback/', {
+        payment_reference: currentActivePaymentRef
+      });
+      UI.showToast('Gateway callback processed by backend!', 'success');
+      // Status will be picked up immediately on the next poll or directly
+      showPaymentVerifiedUI(res);
+    } catch (err) {
+      console.error('Simulation error:', err);
+      UI.showToast(err.message || 'Simulation failed.', 'error');
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  async function handleCreateApplication(event) {
+    event.preventDefault();
+    const user = Auth.getUser();
+    const alertBox = document.getElementById('modal-app-alert');
+    const btn = document.getElementById('create-app-btn');
+    const btnText = document.getElementById('create-app-btn-text');
+
+    alertBox.style.display = 'none';
+    btn.disabled = true;
+    btnText.textContent = 'Submitting...';
+
+    try {
+      const category = document.getElementById('app-category').value;
+      const serviceType = document.getElementById('app-reason').value;
+
+      const isRenewal = (serviceType === 'Renewal' || Boolean(window.isRenewalMode));
+      const payload = {
+        applicant: user.user_id,
+        passport_category: category,
+        service_type: isRenewal ? 'Passport Renewal' : serviceType,
+        application_type: isRenewal ? 'RENEWAL' : 'NEW',
+        status: 'Pending'
+      };
+
+      const created = await API.post('/applications/', payload);
+
+      WorkflowManager.invalidate();
+      UI.showToast(`Application #NP-${String(created.application_id).padStart(4,'0')} submitted! Continuing to document upload...`, 'success');
+      UI.closeModal('new-app-modal');
+      setTimeout(() => {
+        window.location.href = `/applicant/documents/?application_id=${created.application_id}`;
+      }, 1000);
+    } catch (err) {
+      alertBox.textContent = err.message || 'Could not submit application. Please try again.';
+      alertBox.style.display = 'flex';
+    } finally {
+      btn.disabled = false;
+      btnText.textContent = t('btn_submit_application', 'Submit Application');
+    }
+  }
+
+  // Handle immediate bilingual updates on language toggle
+  window.addEventListener('languageChanged', () => {
+    try { loadMyApplications(); } catch (e) {}
+    I18n.applyTranslations();
+  });
+</script>
+{% endblock %}

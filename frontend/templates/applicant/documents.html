@@ -1,0 +1,607 @@
+{% extends "base.html" %}
+
+{% block title %}Document Upload — Nepal Passport Portal{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/applicant.css">
+<style>
+  .doc-upload-zone {
+    border: 2px dashed var(--outline-variant);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-xl);
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background-color 0.2s;
+    background-color: var(--surface-container-low);
+  }
+  .doc-upload-zone:hover, .doc-upload-zone.dragover {
+    border-color: var(--primary);
+    background-color: var(--primary-container);
+  }
+  .doc-upload-zone input[type="file"] { display: none; }
+  .doc-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--outline-variant);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    margin-bottom: var(--spacing-xs);
+  }
+  .doc-item:hover { background: var(--surface-container-low); }
+  .doc-icon { width: 40px; height: 40px; border-radius: var(--radius-sm); background: var(--primary-container); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="portal-wrapper">
+
+  <!-- Sidebar -->
+  <aside class="portal-sidebar">
+    <div class="flex items-center gap-sm mb-lg pb-md" style="border-bottom: 1px solid var(--outline-variant);">
+      <div class="user-avatar-circle auth-user-avatar" style="width:40px;height:40px;font-size:1rem;">U</div>
+      <div class="flex flex-col">
+        <span class="auth-user-name font-bold text-sm text-primary">Citizen User</span>
+        <span class="text-xs text-muted">Citizen Account</span>
+      </div>
+    </div>
+    <span class="sidebar-title" data-i18n="side_citizen_services">Citizen Services</span>
+    <a href="/applicant/dashboard/" class="sidebar-item"><span class="material-symbols-outlined">dashboard</span><span data-i18n="side_dashboard">Dashboard</span></a>
+    <a href="/applicant/apply/" class="sidebar-item"><span class="material-symbols-outlined">note_add</span><span data-i18n="side_my_application">My Applications</span></a>
+    <a href="/applicant/documents/" class="sidebar-item active"><span class="material-symbols-outlined">upload_file</span><span data-i18n="side_documents">Documents</span></a>
+    <a href="/applicant/queue/" class="sidebar-item"><span class="material-symbols-outlined">confirmation_number</span><span data-i18n="side_queue_token">Queue Token</span></a>
+    <a href="/applicant/notifications/" class="sidebar-item"><span class="material-symbols-outlined">notifications</span><span data-i18n="side_notifications">Notifications</span></a>
+    <a href="/applicant/profile/" class="sidebar-item"><span class="material-symbols-outlined">person</span><span data-i18n="side_my_profile">Profile</span></a>
+    <span class="sidebar-title mt-lg" data-i18n="side_account">Account</span>
+    <a href="/" class="sidebar-item"><span class="material-symbols-outlined">home</span><span data-i18n="side_back_home">Home</span></a>
+    <button type="button" onclick="Auth.logout()" class="sidebar-item text-error mt-auto" style="background:none;border:none;width:100%;text-align:left;cursor:pointer;">
+      <span class="material-symbols-outlined text-error">logout</span><span data-i18n="side_logout">Sign Out</span>
+    </button>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="portal-content">
+
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-md mb-xl">
+      <div>
+        <h1 style="font-size:1.75rem;color:var(--primary);margin:0;" data-i18n="docs_page_title">Document Upload &amp; Verification</h1>
+        <p class="text-sm text-muted m-0" data-i18n="docs_page_subtitle">Upload your required documents for passport application review.</p>
+      </div>
+    </div>
+
+    <!-- Application Selector -->
+    <div class="card mb-xl">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="material-symbols-outlined text-primary">assignment</span>
+          <span data-i18n="docs_select_app">Select Application</span>
+        </div>
+      </div>
+      <div class="p-md">
+        <div class="form-group m-0">
+          <label class="form-label" for="doc-app-select" data-i18n="choose_app_to_upload">Choose Application to Upload Documents For</label>
+          <select id="doc-app-select" class="form-select" onchange="onApplicationSelected()">
+            <option value="" data-i18n="select_app_placeholder">— Select an Application —</option>
+          </select>
+        </div>
+        <div id="doc-app-pkg-info" class="mt-md p-md rounded-lg" style="display:none;background:var(--surface-container-low);border:1px solid var(--outline-variant);">
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-md">
+            <div><span class="text-xs text-muted block" data-i18n="label_passport_category">Selected Package</span><strong class="text-primary font-bold text-sm" id="doc-pkg-name">—</strong></div>
+            <div><span class="text-xs text-muted block" data-i18n="label_pages_fee">Passport Pages</span><span class="text-sm font-medium" id="doc-pkg-pages">—</strong></div>
+            <div><span class="text-xs text-muted block" data-i18n="label_fee_amount">Fee Required</span><span class="text-sm font-medium" id="doc-pkg-fee">—</strong></div>
+            <div><span class="text-xs text-muted block" data-i18n="label_delivery">Delivery Mode</span><span class="text-sm font-medium" id="doc-pkg-delivery">—</strong></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Upload Zone (shown when application is selected) -->
+    <div id="upload-section" style="display:none;">
+
+      <!-- ===== PASSPORT PHOTO CARD ===== -->
+      <div class="card mb-xl" id="passport-photo-card" style="border: 2px solid var(--primary); border-left: 6px solid var(--primary);">
+        <div class="card-header" style="background: linear-gradient(135deg, var(--primary-container), var(--surface-container-low));">
+          <div class="card-title">
+            <span class="material-symbols-outlined text-primary">add_a_photo</span>
+            <span><span data-i18n="doc_photo">Passport-Size Photograph</span> <span class="badge badge-rejected" style="font-size:0.7rem;" data-i18n="badge_mandatory">MANDATORY</span></span>
+          </div>
+        </div>
+        <div class="p-lg flex flex-col gap-md">
+          <!-- Photo rejection alert -->
+          <div id="photo-rejection-alert" class="alert" style="display:none; background: rgba(239,68,68,0.08); border: 1px solid #ef4444; color: #dc2626; border-radius: var(--radius-md);">
+            <span class="material-symbols-outlined" style="color:#dc2626;font-size:20px;">cancel</span>
+            <div>
+              <strong>Passport Photo Rejected</strong>
+              <p class="text-xs m-0 mt-xs" id="photo-rejection-reason">Please re-upload meeting requirements.</p>
+            </div>
+          </div>
+
+          <div class="flex flex-col md:flex-row gap-lg items-start">
+            <!-- Photo Preview -->
+            <div class="shrink-0 flex flex-col items-center gap-sm">
+              <div id="photo-preview-frame" style="width: 120px; height: 150px; border: 3px solid var(--outline-variant); border-radius: var(--radius-sm); background: var(--surface-container-low); display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                <span class="material-symbols-outlined text-muted" style="font-size: 52px;">person</span>
+              </div>
+              <span id="photo-status-badge" class="badge badge-pending" style="font-size: 0.7rem;" data-i18n="status_not_uploaded">Not Uploaded</span>
+            </div>
+            <!-- Upload controls -->
+            <div style="flex:1;">
+              <p class="text-sm m-0 mb-sm"><strong data-i18n="label_requirements">Requirements:</strong></p>
+              <ul class="text-xs text-muted" style="margin: 0 0 12px 16px; padding: 0; line-height: 1.8;">
+                <li data-i18n="photo_req_1">White or light-grey plain background</li>
+                <li data-i18n="photo_req_2">Recent photograph (taken within 6 months)</li>
+                <li data-i18n="photo_req_3">Face clearly visible, eyes open, neutral expression</li>
+                <li data-i18n="photo_req_4">Format: JPG or PNG only (PDF not accepted)</li>
+                <li data-i18n="photo_req_5">Maximum file size: 5 MB</li>
+              </ul>
+              <div class="doc-upload-zone" id="photo-upload-zone" onclick="document.getElementById('photo-file-input').click()" ondragover="onDragOver(event, 'photo-upload-zone')" ondragleave="onDragLeave(event, 'photo-upload-zone')" ondrop="onDropPhoto(event)">
+                <input type="file" id="photo-file-input" accept=".jpg,.jpeg,.png" onchange="onPhotoSelected(event)">
+                <span class="material-symbols-outlined text-primary" style="font-size:32px;display:block;margin-bottom:6px;">portrait</span>
+                <p class="text-sm font-semibold text-primary m-0" data-i18n="photo_click_drop">Click to upload photo or drag & drop</p>
+                <p class="text-xs text-muted m-0 mt-xs" data-i18n="photo_format_hint">JPG / PNG only — Max 5 MB</p>
+                <p id="selected-photo-name" class="text-xs font-semibold text-success mt-sm" style="display:none;"></p>
+              </div>
+              <button type="button" id="photo-upload-btn" onclick="handleUploadPhoto()" class="btn btn-primary mt-md" disabled>
+                <span class="material-symbols-outlined">upload</span>
+                <span id="photo-upload-btn-text" data-i18n="btn_upload_photo">Upload Passport Photo</span>
+              </button>
+              <div id="photo-upload-progress" style="display:none; margin-top: 8px;">
+                <div style="background:var(--outline-variant);border-radius:4px;height:6px;overflow:hidden;">
+                  <div id="photo-progress-bar" style="height:100%;width:0%;background:var(--primary);transition:width 0.3s;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Upload Form -->
+      <div class="card mb-xl">
+        <div class="card-header">
+          <div class="card-title">
+            <span class="material-symbols-outlined text-primary">upload_file</span>
+            <span data-i18n="upload_other_docs">Upload Other Documents</span>
+          </div>
+        </div>
+        <div class="p-lg flex flex-col gap-md">
+          <div id="upload-alert" class="alert alert-danger" style="display:none;"></div>
+
+          <div class="form-group">
+            <label class="form-label" for="doc-type"><span data-i18n="label_doc_type">Document Type</span> <span class="required">*</span></label>
+            <select id="doc-type" class="form-select" required>
+              <option value="" data-i18n="docs_select_placeholder">— Select Document Type —</option>
+              <option value="Citizenship Certificate" data-i18n="doc_citizenship">Citizenship Certificate</option>
+              <option value="National ID Card" data-i18n="doc_nid">National ID Card (NID)</option>
+              <option value="Birth Certificate" data-i18n="doc_birth_cert">Birth Certificate</option>
+              <option value="Previous Passport" data-i18n="doc_old_passport">Previous Passport (if renewal)</option>
+              <option value="Supporting Document" data-i18n="doc_other">Supporting Document</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="form-label"><span data-i18n="label_uploaded_file">File</span> <span class="required">*</span></label>
+            <div class="doc-upload-zone" id="upload-zone" onclick="document.getElementById('doc-file-input').click()" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+              <input type="file" id="doc-file-input" accept=".pdf,.jpg,.jpeg,.png" onchange="onFileSelected(event)">
+              <span class="material-symbols-outlined text-primary" style="font-size:40px;display:block;margin-bottom:8px;">cloud_upload</span>
+              <p class="text-sm font-semibold text-primary m-0" data-i18n="docs_drag_drop">Click to select or drag & drop</p>
+              <p class="text-xs text-muted m-0 mt-xs" data-i18n="docs_format_hint">Accepted: PDF, JPG, PNG — Max 5 MB</p>
+              <p id="selected-file-name" class="text-xs font-semibold text-primary mt-sm" style="display:none;"></p>
+            </div>
+          </div>
+
+          <button type="button" id="upload-btn" onclick="handleUploadDocument()" class="btn btn-primary" disabled>
+            <span class="material-symbols-outlined">upload</span>
+            <span id="upload-btn-text" data-i18n="btn_upload_document">Upload Document</span>
+          </button>
+
+          <!-- Progress bar -->
+          <div id="upload-progress-wrap" style="display:none;">
+            <div style="background:var(--outline-variant);border-radius:4px;height:6px;overflow:hidden;">
+              <div id="upload-progress-bar" style="height:100%;width:0%;background:var(--primary);transition:width 0.3s;"></div>
+            </div>
+            <p class="text-xs text-muted mt-xs" id="upload-progress-label">Uploading...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Uploaded Documents List -->
+      <div class="card mb-xl">
+        <div class="card-header">
+          <div class="card-title">
+            <span class="material-symbols-outlined text-primary">folder_open</span>
+            <span data-i18n="docs_uploaded_list">Uploaded Documents</span>
+          </div>
+          <button type="button" onclick="loadDocuments()" class="btn btn-outline btn-sm" title="Refresh" data-i18n-title="btn_refresh">
+            <span class="material-symbols-outlined">refresh</span>
+          </button>
+        </div>
+        <div id="documents-list" class="p-md">
+          <div class="empty-state">
+            <span class="material-symbols-outlined empty-state-icon">description</span>
+            <p class="empty-state-desc" data-i18n="docs_no_docs_yet">No documents uploaded yet.</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Required Documents Info -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="material-symbols-outlined text-primary">checklist</span>
+          <span data-i18n="required_docs_title">Required Documents</span>
+        </div>
+      </div>
+      <div class="p-md flex flex-col gap-sm">
+        <div class="flex items-center gap-sm p-sm rounded-md" style="background:var(--surface-container-low);">
+          <span class="material-symbols-outlined text-primary" style="font-size:20px;">article</span>
+          <div>
+            <strong class="text-sm block" data-i18n="doc_citizenship">Citizenship Certificate</strong>
+            <span class="text-xs text-muted" data-i18n="citizenship_desc">Original or clear scanned copy of Nepali citizenship document</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-sm p-sm rounded-md" style="background:var(--surface-container-low);">
+          <span class="material-symbols-outlined text-primary" style="font-size:20px;">badge</span>
+          <div>
+            <strong class="text-sm block" data-i18n="doc_nid">National ID Card (NID)</strong>
+            <span class="text-xs text-muted" data-i18n="nid_desc">Both sides of the National Identity Card</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-sm p-sm rounded-md" style="background:var(--surface-container-low);">
+          <span class="material-symbols-outlined text-primary" style="font-size:20px;">portrait</span>
+          <div>
+            <strong class="text-sm block" data-i18n="doc_photo">Passport-Size Photograph</strong>
+            <span class="text-xs text-muted" data-i18n="photo_desc">Recent colour photograph with white background</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-sm p-sm rounded-md" style="background:var(--surface-container-low);">
+          <span class="material-symbols-outlined text-muted" style="font-size:20px;">book</span>
+          <div>
+            <strong class="text-sm block" data-i18n="doc_old_passport">Previous Passport</strong>
+            <span class="text-xs text-muted" data-i18n="old_passport_desc">Required only for renewal or replacement of an existing passport</span>
+          </div>
+        </div>
+          <div>
+            <strong class="text-sm block">Previous Passport <span class="text-xs text-muted">(If Renewal)</span></strong>
+            <span class="text-xs text-muted">Data page of your existing/expired passport</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  let selectedFile = null;
+  let selectedApplicationId = null;
+  let myApplicationsList = [];
+
+  let selectedPhotoFile = null;
+
+  async function initDocumentsPage() {
+    if (!Auth.requireAuth(['citizen', 'applicant'])) return;
+    const canAccess = await WorkflowManager.guardPage('documents');
+    if (!canAccess) return;
+    await loadApplicationOptions();
+    // Auto-scroll to photo card if ?photo=1
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('photo') === '1') {
+      setTimeout(() => {
+        const photoCard = document.getElementById('passport-photo-card');
+        if (photoCard) photoCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 800);
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initDocumentsPage);
+  } else {
+    initDocumentsPage();
+  }
+
+  async function loadApplicationOptions() {
+    const user = Auth.getUser();
+    const myId = user ? (user.user_id || user.id || user.applicant_id) : null;
+    const select = document.getElementById('doc-app-select');
+    try {
+      const data = await API.get('/applications/');
+      const all = Array.isArray(data) ? data : (data.results || []);
+      myApplicationsList = all.filter(a => String(a.applicant) === String(myId));
+      if (myApplicationsList.length === 0) {
+        select.innerHTML = '<option value="">No applications found. Please create one first.</option>';
+        return;
+      }
+      select.innerHTML = '<option value="">— Select an Application —</option>' +
+        myApplicationsList.map(a => `<option value="${a.application_id}">#NP-${String(a.application_id).padStart(4,'0')} — ${a.status}</option>`).join('');
+
+      // Auto-select from query parameter or latest application
+      const urlParams = new URLSearchParams(window.location.search);
+      const targetAppId = urlParams.get('application_id');
+      const defaultApp = targetAppId 
+        ? myApplicationsList.find(a => String(a.application_id) === String(targetAppId))
+        : myApplicationsList[myApplicationsList.length - 1];
+
+      if (defaultApp) {
+        select.value = defaultApp.application_id;
+        onApplicationSelected();
+      }
+    } catch (err) {
+      select.innerHTML = '<option value="">Could not load applications.</option>';
+    }
+  }
+
+  function onApplicationSelected() {
+    const val = document.getElementById('doc-app-select').value;
+    const pkgCard = document.getElementById('doc-app-pkg-info');
+    if (!val) {
+      document.getElementById('upload-section').style.display = 'none';
+      if (pkgCard) pkgCard.style.display = 'none';
+      return;
+    }
+    selectedApplicationId = parseInt(val);
+    const selApp = myApplicationsList.find(a => a.application_id === selectedApplicationId);
+    if (selApp && pkgCard) {
+      const pName = selApp.passport_category || 'Ordinary (34 Pages)';
+      const pPages = selApp.passport_pages || (pName.includes('66') ? '66 Pages' : '34 Pages');
+      const pFee = selApp.fee_amount ? `NPR ${Number(selApp.fee_amount).toLocaleString()}` : (pName.includes('66') ? 'NPR 10,000' : 'NPR 5,000');
+      const pDelivery = selApp.delivery_type || (pName.toLowerCase().includes('urgent') ? 'Fast-Track Delivery' : 'Standard Delivery');
+
+      document.getElementById('doc-pkg-name').textContent = pName;
+      document.getElementById('doc-pkg-pages').textContent = pPages;
+      document.getElementById('doc-pkg-fee').textContent = pFee;
+      document.getElementById('doc-pkg-delivery').textContent = pDelivery;
+      pkgCard.style.display = 'block';
+    }
+
+    document.getElementById('upload-section').style.display = 'block';
+    loadDocuments();
+  }
+
+  async function loadDocuments() {
+    if (!selectedApplicationId) return;
+    const container = document.getElementById('documents-list');
+    container.innerHTML = '<p class="text-sm text-muted text-center py-md">Loading documents...</p>';
+    try {
+      const data = await API.get('/documents/');
+      const all = Array.isArray(data) ? data : (data.results || []);
+      const docs = all.filter(d => String(d.application) === String(selectedApplicationId));
+
+      // Handle passport photo display in photo card
+      const photoDoc = docs.find(d => d.document_type === 'Passport Photo');
+      const photoFrame = document.getElementById('photo-preview-frame');
+      const photoBadge = document.getElementById('photo-status-badge');
+      const photoRejAlert = document.getElementById('photo-rejection-alert');
+      if (photoDoc) {
+        if (photoDoc.file_path && photoFrame) {
+          photoFrame.innerHTML = `<img src="${photoDoc.file_path}" alt="Passport Photo" style="width:100%;height:100%;object-fit:cover;">`;
+        }
+        if (photoBadge) {
+          photoBadge.textContent = I18n.translateStatus(photoDoc.verification_status);
+          if (photoDoc.verification_status === 'Verified') {
+            photoBadge.className = 'badge badge-approved';
+          } else if (photoDoc.verification_status === 'Rejected') {
+            photoBadge.className = 'badge badge-rejected';
+            if (photoRejAlert) {
+              photoRejAlert.style.display = 'flex';
+              const reasonEl = document.getElementById('photo-rejection-reason');
+              if (reasonEl) reasonEl.textContent = photoDoc.rejection_reason || t('err_photo_rejected', 'Does not meet photo requirements. Please re-upload.');
+            }
+          } else {
+            photoBadge.className = 'badge badge-pending';
+          }
+        }
+      }
+
+      // Non-photo documents list
+      const otherDocs = docs.filter(d => d.document_type !== 'Passport Photo');
+      if (otherDocs.length === 0) {
+        container.innerHTML = `<div class="empty-state py-md">
+          <span class="material-symbols-outlined empty-state-icon">description</span>
+          <p class="empty-state-desc" data-i18n="empty_no_other_docs">${t('empty_no_other_docs', 'No other documents uploaded yet. Upload Citizenship, NID, etc. above.')}</p>
+        </div>`;
+        return;
+      }
+      container.innerHTML = otherDocs.map(doc => {
+        const isPhoto = doc.document_type === 'Passport Photo';
+        return `
+          <div class="doc-item">
+            <div class="doc-icon">
+              <span class="material-symbols-outlined text-primary" style="font-size:22px;">${isPhoto ? 'portrait' : 'description'}</span>
+            </div>
+            <div style="flex:1;">
+              <strong class="text-sm block">${I18n.translateDocType(doc.document_type)}</strong>
+              <span class="text-xs text-muted">${doc.file_name || 'File uploaded'} • ${UI.formatDate(doc.upload_date)}</span>
+              ${doc.rejection_reason ? `<span class="text-xs text-error block mt-xs">${t('label_reason', 'Reason')}: ${doc.rejection_reason}</span>` : ''}
+            </div>
+            ${UI.renderStatusBadge(doc.verification_status)}
+          </div>`;
+      }).join('');
+    } catch (err) {
+      container.innerHTML = `<p class="text-sm text-error text-center py-md">${t('err_load_docs', 'Could not load documents. Please try again.')}</p>`;
+    }
+  }
+
+  function onFileSelected(e) {
+    const file = e.target.files[0];
+    if (file) validateAndSetFile(file);
+  }
+
+  function onPhotoSelected(e) {
+    const file = e.target.files[0];
+    if (file) validateAndSetPhoto(file);
+  }
+
+  function validateAndSetPhoto(file) {
+    const alertBox = document.getElementById('upload-alert');
+    const allowed = ['image/jpeg', 'image/png', 'image/jpg'];
+    const nameEl = document.getElementById('selected-photo-name');
+    if (!allowed.includes(file.type)) {
+      UI.showToast('Passport photo must be in JPG or PNG format only.', 'error');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      UI.showToast('Passport photo must not exceed 5 MB.', 'error');
+      return;
+    }
+    selectedPhotoFile = file;
+    nameEl.textContent = `✓ ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+    nameEl.style.display = 'block';
+    document.getElementById('photo-upload-btn').disabled = false;
+    // Live preview
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const frame = document.getElementById('photo-preview-frame');
+      if (frame) frame.innerHTML = `<img src="${ev.target.result}" alt="Preview" style="width:100%;height:100%;object-fit:cover;">`;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function onDropPhoto(e) {
+    e.preventDefault();
+    document.getElementById('photo-upload-zone').classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) validateAndSetPhoto(file);
+  }
+
+  async function handleUploadPhoto() {
+    const alertBox = document.getElementById('upload-alert');
+    const btn = document.getElementById('photo-upload-btn');
+    const btnText = document.getElementById('photo-upload-btn-text');
+    const progressEl = document.getElementById('photo-upload-progress');
+    const progressBar = document.getElementById('photo-progress-bar');
+    if (!selectedPhotoFile) { UI.showToast('Please select a photo file.', 'warning'); return; }
+    if (!selectedApplicationId) { UI.showToast('Please select an application first.', 'warning'); return; }
+    btn.disabled = true;
+    btnText.textContent = 'Uploading...';
+    progressEl.style.display = 'block';
+    let prog = 0;
+    const interval = setInterval(() => { prog = Math.min(prog + 12, 90); progressBar.style.width = prog + '%'; }, 120);
+    try {
+      const formData = new FormData();
+      formData.append('application', selectedApplicationId);
+      formData.append('document_type', 'Passport Photo');
+      formData.append('file_name', selectedPhotoFile.name);
+      formData.append('file_path', selectedPhotoFile);
+      await API.upload('/documents/', formData);
+      clearInterval(interval);
+      progressBar.style.width = '100%';
+      UI.showToast('Passport photo uploaded successfully!', 'success');
+      setTimeout(() => { progressEl.style.display = 'none'; progressBar.style.width = '0'; }, 600);
+      selectedPhotoFile = null;
+      document.getElementById('photo-file-input').value = '';
+      document.getElementById('selected-photo-name').style.display = 'none';
+      btn.disabled = true;
+      btnText.textContent = 'Upload Passport Photo';
+      document.getElementById('photo-status-badge').textContent = 'Pending Review';
+      document.getElementById('photo-status-badge').className = 'badge badge-pending';
+      document.getElementById('photo-rejection-alert').style.display = 'none';
+      WorkflowManager.invalidate();
+      loadDocuments();
+    } catch (err) {
+      clearInterval(interval);
+      progressEl.style.display = 'none';
+      UI.showToast(err.message || 'Photo upload failed.', 'error');
+      btn.disabled = false;
+      btnText.textContent = 'Upload Passport Photo';
+    }
+  }
+
+  function onDragOver(e, zoneId) { e.preventDefault(); document.getElementById(zoneId || 'upload-zone').classList.add('dragover'); }
+  function onDragLeave(e, zoneId) { document.getElementById(zoneId || 'upload-zone').classList.remove('dragover'); }
+  function onDrop(e) {
+    e.preventDefault();
+    document.getElementById('upload-zone').classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) validateAndSetFile(file);
+  }
+
+  function validateAndSetFile(file) {
+    const alertBox = document.getElementById('upload-alert');
+    const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+    if (!allowed.includes(file.type)) {
+      alertBox.textContent = 'Invalid file type. Only PDF, JPG, and PNG are accepted.';
+      alertBox.style.display = 'flex';
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alertBox.textContent = 'File size exceeds 5 MB. Please upload a smaller file.';
+      alertBox.style.display = 'flex';
+      return;
+    }
+    alertBox.style.display = 'none';
+    selectedFile = file;
+    const nameEl = document.getElementById('selected-file-name');
+    nameEl.textContent = `✓ ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+    nameEl.style.display = 'block';
+    document.getElementById('upload-btn').disabled = false;
+  }
+
+  async function handleUploadDocument() {
+    const docType = document.getElementById('doc-type').value;
+    const alertBox = document.getElementById('upload-alert');
+    const btn = document.getElementById('upload-btn');
+    const btnText = document.getElementById('upload-btn-text');
+
+    alertBox.style.display = 'none';
+    if (!docType) { alertBox.textContent = 'Please select a document type.'; alertBox.style.display = 'flex'; return; }
+    if (!selectedFile) { alertBox.textContent = 'Please select a file to upload.'; alertBox.style.display = 'flex'; return; }
+    if (!selectedApplicationId) { alertBox.textContent = 'Please select an application.'; alertBox.style.display = 'flex'; return; }
+
+    btn.disabled = true;
+    btnText.textContent = 'Uploading...';
+
+    const progressWrap = document.getElementById('upload-progress-wrap');
+    const progressBar = document.getElementById('upload-progress-bar');
+    progressWrap.style.display = 'block';
+
+    // Simulate progress
+    let prog = 0;
+    const progInterval = setInterval(() => {
+      prog = Math.min(prog + 10, 90);
+      progressBar.style.width = prog + '%';
+    }, 150);
+
+    try {
+      const formData = new FormData();
+      formData.append('application', selectedApplicationId);
+      formData.append('document_type', docType);
+      formData.append('file_name', selectedFile.name);
+      formData.append('file_path', selectedFile);
+
+      await API.upload('/documents/', formData);
+      clearInterval(progInterval);
+      progressBar.style.width = '100%';
+
+      UI.showToast('Document uploaded successfully!', 'success');
+      setTimeout(() => { progressWrap.style.display = 'none'; progressBar.style.width = '0%'; }, 600);
+
+      // Reset
+      selectedFile = null;
+      document.getElementById('doc-file-input').value = '';
+      document.getElementById('selected-file-name').style.display = 'none';
+      document.getElementById('doc-type').value = '';
+      btn.disabled = true;
+      btnText.textContent = 'Upload Document';
+      loadDocuments();
+    } catch (err) {
+      clearInterval(progInterval);
+      progressWrap.style.display = 'none';
+      alertBox.textContent = err.message || 'Upload failed. Please try again.';
+      alertBox.style.display = 'flex';
+      btn.disabled = false;
+      btnText.textContent = t('btn_upload_document', 'Upload Document');
+    }
+  }
+
+  // Handle immediate language toggle updates
+  window.addEventListener('languageChanged', () => {
+    try { loadDocuments(); } catch(e) {}
+    I18n.applyTranslations();
+  });
+</script>
+{% endblock %}

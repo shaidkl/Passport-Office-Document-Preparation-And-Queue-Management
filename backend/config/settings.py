@@ -150,3 +150,7 @@ MAILERS = {
     },
 }
 
+# Passport Configuration
+PASSPORT_VALIDITY_YEARS = 10
+
+

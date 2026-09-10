@@ -202,3 +202,218 @@
   font-weight: 700;
   letter-spacing: 1px;
 }
+
+/* ==========================================================================
+   WORKFLOW PROGRESS TRACKER
+   ========================================================================== */
+
+.workflow-tracker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: var(--surface);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-xl);
+  margin-bottom: var(--spacing-xl);
+  overflow-x: auto;
+  gap: 0;
+  scrollbar-width: thin;
+}
+
+.wf-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 70px;
+  position: relative;
+  transition: transform 0.2s;
+}
+
+.wf-step:hover { transform: translateY(-2px); }
+
+.wf-step-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  border: 2px solid var(--outline-variant);
+  background: var(--surface-container-low);
+  transition: all 0.3s;
+}
+
+.wf-step-icon .material-symbols-outlined { font-size: 20px; }
+
+.wf-step-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-align: center;
+  color: var(--text-muted);
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+/* Completed */
+.wf-step-completed .wf-step-icon {
+  background: var(--success);
+  border-color: var(--success);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(21, 128, 61, 0.3);
+}
+.wf-step-completed .wf-step-label { color: var(--success); }
+
+/* Current */
+.wf-step-current .wf-step-icon {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  box-shadow: 0 0 0 4px rgba(var(--primary-rgb, 26, 58, 110), 0.15);
+  animation: pulse-ring 2s infinite;
+}
+.wf-step-current .wf-step-label { color: var(--primary); font-weight: 700; }
+
+/* Upcoming / locked */
+.wf-step-upcoming .wf-step-icon {
+  background: var(--surface-container-low);
+  border-color: var(--outline-variant);
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+/* Error */
+.wf-step-error .wf-step-icon {
+  background: var(--error);
+  border-color: var(--error);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(185, 28, 28, 0.3);
+}
+.wf-step-error .wf-step-label { color: var(--error); font-weight: 700; }
+
+/* Connectors between steps */
+.wf-connector {
+  flex: 1;
+  height: 2px;
+  background: var(--outline-variant);
+  min-width: 16px;
+  max-width: 48px;
+  margin-bottom: 22px;
+  transition: background 0.3s;
+}
+.wf-connector-done { background: var(--success); }
+
+@keyframes pulse-ring {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(26, 58, 110, 0.12); }
+  50% { box-shadow: 0 0 0 8px rgba(26, 58, 110, 0.08); }
+}
+
+@media (max-width: 600px) {
+  .workflow-tracker { padding: var(--spacing-sm); }
+  .wf-step { min-width: 52px; }
+  .wf-step-icon { width: 34px; height: 34px; }
+  .wf-step-icon .material-symbols-outlined { font-size: 16px; }
+  .wf-step-label { font-size: 0.55rem; }
+}
+
+/* ==========================================================================
+   NEXT STEP CARD
+   ========================================================================== */
+
+.next-step-card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg) var(--spacing-xl);
+  border-radius: var(--radius-xl);
+  border: 1.5px solid var(--primary);
+  background: linear-gradient(135deg, var(--surface) 0%, var(--surface-container-low) 100%);
+  margin-bottom: var(--spacing-xl);
+  box-shadow: var(--shadow-md);
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow 0.2s;
+}
+.next-step-card:hover { box-shadow: var(--shadow-lg); }
+.next-step-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
+}
+.next-step-card.nsc-error { border-color: var(--error); }
+.next-step-card.nsc-error::before { background: var(--error); }
+.next-step-card.nsc-success { border-color: var(--success); }
+.next-step-card.nsc-success::before { background: var(--success); }
+.next-step-card.nsc-warning { border-color: var(--secondary); }
+.next-step-card.nsc-warning::before { background: var(--secondary); }
+.next-step-card.nsc-secondary { border-color: var(--outline-variant); }
+.next-step-card.nsc-secondary::before { background: var(--outline-variant); }
+
+.nsc-icon-wrap {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-lg);
+  background: var(--primary-container);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.nsc-icon-wrap .material-symbols-outlined { font-size: 28px; color: var(--primary); }
+.nsc-error .nsc-icon-wrap { background: rgba(185, 28, 28, 0.08); }
+.nsc-error .nsc-icon-wrap .material-symbols-outlined { color: var(--error); }
+.nsc-success .nsc-icon-wrap { background: rgba(21, 128, 61, 0.08); }
+.nsc-success .nsc-icon-wrap .material-symbols-outlined { color: var(--success); }
+
+.nsc-body { flex: 1; }
+.nsc-tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--primary);
+  margin-bottom: 4px;
+  display: block;
+}
+.nsc-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 6px;
+}
+.nsc-desc { font-size: 0.875rem; color: var(--text-muted); margin: 0 0 var(--spacing-md); }
+
+.nsc-actions { display: flex; gap: var(--spacing-sm); flex-wrap: wrap; align-items: center; }
+
+/* QR panel inside Next Step card */
+.nsc-qr-panel {
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: flex-start;
+  margin-top: var(--spacing-sm);
+}
+
+/* Upload panel */
+.wf-upload-panel {
+  border: 2px dashed var(--outline-variant);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-xl);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  background: var(--surface-container-low);
+}
+.wf-upload-panel:hover, .wf-upload-panel.dragover {
+  border-color: var(--primary);
+  background: var(--primary-container);
+}
+.wf-upload-panel input[type="file"] { display: none; }

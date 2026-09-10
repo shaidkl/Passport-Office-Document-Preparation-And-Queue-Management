@@ -21,29 +21,48 @@ class Command(BaseCommand):
             email='admin@passport.gov.np',
             defaults={
                 'full_name': 'Chief System Administrator',
+                'username': 'superadmin',
                 'phone': '9800000001',
-                'password': 'adminpassword123'
+                'password': 'adminpassword123',
+                'is_active': True
             }
         )
         if created:
-            self.stdout.write(self.style.SUCCESS("✅ Created Default Admin: admin@passport.gov.np / adminpassword123"))
+            self.stdout.write(self.style.SUCCESS("✅ Created Default Admin: superadmin (admin@passport.gov.np / adminpassword123)"))
         else:
-            self.stdout.write(self.style.SUCCESS("ℹ️ Admin account already exists: admin@passport.gov.np"))
+            if not admin.username:
+                admin.username = 'superadmin'
+            admin.is_active = True
+            admin.save()
+            self.stdout.write(self.style.SUCCESS("ℹ️ Admin account updated/exists: superadmin / admin@passport.gov.np"))
 
         # 2. Staff Officer
         staff, created = Staff.objects.get_or_create(
             email='staff@passport.gov.np',
             defaults={
                 'full_name': 'Officer Ramesh Karki',
+                'username': 'ramesh.staff',
+                'department': 'Verification Desk',
+                'designation': 'Senior Verification Officer',
                 'phone': '9800000002',
                 'password': 'staffpassword123',
-                'status': 'Active'
+                'status': 'Active',
+                'is_active': True
             }
         )
         if created:
-            self.stdout.write(self.style.SUCCESS("✅ Created Default Staff: staff@passport.gov.np / staffpassword123"))
+            self.stdout.write(self.style.SUCCESS("✅ Created Default Staff: ramesh.staff (staff@passport.gov.np / staffpassword123)"))
         else:
-            self.stdout.write(self.style.SUCCESS("ℹ️ Staff account already exists: staff@passport.gov.np"))
+            if not staff.username:
+                staff.username = 'ramesh.staff'
+            if not staff.department:
+                staff.department = 'Verification Desk'
+            if not staff.designation:
+                staff.designation = 'Senior Verification Officer'
+            staff.is_active = True
+            staff.status = 'Active'
+            staff.save()
+            self.stdout.write(self.style.SUCCESS("ℹ️ Staff account updated/exists: ramesh.staff / staff@passport.gov.np"))
 
         # 3. Citizen / Applicant
         citizen, created = Applicant.objects.get_or_create(

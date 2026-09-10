@@ -24,6 +24,7 @@ urlpatterns = [
     # Admin Portal
     path('admin-portal/dashboard/', views.admin_dashboard, name='admin-dashboard'),
     path('admin-portal/applications/', views.admin_applications, name='admin-applications'),
+    path('admin-portal/payments/', views.admin_payments, name='admin-payments'),
     path('admin-portal/staff/', views.admin_staff, name='admin-staff'),
     path('admin-portal/reports/', views.admin_reports, name='admin-reports'),
     path('admin-portal/activity-logs/', views.admin_activity_logs, name='admin-activity-logs'),

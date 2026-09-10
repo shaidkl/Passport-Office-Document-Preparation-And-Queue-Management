@@ -24,18 +24,20 @@ class CustomTokenAuthentication(BaseAuthentication):
     def authenticate(self, request):
 
         auth_header = request.headers.get("Authorization")
+        token = None
 
-        if not auth_header:
+        if auth_header:
+            parts = auth_header.split()
+            if len(parts) != 2 or parts[0].lower() != "bearer":
+                raise AuthenticationFailed(
+                    "Invalid Authorization header. Use Bearer <token>."
+                )
+            token = parts[1]
+        elif 'token' in request.query_params:
+            token = request.query_params.get('token')
+
+        if not token:
             return None
-
-        parts = auth_header.split()
-
-        if len(parts) != 2 or parts[0].lower() != "bearer":
-            raise AuthenticationFailed(
-                "Invalid Authorization header. Use Bearer <token>."
-            )
-
-        token = parts[1]
 
         try:
             auth_token = AuthToken.objects.get(token=token)

@@ -15,8 +15,8 @@
       <div class="stat-icon primary mx-auto" style="margin: 0 auto var(--spacing-sm) auto;">
         <span class="material-symbols-outlined" style="font-size: 28px;">search_check</span>
       </div>
-      <h1 style="font-size: 1.5rem; color: var(--primary); margin: 0;">Live Passport Application Tracking</h1>
-      <p class="text-sm text-muted m-0">Enter your official Application Reference ID or Queue Token number to check your processing status.</p>
+      <h1 style="font-size: 1.5rem; color: var(--primary); margin: 0;" data-i18n="track_page_title">Live Passport Application Tracking</h1>
+      <p class="text-sm text-muted m-0" data-i18n="track_page_desc">Enter your official Application Reference ID or Queue Token number to check your processing status.</p>
     </div>
 
     <!-- Search Form -->
@@ -27,6 +27,7 @@
           id="track-query" 
           class="form-control" 
           placeholder="e.g. 1 or NP-12345" 
+          data-i18n-placeholder="track_input_placeholder"
           style="padding-left: 38px; font-size: 1rem;" 
           required 
           autofocus
@@ -37,7 +38,7 @@
       </div>
       <button type="submit" id="track-btn" class="btn btn-primary btn-lg" style="min-width: 140px;">
         <span class="material-symbols-outlined">search</span>
-        <span id="track-btn-text">Track Status</span>
+        <span id="track-btn-text" data-i18n="btn_track_status">Track Status</span>
       </button>
     </form>
   </div>
@@ -46,12 +47,12 @@
   <div id="track-alert" class="alert alert-danger" style="display: none;"></div>
 
   <!-- Result Container (Hidden until search result) -->
-  <div id="track-result" class="card track-result-card">
+  <div id="track-result" class="card track-result-card" style="display: none;">
     
     <!-- Result Header -->
     <div class="flex flex-wrap items-center justify-between gap-md pb-md mb-lg" style="border-bottom: 1px solid var(--outline-variant);">
       <div>
-        <span class="text-xs text-muted font-bold uppercase tracking-wider block">Application ID</span>
+        <span class="text-xs text-muted font-bold uppercase tracking-wider block" data-i18n="label_application_id">Application ID</span>
         <h2 id="res-app-id" style="color: var(--primary); margin: 0; font-size: 1.5rem;">#NP-0001</h2>
         <span id="res-applicant-name" class="text-sm text-muted font-medium">Applicant: R*** S***</span>
       </div>
@@ -62,7 +63,7 @@
     </div>
 
     <!-- Live Stage Timeline -->
-    <h4 class="text-sm font-bold text-primary mb-sm">Processing Stage Timeline</h4>
+    <h4 class="text-sm font-bold text-primary mb-sm" data-i18n="dash_workflow_tracker">Processing Stage Timeline</h4>
     <div class="track-timeline">
       
       <!-- Stage 1 -->
@@ -70,8 +71,8 @@
         <div class="track-timeline-bullet">
           <span class="material-symbols-outlined" style="font-size: 12px;">check</span>
         </div>
-        <strong class="text-sm text-primary">Application Submitted</strong>
-        <span id="res-submission-date" class="text-xs text-muted">Online form received</span>
+        <strong class="text-sm text-primary" data-i18n="stage_submitted">Application Submitted</strong>
+        <span id="res-submission-date" class="text-xs text-muted" data-i18n="stage_submitted_desc">Online form received</span>
       </div>
 
       <!-- Stage 2 -->
@@ -79,8 +80,8 @@
         <div class="track-timeline-bullet">
           <span class="material-symbols-outlined" style="font-size: 12px;">hourglass_top</span>
         </div>
-        <strong class="text-sm text-primary">Document Review &amp; Biometrics</strong>
-        <span id="res-review-desc" class="text-xs text-muted">Verification against national registry</span>
+        <strong class="text-sm text-primary" data-i18n="stage_review">Document Review &amp; Biometrics</strong>
+        <span id="res-review-desc" class="text-xs text-muted" data-i18n="stage_review_desc">Verification against national registry</span>
       </div>
 
       <!-- Stage 3 -->
@@ -88,8 +89,8 @@
         <div class="track-timeline-bullet">
           <span class="material-symbols-outlined" style="font-size: 12px;">verified</span>
         </div>
-        <strong class="text-sm text-primary">Officer Verification &amp; Approval</strong>
-        <span class="text-xs text-muted">Digital eligibility and security clearance</span>
+        <strong class="text-sm text-primary" data-i18n="stage_approved">Officer Verification &amp; Approval</strong>
+        <span class="text-xs text-muted" data-i18n="stage_approved_desc">Digital eligibility and security clearance</span>
       </div>
 
       <!-- Stage 4 -->
@@ -97,8 +98,8 @@
         <div class="track-timeline-bullet">
           <span class="material-symbols-outlined" style="font-size: 12px;">badge</span>
         </div>
-        <strong class="text-sm text-primary">Virtual e-Passport Issued</strong>
-        <span class="text-xs text-muted">Active and accessible in your Citizen Portal</span>
+        <strong class="text-sm text-primary" data-i18n="stage_completed">Virtual e-Passport Issued</strong>
+        <span class="text-xs text-muted" data-i18n="stage_completed_desc">Active and accessible in your Citizen Portal</span>
       </div>
 
     </div>
@@ -109,7 +110,7 @@
       <!-- Queue Token Box -->
       <div class="p-md rounded-lg" style="background-color: var(--surface-container-low); border: 1px solid var(--outline-variant);">
         <div class="flex items-center justify-between mb-xs">
-          <span class="text-xs font-bold text-muted uppercase">Digital Queue Token</span>
+          <span class="text-xs font-bold text-muted uppercase" data-i18n="label_queue_token">Digital Queue Token</span>
           <span id="res-queue-status-badge"></span>
         </div>
         <div class="flex items-baseline gap-sm">
@@ -120,21 +121,22 @@
 
       <!-- Document Verification Box -->
       <div class="p-md rounded-lg" style="background-color: var(--surface-container-low); border: 1px solid var(--outline-variant);">
-        <span class="text-xs font-bold text-muted uppercase block mb-xs">Uploaded Documents</span>
+        <span class="text-xs font-bold text-muted uppercase block mb-xs" data-i18n="docs_uploaded_list">Uploaded Documents</span>
         <div class="flex items-center justify-between">
           <span class="text-sm font-semibold text-primary" id="res-doc-count">0 of 0 Verified</span>
           <span class="material-symbols-outlined text-success" style="font-size: 22px;">verified_user</span>
         </div>
-        <span class="text-xs text-muted block mt-xs">Scanned Citizenship &amp; NID files</span>
+        <span class="text-xs text-muted block mt-xs" data-i18n="docs_page_subtitle">Scanned Citizenship &amp; NID files</span>
       </div>
 
     </div>
 
     <!-- Actions -->
     <div class="mt-lg pt-md flex items-center justify-between" style="border-top: 1px solid var(--outline-variant);">
-      <span class="text-xs text-muted">Need to modify details or upload missing documents?</span>
+      <span class="text-xs text-muted" data-i18n="cta_desc">Need to modify details or upload missing documents?</span>
       <a href="/login/" class="btn btn-outline-primary btn-sm">
-        <span class="material-symbols-outlined">login</span> Sign In to Portal
+        <span class="material-symbols-outlined">login</span>
+        <span data-i18n="nav_login">Sign In to Portal</span>
       </a>
     </div>
 
@@ -145,6 +147,8 @@
 
 {% block extra_js %}
 <script>
+  let lastTrackData = null;
+
   document.addEventListener('DOMContentLoaded', () => {
     // Check if query was passed via URL (e.g. /track/?id=1 or /track/?query=1)
     const urlParams = new URLSearchParams(window.location.search);
@@ -152,6 +156,12 @@
     if (query) {
       document.getElementById('track-query').value = query;
       performTrack(query);
+    }
+  });
+
+  window.addEventListener('languageChanged', () => {
+    if (lastTrackData) {
+      renderTrackResult(lastTrackData);
     }
   });
 
@@ -168,46 +178,55 @@
     const resultCard = document.getElementById('track-result');
     const trackBtn = document.getElementById('track-btn');
     const btnText = document.getElementById('track-btn-text');
+    const isNe = (typeof I18n !== 'undefined' && I18n.currentLang === 'ne');
 
     alertBox.style.display = 'none';
     resultCard.style.display = 'none';
 
     trackBtn.disabled = true;
-    btnText.textContent = 'Searching...';
+    btnText.textContent = isNe ? 'खोज्दै...' : 'Searching...';
 
     try {
       const data = await API.get('/track/', { query });
+      lastTrackData = data;
       renderTrackResult(data);
     } catch (err) {
-      alertBox.textContent = err.message || `No application record found for "${query}". Please check your ID and try again.`;
+      alertBox.textContent = (typeof I18n !== 'undefined' && I18n.translateError)
+        ? I18n.translateError(err.message)
+        : (err.message || (isNe ? `"${query}" को लागि कुनै आवेदन फेला परेन। कृपया पुनः प्रयास गर्नुहोस्।` : `No application record found for "${query}". Please check your ID and try again.`));
       alertBox.style.display = 'flex';
     } finally {
       trackBtn.disabled = false;
-      btnText.textContent = 'Track Status';
+      btnText.textContent = isNe ? 'आवेदन स्थिति हेर्नुहोस्' : 'Track Status';
     }
   }
 
   function renderTrackResult(data) {
     const resultCard = document.getElementById('track-result');
+    const isNe = (typeof I18n !== 'undefined' && I18n.currentLang === 'ne');
     
     document.getElementById('res-app-id').textContent = `#NP-${String(data.application_id).padStart(4, '0')}`;
-    document.getElementById('res-applicant-name').textContent = `Applicant: ${data.applicant_name}`;
+    document.getElementById('res-applicant-name').textContent = `${isNe ? 'आवेदक' : 'Applicant'}: ${data.applicant_name}`;
     document.getElementById('res-status-badge').innerHTML = UI.renderStatusBadge(data.status);
-    document.getElementById('res-last-updated').textContent = `Updated: ${UI.formatDateTime(data.last_updated)}`;
-    document.getElementById('res-submission-date').textContent = `Submitted on ${UI.formatDate(data.submission_date)}`;
+    document.getElementById('res-last-updated').textContent = `${isNe ? 'अद्यावधिक' : 'Updated'}: ${UI.formatDateTime(data.last_updated)}`;
+    document.getElementById('res-submission-date').textContent = `${isNe ? 'दर्ता मिति' : 'Submitted on'}: ${UI.formatDate(data.submission_date)}`;
 
     // Documents
-    document.getElementById('res-doc-count').textContent = `${data.documents_verified || 0} of ${data.documents_count || 0} Verified`;
+    document.getElementById('res-doc-count').textContent = isNe
+      ? `${data.documents_verified || 0} / ${data.documents_count || 0} प्रमाणित`
+      : `${data.documents_verified || 0} of ${data.documents_count || 0} Verified`;
 
     // Queue Token
     if (data.queue_token) {
       document.getElementById('res-token-number').textContent = `T-${data.queue_token.token_number}`;
       document.getElementById('res-queue-status-badge').innerHTML = UI.renderStatusBadge(data.queue_token.queue_status);
-      document.getElementById('res-token-slot').textContent = data.queue_token.time_slot ? `Slot: ${data.queue_token.time_slot}` : 'Time Slot: Standard';
+      document.getElementById('res-token-slot').textContent = data.queue_token.time_slot 
+        ? `${isNe ? 'समय' : 'Slot'}: ${data.queue_token.time_slot}` 
+        : (isNe ? 'समय: नियमित' : 'Time Slot: Standard');
     } else {
-      document.getElementById('res-token-number').textContent = 'Pending';
-      document.getElementById('res-queue-status-badge').innerHTML = '<span class="badge badge-inactive">Not Issued</span>';
-      document.getElementById('res-token-slot').textContent = 'Token assigned upon document review';
+      document.getElementById('res-token-number').textContent = isNe ? 'लम्बित' : 'Pending';
+      document.getElementById('res-queue-status-badge').innerHTML = `<span class="badge badge-inactive">${isNe ? 'जारी नभएको' : 'Not Issued'}</span>`;
+      document.getElementById('res-token-slot').textContent = isNe ? 'कागजात समीक्षापछि लाम टोकन जारी हुनेछ' : 'Token assigned upon document review';
     }
 
     // Update timeline stages
@@ -239,11 +258,21 @@
       stageCompleted.classList.add('completed');
     } else if (st === 'rejected') {
       stageReview.classList.add('completed');
-      document.getElementById('res-review-desc').textContent = 'Application rejected. Please see portal for details.';
+      document.getElementById('res-review-desc').textContent = isNe ? 'आवेदन अस्वीकृत भएको छ। थप विवरणको लागि पोर्टल हेर्नुहोस्।' : 'Application rejected. Please see portal for details.';
     }
 
     resultCard.style.display = 'block';
+    if (typeof I18n !== 'undefined' && I18n.applyTranslations) {
+      I18n.applyTranslations(resultCard);
+    }
     resultCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
+
+  window.addEventListener('languageChanged', () => {
+    if (lastTrackData) {
+      renderTrackResult(lastTrackData);
+    }
+    if (typeof I18n !== 'undefined') I18n.applyTranslations();
+  });
 </script>
 {% endblock %}

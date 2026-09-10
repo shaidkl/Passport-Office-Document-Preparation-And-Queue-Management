@@ -14,32 +14,33 @@
     
     <!-- Officer Badge -->
     <div class="flex items-center gap-sm mb-lg pb-md" style="border-bottom: 1px solid var(--outline-variant);">
-      <div class="user-avatar-circle auth-user-avatar" style="width: 40px; height: 40px; font-size: 1rem; background-color: var(--primary);">ST</div>
+      <div class="user-avatar-circle auth-user-avatar" id="staff-avatar" style="width: 40px; height: 40px; font-size: 1rem; background-color: var(--primary);">ST</div>
       <div class="flex flex-col">
-        <span class="auth-user-name font-bold text-sm text-primary">Staff Officer</span>
-        <span class="text-xs counter-active-badge">● Desk Counter 03</span>
+        <span class="auth-user-name font-bold text-sm text-primary" id="staff-officer-name">Staff Officer</span>
+        <span class="text-xs text-muted" id="staff-officer-username">@officer</span>
+        <span class="text-xs counter-active-badge mt-xs" id="staff-officer-role">Verification Desk</span>
       </div>
     </div>
 
     <!-- Navigation Items -->
-    <span class="sidebar-title">Operations</span>
+    <span class="sidebar-title" data-i18n="staff_sidebar_operations">Operations</span>
     <a href="/staff/dashboard/" class="sidebar-item active">
       <span class="material-symbols-outlined">how_to_reg</span>
-      <span>Queue & Verification</span>
+      <span data-i18n="staff_sidebar_queue_verify">Queue & Verification</span>
     </a>
     <a href="#queue-roster" class="sidebar-item">
       <span class="material-symbols-outlined">queue</span>
-      <span>Waiting Roster</span>
+      <span data-i18n="staff_sidebar_waiting_roster">Waiting Roster</span>
     </a>
     
-    <span class="sidebar-title mt-lg">System</span>
+    <span class="sidebar-title mt-lg" data-i18n="side_account">System</span>
     <a href="/" class="sidebar-item">
       <span class="material-symbols-outlined">home</span>
-      <span>Home Portal</span>
+      <span data-i18n="side_back_home">Home Portal</span>
     </a>
     <button type="button" onclick="Auth.logout()" class="sidebar-item text-error mt-auto" style="background: none; border: none; width: 100%; text-align: left; cursor: pointer;">
       <span class="material-symbols-outlined text-error">logout</span>
-      <span>Sign Out</span>
+      <span data-i18n="side_logout">Sign Out</span>
     </button>
   </aside>
 
@@ -50,16 +51,16 @@
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-md mb-xl">
       <div>
         <div class="flex items-center gap-sm">
-          <h1 style="font-size: 1.75rem; color: var(--primary); margin: 0;">Digital Verification &amp; Queue Desk</h1>
-          <span class="counter-active-badge">Desk Active</span>
+          <h1 style="font-size: 1.75rem; color: var(--primary); margin: 0;" data-i18n="staff_desk_title">Digital Verification &amp; Queue Desk</h1>
+          <span class="counter-active-badge" data-i18n="staff_desk_active">Desk Active</span>
         </div>
-        <p class="text-sm text-muted m-0">Review citizen applications, verify uploaded digital documents, and grant instant Virtual e-Passports.</p>
+        <p class="text-sm text-muted m-0" data-i18n="staff_desk_subtitle">Review citizen applications, verify uploaded digital documents, and grant instant Virtual e-Passports.</p>
       </div>
 
       <div class="flex items-center gap-sm">
         <button type="button" onclick="loadStaffWorkspace()" class="btn btn-outline" title="Refresh queue">
           <span class="material-symbols-outlined">sync</span>
-          Sync Queue
+          <span data-i18n="staff_sync_queue">Sync Queue</span>
         </button>
       </div>
     </div>
@@ -71,18 +72,18 @@
       <div class="card queue-caller-card lg:col-span-2">
         <div class="flex flex-wrap items-center justify-between gap-md pb-md mb-md" style="border-bottom: 1px solid var(--outline-variant);">
           <div>
-            <span class="text-xs font-bold text-muted uppercase tracking-wider block">Currently Serving Token</span>
+            <span class="text-xs font-bold text-muted uppercase tracking-wider block" data-i18n="staff_currently_serving">Currently Serving Token</span>
             <div class="flex items-baseline gap-md">
               <span id="current-token-num" class="serving-token-number">--</span>
               <div id="current-token-badge">
-                <span class="badge badge-inactive">No Token Called</span>
+                <span class="badge badge-inactive" data-i18n="staff_no_token_called">No Token Called</span>
               </div>
             </div>
           </div>
           
           <div class="text-right">
             <span id="current-app-ref" class="text-sm font-bold text-primary block">Ref: None</span>
-            <span id="current-app-date" class="text-xs text-muted">Awaiting Next Citizen</span>
+            <span id="current-app-date" class="text-xs text-muted" data-i18n="staff_awaiting_citizen">Awaiting Next Citizen</span>
           </div>
         </div>
 
@@ -90,34 +91,34 @@
         <div class="flex flex-wrap gap-sm pt-sm">
           <button type="button" onclick="handleCallNextToken()" class="btn btn-primary btn-lg" id="btn-call-next">
             <span class="material-symbols-outlined">campaign</span>
-            Call Next Token
+            <span data-i18n="btn_call_next">Call Next Token</span>
           </button>
           
           <button type="button" onclick="handleUpdateTokenStatus('Serving')" class="btn btn-outline-primary" id="btn-serving" disabled>
             <span class="material-symbols-outlined">record_voice_over</span>
-            Mark Serving
+            <span data-i18n="btn_mark_serving">Mark Serving</span>
           </button>
 
           <button type="button" onclick="handleUpdateTokenStatus('Completed')" class="btn btn-success" id="btn-complete" disabled>
             <span class="material-symbols-outlined">task_alt</span>
-            Complete Service
+            <span data-i18n="btn_complete_service">Complete Service</span>
           </button>
 
           <button type="button" onclick="handleUpdateTokenStatus('Skipped')" class="btn btn-danger" id="btn-skip" disabled>
             <span class="material-symbols-outlined">skip_next</span>
-            Skip Token
+            <span data-i18n="btn_skip_token">Skip Token</span>
           </button>
         </div>
       </div>
 
       <!-- Col 3: Today's Desk Metrics -->
-      <div class="flex flex-col gap-md">
+      <div class="grid grid-cols-2 lg:grid-cols-1 gap-md">
         
         <div class="stat-card">
           <div>
-            <span class="stat-label">Citizens In Queue</span>
+            <span class="stat-label" data-i18n="staff_stat_waiting">Citizens In Queue</span>
             <div class="stat-value text-primary" id="stat-waiting-count">0</div>
-            <span class="text-xs text-muted">Awaiting verification</span>
+            <span class="text-xs text-muted" data-i18n="staff_stat_waiting_desc">Awaiting verification</span>
           </div>
           <div class="stat-icon primary">
             <span class="material-symbols-outlined">groups</span>
@@ -126,9 +127,31 @@
 
         <div class="stat-card">
           <div>
-            <span class="stat-label">Completed Today</span>
+            <span class="stat-label" data-i18n="staff_stat_pending_apps">Pending Review</span>
+            <div class="stat-value" id="stat-pending-verifications" style="color: var(--warning);">0</div>
+            <span class="text-xs text-warning" data-i18n="staff_stat_pending_desc">Applications pending</span>
+          </div>
+          <div class="stat-icon warning">
+            <span class="material-symbols-outlined">pending_actions</span>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div>
+            <span class="stat-label" data-i18n="staff_stat_verified">Verified Documents</span>
+            <div class="stat-value text-primary" id="stat-verified-docs">0</div>
+            <span class="text-xs text-muted" data-i18n="staff_stat_verified_desc">Authenticated files</span>
+          </div>
+          <div class="stat-icon primary">
+            <span class="material-symbols-outlined">fact_check</span>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div>
+            <span class="stat-label" data-i18n="staff_stat_served">Completed Today</span>
             <div class="stat-value text-success" id="stat-completed-count">0</div>
-            <span class="text-xs text-success">Processed &amp; Verified</span>
+            <span class="text-xs text-success" data-i18n="staff_stat_served_desc">Processed &amp; Verified</span>
           </div>
           <div class="stat-icon success">
             <span class="material-symbols-outlined">done_all</span>
@@ -144,7 +167,7 @@
       <div class="card-header">
         <div class="card-title">
           <span class="material-symbols-outlined text-primary">list_alt</span>
-          Active Applications &amp; Verification Queue
+          <span data-i18n="staff_active_apps_title">Active Applications &amp; Verification Queue</span>
         </div>
         <span class="text-xs text-muted" id="table-record-count">0 records</span>
       </div>
@@ -153,16 +176,16 @@
         <table class="table">
           <thead>
             <tr>
-              <th>Token / Ref</th>
-              <th>Applicant Details</th>
-              <th>Submission Date</th>
-              <th>Status</th>
-              <th>Verification Action</th>
+              <th data-i18n="staff_col_token_ref">Token / Ref</th>
+              <th data-i18n="staff_col_applicant">Applicant Details</th>
+              <th data-i18n="label_date">Submission Date</th>
+              <th data-i18n="label_status">Status</th>
+              <th data-i18n="label_actions">Verification Action</th>
             </tr>
           </thead>
           <tbody id="staff-queue-table-body">
             <tr>
-              <td colspan="5" class="text-center text-muted py-lg">Loading queue records...</td>
+              <td colspan="5" class="text-center text-muted py-lg" data-i18n="label_loading">Loading queue records...</td>
             </tr>
           </tbody>
         </table>
@@ -171,6 +194,137 @@
 
   </main>
 </div>
+
+<!-- Modal: Application Review & Verification Workspace -->
+<div id="app-workspace-modal" class="modal-backdrop">
+  <div class="modal-dialog" style="max-width: 860px;">
+    <div class="modal-header">
+      <div>
+        <h3 class="modal-title flex items-center gap-xs m-0">
+          <span class="material-symbols-outlined text-primary">fact_check</span>
+          <span data-i18n="staff_modal_title">Application Review &amp; Verification Desk</span>
+        </h3>
+        <span class="text-xs text-muted font-mono" id="modal-app-ref">#NP-0000</span>
+      </div>
+      <button type="button" onclick="UI.closeModal('app-workspace-modal')" style="background:none; border:none; cursor:pointer;">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+
+    <div class="modal-body" style="max-height: 75vh; overflow-y: auto;">
+      <!-- Applicant Overview Grid -->
+      <div class="card mb-md" style="background: var(--surface-container-lowest); border: 1px solid var(--outline-variant);">
+        <div class="card-body">
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-md">
+            <div>
+              <span class="text-xs text-muted block" data-i18n="label_full_name">Applicant Name</span>
+              <strong class="text-sm text-primary block" id="modal-applicant-name">—</strong>
+            </div>
+            <div>
+              <span class="text-xs text-muted block" data-i18n="label_citizenship_no">Citizenship Number</span>
+              <span class="text-sm font-semibold block" id="modal-applicant-citizenship">—</span>
+            </div>
+            <div>
+              <span class="text-xs text-muted block" data-i18n="label_passport_category">Passport Category</span>
+              <span class="text-sm font-medium block" id="modal-app-category">—</span>
+            </div>
+            <div>
+              <span class="text-xs text-muted block" data-i18n="label_status">Application Status</span>
+              <div id="modal-app-status-badge">—</div>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-md mt-sm pt-sm" style="border-top: 1px dashed var(--outline-variant);">
+            <div>
+              <span class="text-xs text-muted block" data-i18n="label_phone">Contact Phone</span>
+              <span class="text-xs font-mono" id="modal-applicant-phone">—</span>
+            </div>
+            <div>
+              <span class="text-xs text-muted block" data-i18n="label_email">Email Address</span>
+              <span class="text-xs" id="modal-applicant-email">—</span>
+            </div>
+            <div>
+              <span class="text-xs text-muted block" data-i18n="label_fee_amount">Fee / Payment Status</span>
+              <span class="text-xs font-bold text-success" id="modal-app-fee">—</span>
+            </div>
+            <div>
+              <span class="text-xs text-muted block" data-i18n="staff_biometrics_match">Biometrics Match</span>
+              <span class="text-xs font-bold" id="modal-app-biometrics">—</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Uploaded Documents Review -->
+      <div class="card mb-md">
+        <div class="card-header py-xs">
+          <div class="card-title text-sm font-bold">
+            <span class="material-symbols-outlined text-primary" style="font-size: 18px;">folder_shared</span>
+            <span data-i18n="staff_uploaded_credentials">Uploaded Verification Credentials</span>
+          </div>
+          <span class="text-xs text-muted" id="modal-doc-count">0 documents</span>
+        </div>
+        <div class="table-responsive">
+          <table class="table">
+            <thead>
+              <tr>
+                <th data-i18n="staff_col_doc_type">Document Type</th>
+                <th data-i18n="staff_col_file">File Document</th>
+                <th data-i18n="label_status">Status</th>
+                <th data-i18n="label_actions">Review Action</th>
+              </tr>
+            </thead>
+            <tbody id="modal-docs-tbody">
+              <tr><td colspan="4" class="text-center text-muted py-md" data-i18n="label_loading">Loading documents...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Biometric Matching Decision -->
+      <div class="card mb-md" style="background: var(--surface-container-low);">
+        <div class="card-body flex flex-wrap items-center justify-between gap-md">
+          <div>
+            <strong class="text-sm block text-primary" data-i18n="staff_biometrics_stage">Stage 6: Digital Biometrics Matching</strong>
+            <p class="text-xs text-muted m-0" data-i18n="staff_biometrics_desc">Validate facial features and fingerprint scans against national identity database.</p>
+          </div>
+          <div class="flex items-center gap-xs">
+            <button type="button" onclick="handleBiometricsAction('Verified')" class="btn btn-outline-success btn-sm">
+              <span class="material-symbols-outlined" style="font-size: 16px;">fingerprint</span>
+              <span data-i18n="staff_bio_verify_btn">Mark Biometrics Verified</span>
+            </button>
+            <button type="button" onclick="handleBiometricsAction('Failed')" class="btn btn-outline-danger btn-sm">
+              <span class="material-symbols-outlined" style="font-size: 16px;">cancel</span>
+              <span data-i18n="staff_bio_fail_btn">Flag Biometrics Failed</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Digital Signature & Final Decision -->
+      <div class="card" style="border: 1px solid var(--primary-container); background: #f8fafc;">
+        <div class="card-body">
+          <strong class="text-sm block text-primary mb-xs" data-i18n="staff_signature_stage">Stage 8 &amp; 9: Government Digital Signature &amp; Issuance</strong>
+          <p class="text-xs text-muted mb-md" data-i18n="staff_signature_desc">Authorizing this step issues an encrypted Government RSA-SHA256 digital certificate and generates the downloadable Virtual e-Passport.</p>
+          <div class="flex flex-wrap items-center justify-between gap-md">
+            <div class="flex items-center gap-xs">
+              <button type="button" onclick="handleAuthorizeSignature()" class="btn btn-success" id="modal-btn-signature">
+                <span class="material-symbols-outlined">verified_user</span>
+                <span data-i18n="staff_authorize_btn">Authorize Digital Signature &amp; Approve</span>
+              </button>
+              <button type="button" onclick="handleModalRejectApp()" class="btn btn-outline-danger" id="modal-btn-reject">
+                <span class="material-symbols-outlined">close</span>
+                <span data-i18n="btn_reject_application">Reject Application</span>
+              </button>
+            </div>
+            <button type="button" onclick="UI.closeModal('app-workspace-modal')" class="btn btn-outline" data-i18n="staff_close_workspace">Close Workspace</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -178,23 +332,64 @@
   let activeToken = null;
   let queueTokensList = [];
   let applicationsList = [];
+  let deskSummaryData = null;
+  let currentModalApp = null;
+  let currentModalDocs = [];
 
   document.addEventListener('DOMContentLoaded', () => {
     // 1. Guard page for Staff / Administrator
     if (!Auth.requireAuth(['staff', 'administrator'])) return;
 
+    populateStaffProfile();
     loadStaffWorkspace();
   });
+
+  // Re-apply translations on language change
+  window.addEventListener('languageChanged', () => {
+    if (typeof I18n !== 'undefined') I18n.applyTranslations();
+    loadStaffWorkspace();
+  });
+
+  function t(key, fallback) {
+    if (typeof I18n !== 'undefined' && I18n.t) return I18n.t(key, fallback);
+    return fallback || key;
+  }
+
+  function populateStaffProfile() {
+    const user = Auth.getUser();
+    if (!user) return;
+    const nameEl = document.getElementById('staff-officer-name');
+    const unameEl = document.getElementById('staff-officer-username');
+    const roleEl = document.getElementById('staff-officer-role');
+    const avatarEl = document.getElementById('staff-avatar');
+
+    if (nameEl && user.full_name) nameEl.textContent = user.full_name;
+    if (unameEl) unameEl.textContent = user.username ? `@${user.username}` : (user.email || '');
+    if (roleEl) {
+      const parts = [user.department, user.designation].filter(Boolean);
+      roleEl.textContent = parts.length ? parts.join(' • ') : 'Active Duty';
+    }
+    if (avatarEl && user.full_name) {
+      avatarEl.textContent = user.full_name.substring(0, 2).toUpperCase();
+    }
+  }
 
   async function loadStaffWorkspace() {
     UI.showLoading('Syncing desk queue...');
 
     try {
-      // 1. Fetch Queue Tokens
+      // 1. Fetch Real-time Desk Summary
+      try {
+        deskSummaryData = await API.get('/staff/desk-summary/');
+      } catch (err) {
+        console.warn('Could not load desk summary:', err);
+      }
+
+      // 2. Fetch Queue Tokens
       const tokens = await API.get('/queue-tokens/');
       queueTokensList = Array.isArray(tokens) ? tokens : (tokens.results || []);
 
-      // 2. Fetch Applications
+      // 3. Fetch Applications
       const apps = await API.get('/applications/');
       applicationsList = Array.isArray(apps) ? apps : (apps.results || []);
 
@@ -210,13 +405,20 @@
   }
 
   function renderQueueDashboard() {
-    const waitingTokens = queueTokensList.filter(t => t.queue_status === 'Waiting');
-    const completedTokens = queueTokensList.filter(t => t.queue_status === 'Completed');
+    if (deskSummaryData) {
+      document.getElementById('stat-waiting-count').textContent = deskSummaryData.queue_waiting ?? 0;
+      document.getElementById('stat-pending-verifications').textContent = deskSummaryData.pending_verifications ?? 0;
+      document.getElementById('stat-verified-docs').textContent = deskSummaryData.verified_documents ?? 0;
+      document.getElementById('stat-completed-count').textContent = deskSummaryData.completed_count ?? 0;
+    } else {
+      const waitingTokens = queueTokensList.filter(t => t.queue_status === 'Waiting');
+      const completedTokens = queueTokensList.filter(t => t.queue_status === 'Completed');
+      document.getElementById('stat-waiting-count').textContent = waitingTokens.length;
+      document.getElementById('stat-completed-count').textContent = completedTokens.length;
+      document.getElementById('stat-pending-verifications').textContent = applicationsList.filter(a => a.status === 'Pending' || a.status === 'Under Review').length;
+    }
+
     const currentCalled = queueTokensList.find(t => t.queue_status === 'Called' || t.queue_status === 'Serving');
-
-    document.getElementById('stat-waiting-count').textContent = waitingTokens.length;
-    document.getElementById('stat-completed-count').textContent = completedTokens.length;
-
     activeToken = currentCalled || null;
 
     const tokenNumEl = document.getElementById('current-token-num');
@@ -268,6 +470,7 @@
     tbody.innerHTML = applicationsList.map(app => {
       const token = queueTokensList.find(t => t.application === app.application_id);
       const tokenText = token ? `T-${token.token_number}` : 'Unassigned';
+      const citizenName = app.applicant_name || `Applicant #${app.applicant}`;
 
       return `
         <tr>
@@ -276,13 +479,16 @@
             <span class="text-xs text-muted font-mono">${tokenText}</span>
           </td>
           <td>
-            <span class="text-sm font-semibold block text-on-surface">Applicant #${app.applicant}</span>
-            <span class="text-xs text-muted">Submitted via Online Portal</span>
+            <span class="text-sm font-semibold block text-on-surface">${citizenName}</span>
+            <span class="text-xs text-muted">${app.applicant_email || 'Citizen Portal Application'}</span>
           </td>
           <td class="text-xs text-muted">${UI.formatDate(app.submission_date)}</td>
           <td>${UI.renderStatusBadge(app.status)}</td>
           <td>
             <div class="flex items-center gap-xs">
+              <button type="button" onclick="openApplicationWorkspaceModal(${app.application_id})" class="btn btn-outline btn-sm" title="Inspect & Review Documents">
+                <span class="material-symbols-outlined" style="font-size: 16px;">visibility</span> Inspect
+              </button>
               <button type="button" onclick="handleApproveApplication(${app.application_id})" class="btn btn-success btn-sm" title="Approve Application">
                 <span class="material-symbols-outlined" style="font-size: 16px;">check</span> Approve
               </button>
@@ -296,44 +502,193 @@
     }).join('');
   }
 
+  async function openApplicationWorkspaceModal(appId) {
+    UI.showLoading('Loading application details & documents...');
+    try {
+      const [app, docs] = await Promise.all([
+        API.get(`/applications/${appId}/`),
+        API.get(`/documents/?application=${appId}`)
+      ]);
+
+      currentModalApp = app;
+      currentModalDocs = Array.isArray(docs) ? docs : (docs.results || []);
+
+      document.getElementById('modal-app-ref').textContent = `#NP-${String(app.application_id).padStart(4, '0')}`;
+      document.getElementById('modal-applicant-name').textContent = app.applicant_name || `Applicant #${app.applicant}`;
+      document.getElementById('modal-applicant-citizenship').textContent = app.citizenship_number || 'Provided';
+      document.getElementById('modal-app-category').textContent = `${app.passport_category || 'Ordinary'} (${app.service_type || 'New'})`;
+      document.getElementById('modal-app-status-badge').innerHTML = UI.renderStatusBadge(app.status);
+      document.getElementById('modal-applicant-phone').textContent = app.applicant_phone || '—';
+      document.getElementById('modal-applicant-email').textContent = app.applicant_email || '—';
+      document.getElementById('modal-app-fee').textContent = `NPR ${app.fee_amount || '5,000'}`;
+      document.getElementById('modal-app-biometrics').textContent = app.biometric_status || 'Pending';
+
+      renderModalDocsTable();
+      UI.openModal('app-workspace-modal');
+    } catch (err) {
+      console.error('Error opening workspace modal:', err);
+      UI.showToast('Could not load application details.', 'error');
+    } finally {
+      UI.hideLoading();
+    }
+  }
+
+  function renderModalDocsTable() {
+    const tbody = document.getElementById('modal-docs-tbody');
+    const countEl = document.getElementById('modal-doc-count');
+
+    if (!currentModalDocs || currentModalDocs.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-md">No uploaded documents found for this application.</td></tr>`;
+      countEl.textContent = '0 documents';
+      return;
+    }
+
+    countEl.textContent = `${currentModalDocs.length} documents uploaded`;
+
+    tbody.innerHTML = currentModalDocs.map(doc => {
+      const statusBadge = doc.verification_status === 'Verified'
+        ? '<span class="badge badge-approved">Verified</span>'
+        : (doc.verification_status === 'Rejected'
+          ? '<span class="badge badge-error">Rejected</span>'
+          : '<span class="badge badge-pending">Pending Review</span>');
+
+      const token = Auth.getToken();
+      const viewUrl = `/api/documents/${doc.document_id}/view-file/${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+      const fileLink = doc.document_id
+        ? `<a href="${viewUrl}" target="_blank" class="text-xs text-primary font-bold flex items-center gap-xs"><span class="material-symbols-outlined" style="font-size:14px;">open_in_new</span> View File</a>`
+        : '<span class="text-xs text-muted">Digital Record</span>';
+
+
+      return `
+        <tr>
+          <td><strong class="text-sm">${doc.document_type}</strong></td>
+          <td>${fileLink}</td>
+          <td>${statusBadge}</td>
+          <td>
+            <div class="flex items-center gap-xs">
+              <button type="button" onclick="handleVerifyDoc(${doc.document_id})" class="btn btn-outline-success btn-xs" title="Verify Document">
+                <span class="material-symbols-outlined" style="font-size:14px;">check</span> Verify
+              </button>
+              <button type="button" onclick="handleRejectDoc(${doc.document_id})" class="btn btn-outline-danger btn-xs" title="Reject Document">
+                <span class="material-symbols-outlined" style="font-size:14px;">close</span> Reject
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  async function handleVerifyDoc(docId) {
+    UI.showLoading('Verifying document...');
+    try {
+      await API.post(`/documents/${docId}/verify-document/`, { remarks: 'Verified by Desk Officer' });
+      UI.showToast('Document verified successfully.', 'success');
+      // Refresh docs in modal
+      if (currentModalApp) {
+        const docs = await API.get(`/documents/?application=${currentModalApp.application_id}`);
+        currentModalDocs = Array.isArray(docs) ? docs : (docs.results || []);
+        renderModalDocsTable();
+      }
+    } catch (err) {
+      console.error('Verify doc error:', err);
+      UI.showToast(err.message || 'Could not verify document.', 'error');
+    } finally {
+      UI.hideLoading();
+    }
+  }
+
+  async function handleRejectDoc(docId) {
+    const reason = prompt('Reason for rejecting this document:');
+    if (!reason) return;
+
+    UI.showLoading('Rejecting document...');
+    try {
+      await API.post(`/documents/${docId}/reject-document/`, { reason: reason });
+      UI.showToast('Document marked as Rejected.', 'info');
+      if (currentModalApp) {
+        const docs = await API.get(`/documents/?application=${currentModalApp.application_id}`);
+        currentModalDocs = Array.isArray(docs) ? docs : (docs.results || []);
+        renderModalDocsTable();
+      }
+    } catch (err) {
+      console.error('Reject doc error:', err);
+      UI.showToast(err.message || 'Could not reject document.', 'error');
+    } finally {
+      UI.hideLoading();
+    }
+  }
+
+  async function handleBiometricsAction(status) {
+    if (!currentModalApp) return;
+    UI.showLoading(`Setting biometrics status to ${status}...`);
+    try {
+      await API.post(`/applications/${currentModalApp.application_id}/verify-biometrics/`, {
+        biometric_status: status
+      });
+      UI.showToast(`Biometric match updated to '${status}'.`, 'success');
+      document.getElementById('modal-app-biometrics').textContent = status;
+      currentModalApp.biometric_status = status;
+    } catch (err) {
+      console.error('Biometrics error:', err);
+      UI.showToast(err.message || 'Could not update biometrics.', 'error');
+    } finally {
+      UI.hideLoading();
+    }
+  }
+
+  async function handleAuthorizeSignature() {
+    if (!currentModalApp) return;
+    UI.showLoading('Issuing Government Digital Signature & Approving Application...');
+    try {
+      const res = await API.post(`/applications/${currentModalApp.application_id}/authorize-signature/`, {});
+      UI.showToast(`Government PKI Digital Signature issued! Application #NP-${String(currentModalApp.application_id).padStart(4, '0')} Approved.`, 'success');
+      UI.closeModal('app-workspace-modal');
+      loadStaffWorkspace();
+    } catch (err) {
+      console.error('Authorize signature error:', err);
+      UI.showToast(err.message || 'Could not authorize digital signature.', 'error');
+    } finally {
+      UI.hideLoading();
+    }
+  }
+
+  async function handleModalRejectApp() {
+    if (!currentModalApp) return;
+    const reason = prompt('Please specify the reason for rejecting this application:');
+    if (!reason) return;
+
+    UI.showLoading('Rejecting application...');
+    try {
+      await API.patch(`/applications/${currentModalApp.application_id}/`, {
+        status: 'Rejected',
+        processing_notes: reason
+      });
+      UI.showToast(`Application #NP-${String(currentModalApp.application_id).padStart(4, '0')} rejected.`, 'info');
+      UI.closeModal('app-workspace-modal');
+      loadStaffWorkspace();
+    } catch (err) {
+      console.error('Rejection error:', err);
+      UI.showToast(err.message || 'Could not reject application.', 'error');
+    } finally {
+      UI.hideLoading();
+    }
+  }
+
   async function handleCallNextToken() {
-    const waitingToken = queueTokensList.find(t => t.queue_status === 'Waiting');
-    
     UI.showLoading('Calling next citizen token...');
 
     try {
-      if (waitingToken) {
-        // Update existing waiting token to 'Called'
-        const updated = await API.patch(`/queue-tokens/${waitingToken.token_id}/`, {
-          queue_status: 'Called',
-          called_time: new Date().toISOString()
-        });
-        UI.showToast(`Token T-${updated.token_number} called to Counter 03!`, 'success');
-      } else if (applicationsList.length > 0) {
-        // Check for an application that has no token and create one
-        const nextApp = applicationsList.find(a => a.status === 'Pending' || a.status === 'Under Review');
-        if (nextApp) {
-          const user = Auth.getUser();
-          const nextNum = (queueTokensList.length + 1) * 10;
-          const newToken = await API.post('/queue-tokens/', {
-            application: nextApp.application_id,
-            staff: user.user_id,
-            token_number: nextNum,
-            queue_status: 'Called',
-            called_time: new Date().toISOString()
-          });
-          UI.showToast(`Called Token T-${newToken.token_number} for Application #${nextApp.application_id}!`, 'success');
-        } else {
-          UI.showToast('No more pending citizens waiting in queue.', 'info');
-        }
+      const res = await API.post('/queue-tokens/call-next/', {});
+      if (res && res.token) {
+        UI.showToast(`Token T-${res.token.token_number} called to Desk Counter!`, 'success');
       } else {
-        UI.showToast('No pending applicants in queue.', 'info');
+        UI.showToast(res.message || 'No pending citizens in waiting queue.', 'info');
       }
-
       loadStaffWorkspace();
     } catch (err) {
       console.error('Call next error:', err);
-      UI.showToast(err.message || 'Could not update token status.', 'error');
+      UI.showToast(err.message || 'Could not call next token.', 'error');
     } finally {
       UI.hideLoading();
     }
@@ -345,16 +700,9 @@
     UI.showLoading(`Updating token status to ${newStatus}...`);
 
     try {
-      await API.patch(`/queue-tokens/${activeToken.token_id}/`, {
+      await API.post(`/queue-tokens/${activeToken.token_id}/update-status/`, {
         queue_status: newStatus
       });
-
-      // If completed, also update application status to 'Approved'
-      if (newStatus === 'Completed' && activeToken.application) {
-        await API.patch(`/applications/${activeToken.application}/`, {
-          status: 'Approved'
-        });
-      }
 
       UI.showToast(`Token T-${activeToken.token_number} marked as ${newStatus}.`, 'success');
       loadStaffWorkspace();
@@ -389,7 +737,8 @@
     UI.showLoading('Rejecting application...');
     try {
       await API.patch(`/applications/${appId}/`, {
-        status: 'Rejected'
+        status: 'Rejected',
+        processing_notes: reason
       });
       UI.showToast(`Application #NP-${String(appId).padStart(4, '0')} rejected.`, 'info');
       loadStaffWorkspace();

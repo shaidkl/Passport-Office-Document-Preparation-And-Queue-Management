@@ -1,0 +1,321 @@
+{% extends "base.html" %}
+
+{% block title %}Staff Queue Management — Nepal Passport Office{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/staff.css">
+<style>
+  .staff-workspace-layout { display: flex; min-height: calc(100vh - var(--header-height) - var(--topbar-height) - 160px); }
+  .staff-sidebar { width: var(--sidebar-width); background: var(--surface); border-right: 1px solid var(--outline-variant); padding: var(--spacing-lg) var(--spacing-md); display: flex; flex-direction: column; gap: var(--spacing-xs); flex-shrink: 0; }
+  @media(max-width:900px){ .staff-sidebar{ display:none; } }
+  .staff-content { flex:1; padding: var(--spacing-xl); background: var(--background); overflow-y:auto; }
+  @media(max-width:600px){ .staff-content{ padding: var(--spacing-md); } }
+  .counter-active-badge { background: #dcfce7; color: #15803d; padding: 2px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; }
+  .serving-token-number { font-size: 4rem; font-weight: 900; color: var(--primary); line-height: 1; letter-spacing: -2px; }
+  .queue-caller-card { background: linear-gradient(135deg, var(--surface) 0%, var(--surface-container-low) 100%); border: 2px solid var(--primary); }
+  .queue-status-column { display: flex; flex-direction: column; gap: var(--spacing-xs); }
+  .queue-lane { border-radius: var(--radius-md); padding: var(--spacing-sm) var(--spacing-md); border: 1px solid var(--outline-variant); }
+  .queue-lane.waiting { background: #fef9c3; border-color: #ca8a04; }
+  .queue-lane.called { background: var(--primary-container); border-color: var(--primary); }
+  .queue-lane.serving { background: #dcfce7; border-color: #15803d; }
+  .queue-lane.completed { background: var(--surface-container-low); border-color: var(--outline-variant); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="staff-workspace-layout">
+
+  <!-- Sidebar -->
+  <aside class="staff-sidebar">
+    <div class="flex items-center gap-sm mb-lg pb-md" style="border-bottom:1px solid var(--outline-variant);">
+      <div class="user-avatar-circle auth-user-avatar" style="width:40px;height:40px;font-size:1rem;background:var(--primary);">ST</div>
+      <div class="flex flex-col">
+        <span class="auth-user-name font-bold text-sm text-primary">Staff Officer</span>
+        <span class="text-xs counter-active-badge">● <span data-i18n="status_active">Active</span></span>
+      </div>
+    </div>
+    <span class="sidebar-title" data-i18n="staff_sidebar_operations">Operations</span>
+    <a href="/staff/dashboard/" class="sidebar-item"><span class="material-symbols-outlined">how_to_reg</span><span data-i18n="staff_dash_title">Verification Desk</span></a>
+    <a href="/staff/queue/" class="sidebar-item active"><span class="material-symbols-outlined">queue</span><span data-i18n="staff_sidebar_queue">Queue Management</span></a>
+    <a href="/staff/verify/" class="sidebar-item"><span class="material-symbols-outlined">fact_check</span><span data-i18n="staff_sidebar_verify">Document Verify</span></a>
+    <span class="sidebar-title mt-lg" data-i18n="side_account">System</span>
+    <a href="/" class="sidebar-item"><span class="material-symbols-outlined">home</span><span data-i18n="side_back_home">Home Portal</span></a>
+    <button type="button" onclick="Auth.logout()" class="sidebar-item text-error mt-auto" style="background:none;border:none;width:100%;text-align:left;cursor:pointer;">
+      <span class="material-symbols-outlined text-error">logout</span><span data-i18n="side_logout">Sign Out</span>
+    </button>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="staff-content">
+
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-md mb-xl">
+      <div>
+        <div class="flex items-center gap-sm">
+          <h1 style="font-size:1.75rem;color:var(--primary);margin:0;" data-i18n="staff_queue_title">Live Queue Management</h1>
+          <span class="counter-active-badge" data-i18n="staff_live_badge">Live</span>
+        </div>
+        <p class="text-sm text-muted m-0" data-i18n="staff_queue_subtitle">Manage and control the physical queue at your counter.</p>
+      </div>
+      <button type="button" onclick="loadQueueManagement()" class="btn btn-outline">
+        <span class="material-symbols-outlined">sync</span> <span data-i18n="staff_sync_queue">Sync Queue</span>
+      </button>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-md mb-xl">
+      <div class="stat-card">
+        <div><span class="stat-label" data-i18n="status_waiting">Waiting</span><div class="stat-value text-primary" id="q-waiting">0</div></div>
+        <div class="stat-icon primary"><span class="material-symbols-outlined">schedule</span></div>
+      </div>
+      <div class="stat-card">
+        <div><span class="stat-label" data-i18n="status_called">Called</span><div class="stat-value" style="color:var(--secondary);" id="q-called">0</div></div>
+        <div class="stat-icon secondary"><span class="material-symbols-outlined">volume_up</span></div>
+      </div>
+      <div class="stat-card">
+        <div><span class="stat-label" data-i18n="status_serving">Serving</span><div class="stat-value text-success" id="q-serving">0</div></div>
+        <div class="stat-icon success"><span class="material-symbols-outlined">person_search</span></div>
+      </div>
+      <div class="stat-card">
+        <div><span class="stat-label" data-i18n="status_completed">Completed</span><div class="stat-value" id="q-completed">0</div></div>
+        <div class="stat-icon primary"><span class="material-symbols-outlined">done_all</span></div>
+      </div>
+    </div>
+
+    <!-- Active Caller Panel -->
+    <div class="card queue-caller-card mb-xl">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="material-symbols-outlined text-primary">campaign</span>
+          <span data-i18n="staff_active_token_title">Currently Active Token</span>
+        </div>
+        <div id="active-token-badge"></div>
+      </div>
+      <div class="flex flex-wrap items-center gap-xl p-md">
+        <div class="text-center">
+          <span class="text-xs text-muted uppercase tracking-wider block mb-xs" data-i18n="label_token_number">Token No.</span>
+          <span class="serving-token-number" id="active-token-num">—</span>
+        </div>
+        <div style="flex:1;">
+          <div class="grid grid-cols-2 gap-md mb-md">
+            <div><span class="text-xs text-muted block" data-i18n="label_application_id">Application</span><strong id="active-app-ref" class="text-primary">—</strong></div>
+            <div><span class="text-xs text-muted block" data-i18n="queue_info_called_at">Called At</span><span id="active-called-time" class="text-sm">—</span></div>
+          </div>
+          <div class="flex flex-wrap gap-sm">
+            <button type="button" id="btn-serving" onclick="setTokenStatus('Serving')" class="btn btn-outline-primary" disabled>
+              <span class="material-symbols-outlined">record_voice_over</span> <span data-i18n="btn_mark_serving">Mark Serving</span>
+            </button>
+            <button type="button" id="btn-complete" onclick="setTokenStatus('Completed')" class="btn btn-success" disabled>
+              <span class="material-symbols-outlined">task_alt</span> <span data-i18n="btn_complete_service">Complete</span>
+            </button>
+            <button type="button" id="btn-skip" onclick="setTokenStatus('Skipped')" class="btn btn-danger" disabled>
+              <span class="material-symbols-outlined">skip_next</span> <span data-i18n="btn_skip_token">Skip</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Call Next + Token Columns -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-xl mb-xl">
+
+      <!-- Call Next Button -->
+      <div class="card text-center p-xl">
+        <span class="material-symbols-outlined" style="font-size:48px;color:var(--primary);display:block;margin-bottom:12px;">campaign</span>
+        <h3 class="text-primary mb-sm" data-i18n="btn_call_next">Call Next Token</h3>
+        <p class="text-sm text-muted mb-lg" data-i18n="queue_attend_note">Call the next citizen in the Waiting queue to your counter.</p>
+        <button type="button" onclick="callNextToken()" class="btn btn-primary btn-lg" style="width:100%;">
+          <span class="material-symbols-outlined">volume_up</span> <span data-i18n="btn_call_next">Call Next</span>
+        </button>
+      </div>
+
+      <!-- Waiting Queue -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title" style="color:#ca8a04;">
+            <span class="material-symbols-outlined">schedule</span> <span data-i18n="status_waiting">Waiting</span>
+          </div>
+          <span class="badge" style="background:#fef9c3;color:#ca8a04;" id="count-waiting">0</span>
+        </div>
+        <div id="list-waiting" class="queue-status-column p-sm" style="max-height:240px;overflow-y:auto;">
+          <p class="text-muted text-xs text-center py-md" data-i18n="notif_none_yet">No waiting tokens</p>
+        </div>
+      </div>
+
+      <!-- Called / Serving -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title text-success">
+            <span class="material-symbols-outlined">how_to_reg</span> <span data-i18n="staff_sidebar_queue_verify">Called / Serving</span>
+          </div>
+          <span class="badge badge-approved" id="count-serving">0</span>
+        </div>
+        <div id="list-serving" class="queue-status-column p-sm" style="max-height:240px;overflow-y:auto;">
+          <p class="text-muted text-xs text-center py-md" data-i18n="notif_none_yet">No active tokens</p>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- All Tokens Table -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="material-symbols-outlined text-primary">format_list_bulleted</span>
+          <span data-i18n="queue_all_tokens">All Queue Tokens Today</span>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table">
+          <thead>
+            <tr>
+              <th data-i18n="label_queue_token">Token</th>
+              <th data-i18n="label_application_id">Application</th>
+              <th data-i18n="label_date">Date</th>
+              <th data-i18n="queue_info_time_slot">Time Slot</th>
+              <th data-i18n="label_status">Status</th>
+              <th data-i18n="queue_info_called_at">Called At</th>
+              <th data-i18n="label_actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="all-tokens-tbody">
+            <tr><td colspan="7" class="text-center text-muted py-md" data-i18n="label_loading">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  let allTokens = [];
+  let currentActiveToken = null;
+
+  document.addEventListener('DOMContentLoaded', () => {
+    if (!Auth.requireAuth(['staff', 'administrator'])) return;
+    loadQueueManagement();
+  });
+
+  async function loadQueueManagement() {
+    UI.showLoading('Loading queue...');
+    try {
+      const data = await API.get('/queue-tokens/');
+      allTokens = Array.isArray(data) ? data : (data.results || []);
+      renderAll();
+    } catch (err) {
+      UI.showToast('Could not load queue data.', 'error');
+    } finally {
+      UI.hideLoading();
+    }
+  }
+
+  function renderAll() {
+    const waiting = allTokens.filter(t => t.queue_status === 'Waiting');
+    const called = allTokens.filter(t => t.queue_status === 'Called' || t.queue_status === 'Serving');
+    const serving = allTokens.filter(t => t.queue_status === 'Serving');
+    const completed = allTokens.filter(t => t.queue_status === 'Completed');
+
+    document.getElementById('q-waiting').textContent = waiting.length;
+    document.getElementById('q-called').textContent = called.length;
+    document.getElementById('q-serving').textContent = serving.length;
+    document.getElementById('q-completed').textContent = completed.length;
+    document.getElementById('count-waiting').textContent = waiting.length;
+    document.getElementById('count-serving').textContent = called.length;
+
+    // Active panel
+    currentActiveToken = called[0] || null;
+    updateActivePanel();
+
+    // Waiting list
+    const waitingList = document.getElementById('list-waiting');
+    waitingList.innerHTML = waiting.length === 0 ? '<p class="text-muted text-xs text-center py-md">No waiting tokens</p>' :
+      waiting.map(t => `<div class="queue-lane waiting flex items-center justify-between">
+        <strong>T-${String(t.token_number).padStart(3,'0')}</strong>
+        <span class="text-xs text-muted">#NP-${String(t.application).padStart(4,'0')}</span>
+      </div>`).join('');
+
+    // Called/Serving list
+    const servingList = document.getElementById('list-serving');
+    servingList.innerHTML = called.length === 0 ? '<p class="text-muted text-xs text-center py-md">No active tokens</p>' :
+      called.map(t => `<div class="queue-lane ${t.queue_status.toLowerCase()} flex items-center justify-between">
+        <strong>T-${String(t.token_number).padStart(3,'0')}</strong>
+        ${UI.renderStatusBadge(t.queue_status)}
+      </div>`).join('');
+
+    // Full table
+    const tbody = document.getElementById('all-tokens-tbody');
+    if (allTokens.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-md" data-i18n="queue_no_token_yet">No queue tokens found.</td></tr>';
+      if (typeof I18n !== 'undefined') I18n.applyTranslations(tbody);
+      return;
+    }
+    const callLabel = (typeof I18n !== 'undefined') ? I18n.t('btn_call_next', 'Call') : 'Call';
+    const serveLabel = (typeof I18n !== 'undefined') ? I18n.t('btn_mark_serving', 'Serve') : 'Serve';
+    const completeLabel = (typeof I18n !== 'undefined') ? I18n.t('btn_complete_service', 'Complete') : 'Complete';
+    const skipLabel = (typeof I18n !== 'undefined') ? I18n.t('btn_skip_token', 'Skip') : 'Skip';
+
+    tbody.innerHTML = allTokens.map(t => `
+      <tr>
+        <td><strong class="text-primary">T-${String(t.token_number).padStart(3,'0')}</strong></td>
+        <td>#NP-${String(t.application).padStart(4,'0')}</td>
+        <td>${t.token_date ? UI.formatDate(t.token_date) : '—'}</td>
+        <td>${t.time_slot || 'Standard'}</td>
+        <td>${UI.renderStatusBadge(t.queue_status)}</td>
+        <td class="text-xs text-muted">${t.called_time ? UI.formatDateTime(t.called_time) : '—'}</td>
+        <td>
+          <div class="flex gap-xs flex-wrap">
+            ${t.queue_status === 'Waiting' ? `<button onclick="updateToken(${t.token_id},'Called')" class="btn btn-outline-primary btn-sm">${callLabel}</button>` : ''}
+            ${t.queue_status === 'Called' ? `<button onclick="updateToken(${t.token_id},'Serving')" class="btn btn-success btn-sm">${serveLabel}</button>` : ''}
+            ${t.queue_status === 'Serving' ? `<button onclick="updateToken(${t.token_id},'Completed')" class="btn btn-success btn-sm">${completeLabel}</button>` : ''}
+            ${['Waiting','Called'].includes(t.queue_status) ? `<button onclick="updateToken(${t.token_id},'Skipped')" class="btn btn-danger btn-sm">${skipLabel}</button>` : ''}
+          </div>
+        </td>
+      </tr>`).join('');
+
+    if (typeof I18n !== 'undefined') {
+      I18n.applyTranslations();
+    }
+  }
+
+  window.addEventListener('languageChanged', () => {
+    renderAll();
+  });
+
+  function updateActivePanel() {
+    const t = currentActiveToken;
+    document.getElementById('active-token-num').textContent = t ? `T-${String(t.token_number).padStart(3,'0')}` : '—';
+    document.getElementById('active-token-badge').innerHTML = t ? UI.renderStatusBadge(t.queue_status) : '';
+    document.getElementById('active-app-ref').textContent = t ? `#NP-${String(t.application).padStart(4,'0')}` : '—';
+    document.getElementById('active-called-time').textContent = t?.called_time ? UI.formatDateTime(t.called_time) : '—';
+    document.getElementById('btn-serving').disabled = !t || t.queue_status === 'Serving';
+    document.getElementById('btn-complete').disabled = !t;
+    document.getElementById('btn-skip').disabled = !t;
+  }
+
+  async function callNextToken() {
+    const next = allTokens.find(t => t.queue_status === 'Waiting');
+    if (!next) { UI.showToast('No citizens waiting in queue.', 'info'); return; }
+    await updateToken(next.token_id, 'Called');
+  }
+
+  async function setTokenStatus(status) {
+    if (!currentActiveToken) return;
+    await updateToken(currentActiveToken.token_id, status);
+  }
+
+  async function updateToken(tokenId, status) {
+    try {
+      await API.patch(`/queue-tokens/${tokenId}/`, {
+        queue_status: status,
+        ...(status === 'Called' ? { called_time: new Date().toISOString() } : {})
+      });
+      UI.showToast(`Token marked as ${status}.`, 'success');
+      loadQueueManagement();
+    } catch (err) {
+      UI.showToast(err.message || 'Could not update token.', 'error');
+    }
+  }
+</script>
+{% endblock %}

@@ -80,10 +80,10 @@
         <!-- Right Side Auth / User Controls -->
         <div class="header-actions">
 
-          <!-- Mobile / Compact Language Toggle -->
-          <div class="lang-switcher md:hidden" style="margin-right: 4px;">
+          <!-- Prominent Language Switcher in Main Header -->
+          <div class="lang-switcher" style="margin-right: 8px;" title="Choose Language / भाषा छान्नुहोस्">
             <button type="button" class="lang-btn lang-btn-en active" onclick="I18n.setLanguage('en')">EN</button>
-            <button type="button" class="lang-btn lang-btn-ne" onclick="I18n.setLanguage('ne')">ने</button>
+            <button type="button" class="lang-btn lang-btn-ne" onclick="I18n.setLanguage('ne')">नेपाली</button>
           </div>
 
           <!-- Guest Only Buttons -->
@@ -111,14 +111,14 @@
                 <span class="auth-user-role text-xs text-muted" style="line-height: 1;">ROLE</span>
               </div>
             </div>
-            <button type="button" class="btn btn-outline btn-sm" onclick="Auth.logout()" title="Log out">
+            <button type="button" class="btn btn-outline btn-sm" onclick="Auth.logout()" title="Sign Out" data-i18n-title="nav_logout">
               <span class="material-symbols-outlined" style="font-size: 16px;">logout</span>
             </button>
           </div>
 
           <!-- Mobile Hamburger Toggle -->
           <button type="button" class="mobile-nav-toggle" onclick="UI.toggleMobileNav(true)"
-            aria-label="Toggle navigation">
+            aria-label="Toggle navigation" data-i18n-aria-label="label_details">
             <span class="material-symbols-outlined">menu</span>
           </button>
         </div>
@@ -134,44 +134,48 @@
       <div class="flex items-center gap-sm">
         <img src="/static/css/nepali_govt.jpg" alt="Nepal Emblem"
           style="width: 32px; height: 32px; object-fit: contain; border-radius: 2px;">
-        <span class="font-bold text-primary">Passport Nepal</span>
+        <span class="font-bold text-primary" data-i18n="brand_title">Passport Nepal</span>
       </div>
-      <button type="button" style="background:none; border:none; color:var(--on-surface-variant); cursor:pointer;"
-        onclick="UI.toggleMobileNav(false)">
-        <span class="material-symbols-outlined">close</span>
-      </button>
+      <div class="flex items-center gap-xs">
+        <div class="lang-switcher" style="padding: 2px 4px;">
+          <button type="button" class="lang-btn lang-btn-en active" onclick="I18n.setLanguage('en')">EN</button>
+          <button type="button" class="lang-btn lang-btn-ne" onclick="I18n.setLanguage('ne')">ने</button>
+        </div>
+        <button type="button" style="background:none; border:none; color:var(--on-surface-variant); cursor:pointer;"
+          onclick="UI.toggleMobileNav(false)">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
     </div>
 
     <!-- Mobile Nav Links -->
     <div class="flex flex-col gap-xs flex-1">
-      <a href="/" class="sidebar-item"><span class="material-symbols-outlined">home</span> Home</a>
+      <a href="/" class="sidebar-item"><span class="material-symbols-outlined">home</span> <span data-i18n="nav_home">Home</span></a>
       <a href="/#process" class="sidebar-item" onclick="UI.toggleMobileNav(false)"><span
-          class="material-symbols-outlined">list_alt</span> How to Apply</a>
+          class="material-symbols-outlined">list_alt</span> <span data-i18n="nav_how_to_apply">How to Apply</span></a>
       <a href="/#services" class="sidebar-item" onclick="UI.toggleMobileNav(false)"><span
-          class="material-symbols-outlined">info</span> Requirements & Fees</a>
-      <a href="/track/" class="sidebar-item"><span class="material-symbols-outlined">search</span> Track Application</a>
+          class="material-symbols-outlined">info</span> <span data-i18n="nav_requirements">Requirements &amp; Fees</span></a>
+      <a href="/track/" class="sidebar-item"><span class="material-symbols-outlined">search</span> <span data-i18n="nav_track">Track Application</span></a>
 
       <div class="auth-user-only flex flex-col gap-xs" style="display: none;">
-        <span class="sidebar-title">Portals</span>
+        <span class="sidebar-title" data-i18n="nav_portal">Portals</span>
         <a href="/applicant/dashboard/" class="sidebar-item"><span class="material-symbols-outlined">person</span>
-          Citizen Portal</a>
-        <a href="/staff/dashboard/" class="sidebar-item"><span class="material-symbols-outlined">badge</span> Staff
-          Portal</a>
+          <span data-i18n="portal_citizen">Citizen Portal</span></a>
+        <a href="/staff/dashboard/" class="sidebar-item"><span class="material-symbols-outlined">badge</span>
+          <span data-i18n="portal_staff">Staff Portal</span></a>
         <a href="/admin-portal/dashboard/" class="sidebar-item"><span
-            class="material-symbols-outlined">admin_panel_settings</span> Admin Portal</a>
+            class="material-symbols-outlined">admin_panel_settings</span> <span data-i18n="portal_admin">Admin Portal</span></a>
       </div>
     </div>
 
     <!-- Mobile Drawer Auth Buttons -->
     <div class="pt-md" style="border-top: 1px solid var(--outline-variant);">
       <div class="auth-guest-only flex flex-col gap-xs">
-        <a href="/login/" class="btn btn-outline-primary btn-block">Log In</a>
-        <a href="/register/" class="btn btn-primary btn-block">Register</a>
+        <a href="/login/" class="btn btn-outline-primary btn-block" data-i18n="nav_login">Log In</a>
+        <a href="/register/" class="btn btn-primary btn-block" data-i18n="nav_register">Register</a>
       </div>
       <div class="auth-user-only flex flex-col gap-xs" style="display: none;">
-        <button type="button" class="btn btn-outline btn-block text-error" onclick="Auth.logout()">
-          <span class="material-symbols-outlined">logout</span> Log Out
-        </button>
+        <button type="button" class="btn btn-outline btn-block text-error" onclick="Auth.logout()" data-i18n="nav_logout">Sign Out</button>
       </div>
     </div>
   </aside>
@@ -260,6 +264,7 @@
   <script src="/static/js/auth.js"></script>
   <script src="/static/js/common.js"></script>
   <script src="/static/js/i18n.js"></script>
+  <script src="/static/js/workflow.js"></script>
 
   {% block extra_js %}{% endblock %}
 </body>

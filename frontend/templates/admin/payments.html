@@ -1,0 +1,361 @@
+{% extends "base.html" %}
+
+{% block title %}Fee Payments Registry — Central Administration{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/admin.css">
+<style>
+  .admin-layout { display: flex; min-height: calc(100vh - var(--header-height) - var(--topbar-height) - 160px); }
+  .admin-sidebar { width: var(--sidebar-width); background: var(--surface-container-low); border-right: 1px solid var(--outline-variant); padding: var(--spacing-lg) var(--spacing-md); display: flex; flex-direction: column; gap: var(--spacing-xs); flex-shrink: 0; }
+  @media(max-width:900px){ .admin-sidebar{ display:none; } }
+  .admin-content { flex: 1; padding: var(--spacing-xl); background: var(--background); overflow-y: auto; }
+  @media(max-width:600px){ .admin-content{ padding: var(--spacing-md); } }
+  .admin-badge { background-color: var(--secondary-container); color: var(--secondary); font-size: 0.75rem; font-weight: 700; padding: 3px 8px; border-radius: var(--radius-full); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-layout">
+
+  <!-- Sidebar -->
+  <aside class="admin-sidebar">
+    <div class="flex items-center gap-sm mb-lg pb-md" style="border-bottom: 1px solid var(--outline-variant);">
+      <div class="user-avatar-circle auth-user-avatar" style="width: 40px; height: 40px; font-size: 1rem; background-color: var(--secondary);">AD</div>
+      <div class="flex flex-col">
+        <span class="auth-user-name font-bold text-sm text-primary">System Admin</span>
+        <span class="text-xs admin-badge" data-i18n="admin_super_admin">Super Admin Access</span>
+      </div>
+    </div>
+    <span class="sidebar-title" data-i18n="admin_sidebar_system">System Management</span>
+    <a href="/admin-portal/dashboard/" class="sidebar-item"><span class="material-symbols-outlined">analytics</span><span data-i18n="admin_sidebar_overview">System Overview</span></a>
+    <a href="/admin-portal/applications/" class="sidebar-item"><span class="material-symbols-outlined">description</span><span data-i18n="admin_nav_apps">All Applications</span></a>
+    <a href="/admin-portal/payments/" class="sidebar-item active"><span class="material-symbols-outlined">payments</span><span data-i18n="admin_nav_payments">Fee Payments</span></a>
+    <a href="/admin-portal/staff/" class="sidebar-item"><span class="material-symbols-outlined">manage_accounts</span><span data-i18n="admin_nav_staff">Staff Management</span></a>
+    <a href="/admin-portal/reports/" class="sidebar-item"><span class="material-symbols-outlined">bar_chart</span><span data-i18n="admin_nav_reports">System Reports</span></a>
+    <a href="/admin-portal/activity-logs/" class="sidebar-item"><span class="material-symbols-outlined">history_edu</span><span data-i18n="admin_nav_logs">System Activity Logs</span></a>
+    <span class="sidebar-title mt-lg" data-i18n="admin_sidebar_portals">Public Portals</span>
+    <a href="/" class="sidebar-item"><span class="material-symbols-outlined">home</span><span data-i18n="side_back_home">Public Portal</span></a>
+    <button type="button" onclick="Auth.logout()" class="sidebar-item text-error mt-auto" style="background: none; border: none; width: 100%; text-align: left; cursor: pointer;">
+      <span class="material-symbols-outlined text-error">logout</span><span data-i18n="side_logout">Sign Out</span>
+    </button>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="admin-content">
+
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-md mb-xl">
+      <div>
+        <div class="flex items-center gap-sm">
+          <h1 style="font-size: 1.75rem; color: var(--primary); margin: 0;" data-i18n="admin_payments_title">National Passport Fee Registry</h1>
+          <span class="admin-badge" data-i18n="admin_audit_trail">Treasury Gateway</span>
+        </div>
+        <p class="text-sm text-muted m-0" data-i18n="admin_payments_subtitle">Live audit of payment requests, QR disbursements, gateway webhooks, and verified revenues across Nepal.</p>
+      </div>
+      <div class="flex items-center gap-sm">
+        <button type="button" onclick="loadPaymentsData()" class="btn btn-outline" title="Refresh Payment Ledger">
+          <span class="material-symbols-outlined">refresh</span> <span data-i18n="btn_refresh">Refresh</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Metric Stat Cards -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-md mb-xl">
+      <div class="stat-card">
+        <div><span class="stat-label" data-i18n="admin_total_payments">Total Payment Requests</span><div class="stat-value text-primary" id="stat-total-payments">0</div></div>
+        <div class="stat-icon primary"><span class="material-symbols-outlined">receipt_long</span></div>
+      </div>
+      <div class="stat-card">
+        <div><span class="stat-label" data-i18n="admin_verified_revenue">Verified Revenue</span><div class="stat-value text-success" id="stat-verified-rev">NPR 0</div></div>
+        <div class="stat-icon success"><span class="material-symbols-outlined">account_balance</span></div>
+      </div>
+      <div class="stat-card">
+        <div><span class="stat-label" data-i18n="admin_stat_verified_payments">Verified Transactions</span><div class="stat-value text-success" id="stat-verified-count">0</div></div>
+        <div class="stat-icon success"><span class="material-symbols-outlined">verified</span></div>
+      </div>
+      <div class="stat-card">
+        <div><span class="stat-label" data-i18n="admin_pending_payments">Pending / QR Active</span><div class="stat-value text-warning" id="stat-pending-count">0</div></div>
+        <div class="stat-icon warning"><span class="material-symbols-outlined">pending</span></div>
+      </div>
+    </div>
+
+    <!-- Filter & Search Toolbar -->
+    <div class="card mb-xl">
+      <div class="card-body">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-md">
+          <div>
+            <label class="form-label text-xs" for="search-payments" data-i18n="label_search">Search Payments</label>
+            <div class="input-icon-wrapper">
+              <span class="material-symbols-outlined input-icon">search</span>
+              <input type="text" id="search-payments" class="form-control with-icon" placeholder="Search Ref, TXN ID, Applicant..." data-i18n-placeholder="label_search" oninput="filterPayments()">
+            </div>
+          </div>
+          <div>
+            <label class="form-label text-xs" for="filter-status" data-i18n="admin_filter_status">Payment Status</label>
+            <select id="filter-status" class="form-control" onchange="filterPayments()">
+              <option value="All" data-i18n="admin_filter_all">All Statuses</option>
+              <option value="VERIFIED" data-i18n="admin_filter_verified">VERIFIED</option>
+              <option value="QR_GENERATED" data-i18n="status_qr_generated">QR_GENERATED</option>
+              <option value="PENDING" data-i18n="admin_filter_pending">PENDING</option>
+              <option value="PAID" data-i18n="status_completed">PAID</option>
+              <option value="FAILED" data-i18n="admin_failed_refunded">FAILED</option>
+              <option value="EXPIRED" data-i18n="status_expired">EXPIRED</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label text-xs" for="filter-gateway" data-i18n="label_service_type">Gateway Channel</label>
+            <select id="filter-gateway" class="form-control" onchange="filterPayments()">
+              <option value="All" data-i18n="admin_filter_all">All Gateways</option>
+              <option value="eSewa">eSewa</option>
+              <option value="Khalti">Khalti</option>
+              <option value="ConnectIPS">ConnectIPS</option>
+              <option value="Sandbox Gateway">Sandbox Gateway</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Payments Ledger Table -->
+    <div class="card">
+      <div class="card-header flex items-center justify-between">
+        <h3 class="card-title text-base" data-i18n="admin_nav_payments">Payment Ledger & Gateway Transactions</h3>
+        <span class="text-xs text-muted" id="table-count-label">Showing 0 records</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table">
+          <thead>
+            <tr>
+              <th data-i18n="label_reference">Payment Ref</th>
+              <th data-i18n="label_application_id">Application</th>
+              <th data-i18n="label_full_name">Applicant</th>
+              <th data-i18n="label_passport_category">Type</th>
+              <th data-i18n="label_fee_amount">Amount</th>
+              <th data-i18n="label_service_type">Gateway</th>
+              <th data-i18n="label_status">Status</th>
+              <th data-i18n="label_token_number">Transaction ID</th>
+              <th data-i18n="label_date">Date</th>
+              <th data-i18n="label_actions">Action</th>
+            </tr>
+          </thead>
+          <tbody id="payments-tbody">
+            <tr>
+              <td colspan="10" class="text-center text-muted py-lg" data-i18n="label_loading">Loading payment transactions...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Modal: Payment Detail & Audit Inspection -->
+<div id="payment-detail-modal" class="modal-backdrop">
+  <div class="modal-dialog" style="max-width: 580px;">
+    <div class="modal-header">
+      <h3 class="modal-title flex items-center gap-xs">
+        <span class="material-symbols-outlined text-primary">receipt</span>
+        Payment Transaction Details
+      </h3>
+      <button type="button" onclick="UI.closeModal('payment-detail-modal')" style="background:none;border:none;cursor:pointer;">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="modal-body" id="payment-modal-body">
+      <!-- Injected by JavaScript -->
+    </div>
+    <div class="modal-footer flex items-center justify-between">
+      <span class="text-xs text-muted">🔒 Verification controlled strictly by Payment Gateway</span>
+      <button type="button" onclick="UI.closeModal('payment-detail-modal')" class="btn btn-outline">Close</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  let allPayments = [];
+
+  document.addEventListener('DOMContentLoaded', () => {
+    if (!Auth.requireAuth(['administrator', 'staff'])) return;
+    loadPaymentsData();
+  });
+
+  window.addEventListener('languageChanged', () => {
+    if (typeof I18n !== 'undefined') I18n.applyTranslations();
+    loadPaymentsData();
+  });
+
+  async function loadPaymentsData() {
+    UI.showLoading('Loading payment ledger...');
+    try {
+      const data = await API.get('/payments/');
+      allPayments = Array.isArray(data) ? data : (data.results || []);
+      renderMetrics();
+      renderPaymentsTable(allPayments);
+    } catch (err) {
+      console.error('Failed to load payments:', err);
+      UI.showToast('Could not load payment ledger.', 'error');
+    } finally {
+      UI.hideLoading();
+    }
+  }
+
+  function renderMetrics() {
+    const total = allPayments.length;
+    const verifiedList = allPayments.filter(p => p.status === 'VERIFIED' || p.payment_status === 'Completed');
+    const verifiedTotal = verifiedList.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    const pendingCount = allPayments.filter(p => p.status === 'PENDING' || p.status === 'QR_GENERATED' || p.payment_status === 'Pending').length;
+
+    document.getElementById('stat-total-payments').textContent = total;
+    document.getElementById('stat-verified-rev').textContent = `NPR ${verifiedTotal.toLocaleString()}`;
+    document.getElementById('stat-verified-count').textContent = verifiedList.length;
+    document.getElementById('stat-pending-count').textContent = pendingCount;
+  }
+
+  function filterPayments() {
+    const q = (document.getElementById('search-payments').value || '').toLowerCase().trim();
+    const st = document.getElementById('filter-status').value;
+    const gw = document.getElementById('filter-gateway').value;
+
+    const filtered = allPayments.filter(p => {
+      const ref = (p.payment_reference || '').toLowerCase();
+      const txn = (p.transaction_id || '').toLowerCase();
+      const applicant = (p.applicant_name || '').toLowerCase();
+      const appId = String(p.application || '');
+
+      const matchesQ = !q || ref.includes(q) || txn.includes(q) || applicant.includes(q) || appId.includes(q);
+      const matchesSt = st === 'All' || p.status === st || (st === 'VERIFIED' && p.payment_status === 'Completed');
+      const matchesGw = gw === 'All' || p.gateway_name === gw || p.payment_method === gw;
+
+      return matchesQ && matchesSt && matchesGw;
+    });
+
+    renderPaymentsTable(filtered);
+  }
+
+  function renderPaymentsTable(payments) {
+    const tbody = document.getElementById('payments-tbody');
+    document.getElementById('table-count-label').textContent = `Showing ${payments.length} records`;
+
+    if (payments.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="10" class="text-center text-muted py-lg" data-i18n="label_no_data">No payment records found.</td></tr>`;
+      if (typeof I18n !== 'undefined') I18n.applyTranslations(tbody);
+      return;
+    }
+
+    const detailsLabel = (typeof I18n !== 'undefined') ? I18n.t('label_details', 'Details') : 'Details';
+
+    tbody.innerHTML = payments.map(p => {
+      let badgeClass = 'badge-pending';
+      if (p.status === 'VERIFIED' || p.payment_status === 'Completed') badgeClass = 'badge-approved';
+      else if (p.status === 'FAILED' || p.payment_status === 'Failed') badgeClass = 'badge-rejected';
+      else if (p.status === 'QR_GENERATED') badgeClass = 'badge-warning';
+
+      const ref = p.payment_reference || `ID-${p.payment_id}`;
+      const txn = p.transaction_id || '<span class="text-muted">--</span>';
+      const createdDate = UI.formatDateTime(p.created_at || p.payment_date);
+      const rawStatus = p.status || p.payment_status;
+
+      return `
+        <tr>
+          <td><span class="font-mono font-bold text-primary text-xs">${ref}</span></td>
+          <td><span class="badge badge-outline">#NP-${String(p.application).padStart(4, '0')}</span></td>
+          <td><span class="font-medium text-xs">${p.applicant_name || 'Citizen'}</span></td>
+          <td><span class="text-xs">${(p.payment_type || 'APPLICATION_FEE').replace(/_/g, ' ')}</span></td>
+          <td><span class="font-bold text-xs text-primary">NPR ${Number(p.amount).toLocaleString()}</span></td>
+          <td><span class="badge badge-secondary" style="font-size: 0.7rem;">${p.gateway_name || p.payment_method || 'Gateway'}</span></td>
+          <td><span class="badge ${badgeClass}" data-raw-status="${rawStatus}" style="font-size: 0.7rem;">${UI.renderStatusBadge ? I18n.translateStatus(rawStatus) : rawStatus}</span></td>
+          <td><span class="font-mono text-xs">${txn}</span></td>
+          <td><span class="text-xs text-muted">${createdDate}</span></td>
+          <td>
+            <button type="button" onclick="inspectPayment(${p.payment_id})" class="btn btn-outline btn-sm" title="Inspect Payment">
+              <span class="material-symbols-outlined" style="font-size: 15px;">visibility</span> ${detailsLabel}
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    if (typeof I18n !== 'undefined') {
+      I18n.applyTranslations();
+    }
+  }
+
+  window.addEventListener('languageChanged', () => {
+    filterPayments();
+  });
+
+  function inspectPayment(paymentId) {
+    const p = allPayments.find(item => item.payment_id === paymentId);
+    if (!p) return;
+
+    const modalBody = document.getElementById('payment-modal-body');
+    const isVerified = p.status === 'VERIFIED' || p.payment_status === 'Completed';
+
+    modalBody.innerHTML = `
+      <div class="p-md rounded mb-md border border-outline-variant flex items-center justify-between" style="background: var(--surface-container-low);">
+        <div>
+          <span class="text-xs text-muted uppercase font-bold block">${p.payment_type || 'Application Fee'}</span>
+          <span class="text-2xl font-black text-primary">NPR ${Number(p.amount).toLocaleString()}</span>
+          <span class="text-xs text-muted block">Application Ref: #NP-${String(p.application).padStart(4, '0')}</span>
+        </div>
+        <div class="text-right">
+          <span class="badge ${isVerified ? 'badge-approved' : (p.status === 'FAILED' ? 'badge-rejected' : 'badge-warning')} text-xs">
+            ${p.status || p.payment_status}
+          </span>
+          <span class="text-xs text-muted block mt-xs font-mono">${p.gateway_name || p.payment_method}</span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-sm mb-md">
+        <div class="p-xs bg-surface border rounded">
+          <span class="text-xs text-muted block">Payment Reference</span>
+          <span class="font-mono font-bold text-xs text-primary">${p.payment_reference || '--'}</span>
+        </div>
+        <div class="p-xs bg-surface border rounded">
+          <span class="text-xs text-muted block">Gateway Transaction ID</span>
+          <span class="font-mono text-xs">${p.transaction_id || 'Awaiting Confirmation'}</span>
+        </div>
+        <div class="p-xs bg-surface border rounded">
+          <span class="text-xs text-muted block">Citizen / Applicant</span>
+          <span class="font-medium text-xs">${p.applicant_name || 'Citizen'}</span>
+        </div>
+        <div class="p-xs bg-surface border rounded">
+          <span class="text-xs text-muted block">Created Date</span>
+          <span class="text-xs text-muted">${UI.formatDateTime(p.created_at || p.payment_date)}</span>
+        </div>
+        <div class="p-xs bg-surface border rounded">
+          <span class="text-xs text-muted block">Paid Timestamp</span>
+          <span class="text-xs">${p.paid_at ? UI.formatDateTime(p.paid_at) : '--'}</span>
+        </div>
+        <div class="p-xs bg-surface border rounded">
+          <span class="text-xs text-muted block">Verified Timestamp</span>
+          <span class="text-xs">${p.verified_at ? UI.formatDateTime(p.verified_at) : '--'}</span>
+        </div>
+      </div>
+
+      ${p.failure_reason ? `
+        <div class="p-sm rounded border border-danger mb-md" style="background: rgba(220, 38, 38, 0.05);">
+          <span class="text-xs font-bold text-error block">Failure Explanation</span>
+          <p class="text-xs text-muted m-0">${p.failure_reason}</p>
+        </div>
+      ` : ''}
+
+      ${p.qr_code ? `
+        <div class="p-md rounded border text-center mb-md" style="background: #ffffff;">
+          <span class="text-xs text-muted block mb-xs font-medium">Issued Payment QR Code</span>
+          <img src="${p.qr_code}" alt="QR" style="max-width: 140px; height: auto; border: 1px solid #e2e8f0; border-radius: 4px; display: inline-block;">
+        </div>
+      ` : ''}
+
+      <div class="p-xs bg-surface-low rounded text-xs text-muted border">
+        ℹ️ Automatic verification is enforced. Administrators may inspect transactions but cannot bypass the Payment Gateway or PostgreSQL cryptographic audit trail.
+      </div>
+    `;
+
+    UI.openModal('payment-detail-modal');
+  }
+</script>
+{% endblock %}

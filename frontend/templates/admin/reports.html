@@ -1,0 +1,454 @@
+{% extends "base.html" %}
+
+{% block title %}System Reports — Central Administration{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/admin.css">
+<style>
+  .admin-layout { display: flex; min-height: calc(100vh - var(--header-height) - var(--topbar-height) - 160px); }
+  .admin-sidebar { width: var(--sidebar-width); background: var(--surface-container-low); border-right: 1px solid var(--outline-variant); padding: var(--spacing-lg) var(--spacing-md); display: flex; flex-direction: column; gap: var(--spacing-xs); flex-shrink: 0; }
+  @media(max-width:900px){ .admin-sidebar{ display:none; } }
+  .admin-content { flex: 1; padding: var(--spacing-xl); background: var(--background); overflow-y: auto; }
+  @media(max-width:600px){ .admin-content{ padding: var(--spacing-md); } }
+  .admin-badge { background-color: var(--secondary-container); color: var(--secondary); font-size: 0.75rem; font-weight: 700; padding: 3px 8px; border-radius: var(--radius-full); }
+  .metric-bar-bg { background-color: var(--surface-container-high); border-radius: 999px; height: 8px; overflow: hidden; width: 100%; }
+  .metric-bar-fill { height: 100%; border-radius: 999px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-layout">
+
+  <!-- Sidebar -->
+  <aside class="admin-sidebar">
+    <div class="flex items-center gap-sm mb-lg pb-md" style="border-bottom: 1px solid var(--outline-variant);">
+      <div class="user-avatar-circle auth-user-avatar" style="width: 40px; height: 40px; font-size: 1rem; background-color: var(--secondary);">AD</div>
+      <div class="flex flex-col">
+        <span class="auth-user-name font-bold text-sm text-primary">System Admin</span>
+        <span class="text-xs admin-badge" data-i18n="admin_super_admin">Super Admin Access</span>
+      </div>
+    </div>
+    <span class="sidebar-title" data-i18n="admin_sidebar_system">System Management</span>
+    <a href="/admin-portal/dashboard/" class="sidebar-item"><span class="material-symbols-outlined">analytics</span><span data-i18n="admin_sidebar_overview">System Overview</span></a>
+    <a href="/admin-portal/applications/" class="sidebar-item"><span class="material-symbols-outlined">description</span><span data-i18n="admin_nav_apps">All Applications</span></a>
+    <a href="/admin-portal/payments/" class="sidebar-item"><span class="material-symbols-outlined">payments</span><span data-i18n="admin_nav_payments">Fee Payments</span></a>
+    <a href="/admin-portal/staff/" class="sidebar-item"><span class="material-symbols-outlined">manage_accounts</span><span data-i18n="admin_nav_staff">Staff Management</span></a>
+    <a href="/admin-portal/reports/" class="sidebar-item active"><span class="material-symbols-outlined">bar_chart</span><span data-i18n="admin_nav_reports">System Reports</span></a>
+    <a href="/admin-portal/activity-logs/" class="sidebar-item"><span class="material-symbols-outlined">history_edu</span><span data-i18n="admin_nav_logs">System Activity Logs</span></a>
+    <span class="sidebar-title mt-lg" data-i18n="admin_sidebar_portals">Public Portals</span>
+    <a href="/" class="sidebar-item"><span class="material-symbols-outlined">home</span><span data-i18n="side_back_home">Public Portal</span></a>
+    <button type="button" onclick="Auth.logout()" class="sidebar-item text-error mt-auto" style="background: none; border: none; width: 100%; text-align: left; cursor: pointer;">
+      <span class="material-symbols-outlined text-error">logout</span><span data-i18n="side_logout">Sign Out</span>
+    </button>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="admin-content">
+
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-md mb-xl">
+      <div>
+        <div class="flex items-center gap-sm">
+          <h1 style="font-size: 1.75rem; color: var(--primary); margin: 0;" data-i18n="admin_reports_title">Operational Intelligence & Reports</h1>
+          <span class="admin-badge" data-i18n="admin_audit_trail">Data Analytics</span>
+        </div>
+        <p class="text-sm text-muted m-0" data-i18n="admin_reports_subtitle">Generate executive summaries, monitor queue operational throughput, and export compliance audit reports.</p>
+      </div>
+      <div class="flex items-center gap-sm">
+        <button type="button" onclick="openGenerateReportModal()" class="btn btn-primary">
+          <span class="material-symbols-outlined">post_add</span> <span data-i18n="admin_nav_reports">Generate New Report</span>
+        </button>
+        <button type="button" onclick="loadReportsData()" class="btn btn-outline" title="Refresh Reports">
+          <span class="material-symbols-outlined">refresh</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Live Performance Snapshot -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-md mb-xl">
+      <div class="card">
+        <div class="card-body">
+          <div class="flex items-center justify-between mb-sm">
+            <span class="text-xs font-bold text-muted uppercase" data-i18n="admin_stat_verified_issued">Application Approval Rate</span>
+            <span class="material-symbols-outlined text-success">verified</span>
+          </div>
+          <div class="flex items-baseline gap-xs mb-xs">
+            <span class="text-2xl font-bold" id="kpi-approval-rate">0%</span>
+            <span class="text-xs text-muted" data-i18n="status_under_review">of reviewed applications</span>
+          </div>
+          <div class="metric-bar-bg">
+            <div class="metric-bar-fill" id="bar-approval" style="width:0%;background:var(--success);"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-body">
+          <div class="flex items-center justify-between mb-sm">
+            <span class="text-xs font-bold text-muted uppercase" data-i18n="queue_stage_progress">Queue Completion Ratio</span>
+            <span class="material-symbols-outlined text-primary">schedule</span>
+          </div>
+          <div class="flex items-baseline gap-xs mb-xs">
+            <span class="text-2xl font-bold" id="kpi-queue-rate">0%</span>
+            <span class="text-xs text-muted" data-i18n="status_completed">tokens completed</span>
+          </div>
+          <div class="metric-bar-bg">
+            <div class="metric-bar-fill" id="bar-queue" style="width:0%;background:var(--primary);"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-body">
+          <div class="flex items-center justify-between mb-sm">
+            <span class="text-xs font-bold text-muted uppercase" data-i18n="staff_stat_verified">Document Verification Success</span>
+            <span class="material-symbols-outlined text-info">fact_check</span>
+          </div>
+          <div class="flex items-baseline gap-xs mb-xs">
+            <span class="text-2xl font-bold" id="kpi-doc-rate">0%</span>
+            <span class="text-xs text-muted" data-i18n="status_verified">clean credentials</span>
+          </div>
+          <div class="metric-bar-bg">
+            <div class="metric-bar-fill" id="bar-doc" style="width:0%;background:var(--info);"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reports Archive Table -->
+    <div class="card">
+      <div class="card-header flex justify-between items-center">
+        <div>
+          <h2 class="card-title" data-i18n="admin_nav_reports">Generated Executive Reports</h2>
+          <p class="text-xs text-muted m-0" id="reports-count-text">Showing 0 reports</p>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table">
+          <thead>
+            <tr>
+              <th data-i18n="label_reference">Report ID</th>
+              <th data-i18n="label_passport_category">Report Type</th>
+              <th data-i18n="label_date">Generated At</th>
+              <th data-i18n="label_details">Key Metrics Summary</th>
+              <th data-i18n="label_actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="reports-table-body">
+            <tr>
+              <td colspan="5" class="text-center text-muted py-lg" data-i18n="label_loading">Loading saved reports...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Generate Report Modal -->
+<div id="generate-report-modal" class="modal-backdrop" style="display: none;">
+  <div class="modal-container" style="max-width: 520px;">
+    <div class="modal-header">
+      <h3 class="modal-title flex items-center gap-sm">
+        <span class="material-symbols-outlined text-primary">post_add</span>
+        <span>Generate Executive Report</span>
+      </h3>
+      <button type="button" onclick="UI.closeModal('generate-report-modal')" class="modal-close-btn">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="text-sm text-muted mb-md">This will compile live database metrics into a persistent structured report record.</p>
+
+      <div class="form-group mb-md">
+        <label class="form-label" for="report-type-select">Report Category</label>
+        <select id="report-type-select" class="form-control">
+          <option value="Daily Operations & Queue Performance">Daily Operations & Queue Performance</option>
+          <option value="Document Verification & Fraud Audit">Document Verification & Fraud Audit</option>
+          <option value="Staff Workload & Service Efficiency">Staff Workload & Service Efficiency</option>
+          <option value="Monthly Passport Issuance Summary">Monthly Passport Issuance Summary</option>
+        </select>
+      </div>
+
+      <div class="p-md bg-surface-low rounded border border-outline-variant">
+        <span class="text-xs font-bold text-primary block mb-xs">Metrics Automatically Included:</span>
+        <ul class="text-xs text-muted mb-0 pl-md">
+          <li>Total registered citizen applications by status</li>
+          <li>Active and completed queue token tallies</li>
+          <li>Document verification and rejection counts</li>
+          <li>Staff roster operational availability</li>
+        </ul>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" onclick="UI.closeModal('generate-report-modal')" class="btn btn-outline">Cancel</button>
+      <button type="button" onclick="createReportAction()" class="btn btn-primary">
+        <span class="material-symbols-outlined">analytics</span> Compile & Save
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- View Report Details Modal -->
+<div id="view-report-modal" class="modal-backdrop" style="display: none;">
+  <div class="modal-container" style="max-width: 600px;">
+    <div class="modal-header">
+      <h3 class="modal-title flex items-center gap-sm">
+        <span class="material-symbols-outlined text-primary">analytics</span>
+        <span id="view-report-title">Report Analysis</span>
+      </h3>
+      <button type="button" onclick="UI.closeModal('view-report-modal')" class="modal-close-btn">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="grid grid-cols-2 gap-md mb-md">
+        <div>
+          <span class="text-xs text-muted block">Report Reference</span>
+          <span class="font-bold text-sm text-primary" id="modal-report-id">--</span>
+        </div>
+        <div>
+          <span class="text-xs text-muted block">Created Date</span>
+          <span class="text-sm font-medium" id="modal-report-date">--</span>
+        </div>
+      </div>
+
+      <div class="card mb-md" style="background:var(--surface-container-low);">
+        <div class="card-body">
+          <h4 class="text-xs font-bold uppercase text-muted mb-sm">Parsed Report Data</h4>
+          <div id="modal-report-metrics" class="grid grid-cols-2 gap-sm text-sm">
+            <!-- Dynamic KPI items -->
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h4 class="text-xs font-bold uppercase text-muted mb-xs">Raw JSON Payload</h4>
+        <pre id="modal-report-json" class="p-sm rounded bg-surface border border-outline-variant font-mono text-xs overflow-auto" style="max-height: 200px;"></pre>
+      </div>
+    </div>
+    <div class="modal-footer flex justify-between">
+      <button type="button" onclick="deleteReportConfirm()" class="btn btn-outline text-error">
+        <span class="material-symbols-outlined">delete</span> Delete Report
+      </button>
+      <button type="button" onclick="UI.closeModal('view-report-modal')" class="btn btn-outline">Close</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  let allReports = [];
+  let currentReport = null;
+  let cachedApps = [];
+  let cachedTokens = [];
+  let cachedDocs = [];
+  let cachedStaff = [];
+
+  document.addEventListener('DOMContentLoaded', () => {
+    // Administrator Auth Guard
+    if (!Auth.requireAuth(['administrator'])) return;
+
+    loadReportsData();
+  });
+
+  window.addEventListener('languageChanged', () => {
+    if (typeof I18n !== 'undefined') I18n.applyTranslations();
+    loadReportsData();
+  });
+
+  async function loadReportsData() {
+    UI.showLoading('Loading operational reports...');
+    try {
+      const [repRes, appRes, tokRes, docRes, stRes] = await Promise.all([
+        API.get('/reports/'),
+        API.get('/applications/').catch(() => []),
+        API.get('/queue-tokens/').catch(() => []),
+        API.get('/documents/').catch(() => []),
+        API.get('/staff/').catch(() => [])
+      ]);
+
+      allReports = Array.isArray(repRes) ? repRes : (repRes.results || []);
+      cachedApps = Array.isArray(appRes) ? appRes : (appRes.results || []);
+      cachedTokens = Array.isArray(tokRes) ? tokRes : (tokRes.results || []);
+      cachedDocs = Array.isArray(docRes) ? docRes : (docRes.results || []);
+      cachedStaff = Array.isArray(stRes) ? stRes : (stRes.results || []);
+
+      computeKpis();
+      renderReportsTable();
+    } catch (err) {
+      console.error('Reports loading error:', err);
+      UI.showToast(err.message || 'Could not load reports.', 'error');
+      document.getElementById('reports-table-body').innerHTML = `
+        <tr><td colspan="5" class="text-center text-error py-lg">Failed to load reports: ${err.message}</td></tr>
+      `;
+    } finally {
+      UI.hideLoading();
+    }
+  }
+
+  function computeKpis() {
+    // 1. Approval rate: approved / (approved + rejected)
+    const approved = cachedApps.filter(a => a.status === 'Approved').length;
+    const rejected = cachedApps.filter(a => a.status === 'Rejected').length;
+    const totalDecided = approved + rejected;
+    const appRate = totalDecided > 0 ? Math.round((approved / totalDecided) * 100) : 0;
+    document.getElementById('kpi-approval-rate').textContent = `${appRate}%`;
+    document.getElementById('bar-approval').style.width = `${appRate}%`;
+
+    // 2. Queue completion rate: completed / total tokens
+    const totalTokens = cachedTokens.length;
+    const completedTokens = cachedTokens.filter(t => t.queue_status === 'Completed').length;
+    const queueRate = totalTokens > 0 ? Math.round((completedTokens / totalTokens) * 100) : 0;
+    document.getElementById('kpi-queue-rate').textContent = `${queueRate}%`;
+    document.getElementById('bar-queue').style.width = `${queueRate}%`;
+
+    // 3. Document verification rate
+    const totalDocs = cachedDocs.length;
+    const verifiedDocs = cachedDocs.filter(d => d.verification_status === 'Verified').length;
+    const docRate = totalDocs > 0 ? Math.round((verifiedDocs / totalDocs) * 100) : 0;
+    document.getElementById('kpi-doc-rate').textContent = `${docRate}%`;
+    document.getElementById('bar-doc').style.width = `${docRate}%`;
+  }
+
+  function renderReportsTable() {
+    const tbody = document.getElementById('reports-table-body');
+    document.getElementById('reports-count-text').textContent = `Showing ${allReports.length} reports`;
+
+    if (!allReports.length) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="5" class="text-center py-xl">
+            <span class="material-symbols-outlined text-muted" style="font-size:3rem;">description</span>
+            <p class="text-muted mt-sm mb-0">No archived reports yet. Click "Generate New Report" to compile one.</p>
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tbody.innerHTML = allReports.map(rep => {
+      const repDate = rep.report_date ? UI.formatDateTime(rep.report_date) : '--';
+      let summaryText = 'System Analytics';
+      if (rep.report_data) {
+        if (typeof rep.report_data === 'object') {
+          const keys = Object.keys(rep.report_data);
+          summaryText = keys.slice(0, 3).map(k => `${k}: ${rep.report_data[k]}`).join(' | ');
+        } else {
+          summaryText = String(rep.report_data).substring(0, 50);
+        }
+      }
+
+      return `
+        <tr>
+          <td class="font-bold text-primary">#REP-${String(rep.report_id).padStart(4, '0')}</td>
+          <td>
+            <div class="flex items-center gap-xs">
+              <span class="material-symbols-outlined text-primary" style="font-size:1.1rem;">analytics</span>
+              <span class="font-semibold text-sm">${rep.report_type}</span>
+            </div>
+          </td>
+          <td class="text-xs text-muted">${repDate}</td>
+          <td class="text-xs text-muted" style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+            ${summaryText}
+          </td>
+          <td>
+            <button type="button" onclick="openViewReportModal(${rep.report_id})" class="btn btn-sm btn-outline">
+              <span class="material-symbols-outlined">visibility</span> Inspect
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function openGenerateReportModal() {
+    UI.openModal('generate-report-modal');
+  }
+
+  async function createReportAction() {
+    const reportType = document.getElementById('report-type-select').value;
+    const currentUser = Auth.getUser();
+    const adminId = currentUser ? (currentUser.user_id || currentUser.id) : 1;
+
+    // Compile current stats into report payload
+    const reportPayload = {
+      report_type: reportType,
+      administrator: adminId,
+      report_data: {
+        total_applications: cachedApps.length,
+        pending_applications: cachedApps.filter(a => a.status === 'Pending').length,
+        approved_applications: cachedApps.filter(a => a.status === 'Approved').length,
+        rejected_applications: cachedApps.filter(a => a.status === 'Rejected').length,
+        completed_applications: cachedApps.filter(a => a.status === 'Completed').length,
+        total_queue_tokens: cachedTokens.length,
+        waiting_tokens: cachedTokens.filter(t => t.queue_status === 'Waiting').length,
+        completed_tokens: cachedTokens.filter(t => t.queue_status === 'Completed').length,
+        total_documents: cachedDocs.length,
+        verified_documents: cachedDocs.filter(d => d.verification_status === 'Verified').length,
+        rejected_documents: cachedDocs.filter(d => d.verification_status === 'Rejected').length,
+        active_staff_count: cachedStaff.filter(s => s.status === 'Active').length,
+        generated_at: new Date().toISOString()
+      }
+    };
+
+    UI.showLoading('Compiling and saving report...');
+    try {
+      await API.post('/reports/', reportPayload);
+      UI.showToast('Executive report compiled successfully.', 'success');
+      UI.closeModal('generate-report-modal');
+      await loadReportsData();
+    } catch (err) {
+      console.error('Report compilation error:', err);
+      UI.showToast(err.message || 'Failed to generate report.', 'error');
+    } finally {
+      UI.hideLoading();
+    }
+  }
+
+  function openViewReportModal(reportId) {
+    currentReport = allReports.find(r => r.report_id === reportId);
+    if (!currentReport) return;
+
+    document.getElementById('view-report-title').textContent = currentReport.report_type;
+    document.getElementById('modal-report-id').textContent = `#REP-${String(currentReport.report_id).padStart(4, '0')}`;
+    document.getElementById('modal-report-date').textContent = currentReport.report_date ? UI.formatDateTime(currentReport.report_date) : '--';
+
+    const metricsContainer = document.getElementById('modal-report-metrics');
+    const jsonPre = document.getElementById('modal-report-json');
+
+    const data = currentReport.report_data || {};
+    jsonPre.textContent = JSON.stringify(data, null, 2);
+
+    if (typeof data === 'object' && Object.keys(data).length) {
+      metricsContainer.innerHTML = Object.entries(data).map(([key, val]) => `
+        <div class="p-xs bg-surface rounded border border-outline-variant">
+          <span class="text-xs text-muted block capitalize">${key.replace(/_/g, ' ')}</span>
+          <span class="font-bold text-sm text-primary">${val}</span>
+        </div>
+      `).join('');
+    } else {
+      metricsContainer.innerHTML = '<span class="text-xs text-muted">No key-value metrics recorded.</span>';
+    }
+
+    UI.openModal('view-report-modal');
+  }
+
+  async function deleteReportConfirm() {
+    if (!currentReport) return;
+    const confirmed = confirm(`Are you sure you want to permanently delete Report #REP-${currentReport.report_id}?`);
+    if (!confirmed) return;
+
+    UI.showLoading('Deleting report...');
+    try {
+      await API.delete(`/reports/${currentReport.report_id}/`);
+      UI.showToast(`Report #REP-${currentReport.report_id} deleted.`, 'info');
+      UI.closeModal('view-report-modal');
+      await loadReportsData();
+    } catch (err) {
+      console.error('Delete report error:', err);
+      UI.showToast(err.message || 'Could not delete report.', 'error');
+    } finally {
+      UI.hideLoading();
+    }
+  }
+</script>
+{% endblock %}

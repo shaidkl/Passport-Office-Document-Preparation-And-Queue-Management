@@ -58,3 +58,6 @@ def admin_reports(request):
 
 def admin_activity_logs(request):
     return render(request, 'admin/activity_logs.html')
+
+def admin_payments(request):
+    return render(request, 'admin/payments.html')

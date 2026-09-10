@@ -837,8 +837,9 @@ textarea.form-control:focus {
 }
 
 .modal-backdrop.show {
-  display: flex;
+  display: flex !important;
 }
+
 
 .modal-dialog {
   background-color: var(--surface);

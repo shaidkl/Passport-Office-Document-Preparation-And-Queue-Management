@@ -1,0 +1,508 @@
+{% extends "base.html" %}
+
+{% block title %}All Applications — Central Administration{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/admin.css">
+<style>
+  .admin-layout { display: flex; min-height: calc(100vh - var(--header-height) - var(--topbar-height) - 160px); }
+  .admin-sidebar { width: var(--sidebar-width); background: var(--surface-container-low); border-right: 1px solid var(--outline-variant); padding: var(--spacing-lg) var(--spacing-md); display: flex; flex-direction: column; gap: var(--spacing-xs); flex-shrink: 0; }
+  @media(max-width:900px){ .admin-sidebar{ display:none; } }
+  .admin-content { flex: 1; padding: var(--spacing-xl); background: var(--background); overflow-y: auto; }
+  @media(max-width:600px){ .admin-content{ padding: var(--spacing-md); } }
+  .admin-badge { background-color: var(--secondary-container); color: var(--secondary); font-size: 0.75rem; font-weight: 700; padding: 3px 8px; border-radius: var(--radius-full); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-layout">
+
+  <!-- Sidebar -->
+  <aside class="admin-sidebar">
+    <div class="flex items-center gap-sm mb-lg pb-md" style="border-bottom: 1px solid var(--outline-variant);">
+      <div class="user-avatar-circle auth-user-avatar" style="width: 40px; height: 40px; font-size: 1rem; background-color: var(--secondary);">AD</div>
+      <div class="flex flex-col">
+        <span class="auth-user-name font-bold text-sm text-primary">System Admin</span>
+        <span class="text-xs admin-badge" data-i18n="admin_super_admin">Super Admin Access</span>
+      </div>
+    </div>
+    <span class="sidebar-title" data-i18n="admin_sidebar_system">System Management</span>
+    <a href="/admin-portal/dashboard/" class="sidebar-item"><span class="material-symbols-outlined">analytics</span><span data-i18n="admin_sidebar_overview">System Overview</span></a>
+    <a href="/admin-portal/applications/" class="sidebar-item active"><span class="material-symbols-outlined">description</span><span data-i18n="admin_nav_apps">All Applications</span></a>
+    <a href="/admin-portal/payments/" class="sidebar-item"><span class="material-symbols-outlined">payments</span><span data-i18n="admin_nav_payments">Fee Payments</span></a>
+    <a href="/admin-portal/staff/" class="sidebar-item"><span class="material-symbols-outlined">manage_accounts</span><span data-i18n="admin_nav_staff">Staff Management</span></a>
+    <a href="/admin-portal/reports/" class="sidebar-item"><span class="material-symbols-outlined">bar_chart</span><span data-i18n="admin_nav_reports">System Reports</span></a>
+    <a href="/admin-portal/activity-logs/" class="sidebar-item"><span class="material-symbols-outlined">history_edu</span><span data-i18n="admin_nav_logs">System Activity Logs</span></a>
+    <span class="sidebar-title mt-lg" data-i18n="admin_sidebar_portals">Public Portals</span>
+    <a href="/" class="sidebar-item"><span class="material-symbols-outlined">home</span><span data-i18n="side_back_home">Public Portal</span></a>
+    <button type="button" onclick="Auth.logout()" class="sidebar-item text-error mt-auto" style="background: none; border: none; width: 100%; text-align: left; cursor: pointer;">
+      <span class="material-symbols-outlined text-error">logout</span><span data-i18n="side_logout">Sign Out</span>
+    </button>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="admin-content">
+
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-md mb-xl">
+      <div>
+        <div class="flex items-center gap-sm">
+          <h1 style="font-size: 1.75rem; color: var(--primary); margin: 0;" data-i18n="admin_apps_title">Central Application Registry</h1>
+          <span class="admin-badge" data-i18n="admin_registry_badge">Registry Master</span>
+        </div>
+        <p class="text-sm text-muted m-0" data-i18n="admin_apps_subtitle">Monitor, filter, assign desk staff, and manage statuses across all passport applications in Nepal.</p>
+      </div>
+      <div class="flex items-center gap-sm">
+        <button type="button" onclick="loadApplicationsData()" class="btn btn-outline" title="Refresh Applications">
+          <span class="material-symbols-outlined">refresh</span> <span data-i18n="btn_refresh">Refresh</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Metric Stat Cards -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-md mb-xl">
+      <div class="stat-card">
+        <div><span class="stat-label" data-i18n="label_all">Total</span><div class="stat-value text-primary" id="stat-total">0</div></div>
+      </div>
+      <div class="stat-card">
+        <div><span class="stat-label" data-i18n="status_pending">Pending</span><div class="stat-value text-warning" id="stat-pending">0</div></div>
+      </div>
+      <div class="stat-card">
+        <div><span class="stat-label" data-i18n="status_under_review">Under Review</span><div class="stat-value text-info" id="stat-review">0</div></div>
+      </div>
+      <div class="stat-card">
+        <div><span class="stat-label" data-i18n="status_approved">Approved</span><div class="stat-value text-success" id="stat-approved">0</div></div>
+      </div>
+      <div class="stat-card">
+        <div><span class="stat-label" data-i18n="status_completed">Completed</span><div class="stat-value text-primary" id="stat-completed">0</div></div>
+      </div>
+      <div class="stat-card">
+        <div><span class="stat-label" data-i18n="status_rejected">Rejected</span><div class="stat-value text-error" id="stat-rejected">0</div></div>
+      </div>
+    </div>
+
+    <!-- Filter Toolbar -->
+    <div class="card mb-xl">
+      <div class="card-body">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-md">
+          <div>
+            <label class="form-label" for="search-app" data-i18n="label_search">Search Applications</label>
+            <div class="input-icon-wrapper">
+              <span class="material-symbols-outlined input-icon">search</span>
+              <input type="text" id="search-app" class="form-control with-icon" placeholder="Search by App #, Applicant ID..." data-i18n-placeholder="label_search" oninput="filterApplications()">
+            </div>
+          </div>
+          <div>
+            <label class="form-label" for="filter-status" data-i18n="admin_filter_status">Status Filter</label>
+            <select id="filter-status" class="form-control" onchange="filterApplications()">
+              <option value="All" data-i18n="admin_filter_all">All Statuses</option>
+              <option value="Pending" data-i18n="admin_filter_pending">Pending</option>
+              <option value="Under Review" data-i18n="status_under_review">Under Review</option>
+              <option value="Approved" data-i18n="admin_filter_approved">Approved</option>
+              <option value="Completed" data-i18n="status_completed">Completed</option>
+              <option value="Rejected" data-i18n="admin_filter_rejected">Rejected</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label" for="filter-staff" data-i18n="portal_staff">Assigned Staff Filter</label>
+            <select id="filter-staff" class="form-control" onchange="filterApplications()">
+              <option value="All" data-i18n="admin_filter_all">All Staff Officers</option>
+              <option value="Unassigned" data-i18n="label_none">Unassigned Only</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Applications Table -->
+    <div class="card">
+      <div class="card-header flex justify-between items-center">
+        <div>
+          <h2 class="card-title" data-i18n="admin_nav_apps">All Registered Applications</h2>
+          <p class="text-xs text-muted m-0" id="apps-count-text">Showing 0 applications</p>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table">
+          <thead>
+            <tr>
+              <th data-i18n="label_application_id">Application Ref</th>
+              <th data-i18n="label_full_name">Applicant</th>
+              <th data-i18n="portal_staff">Assigned Staff</th>
+              <th data-i18n="label_date">Submitted Date</th>
+              <th data-i18n="label_status">Status</th>
+              <th data-i18n="queue_info_called_at">Last Updated</th>
+              <th data-i18n="label_actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="applications-table-body">
+            <tr>
+              <td colspan="7" class="text-center text-muted py-lg" data-i18n="label_loading">Loading application records...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Application Detail & Edit Modal -->
+<div id="app-detail-modal" class="modal-backdrop" style="display: none;">
+  <div class="modal-container" style="max-width: 680px;">
+    <div class="modal-header">
+      <h3 class="modal-title flex items-center gap-sm">
+        <span class="material-symbols-outlined text-primary">description</span>
+        <span id="detail-modal-title">Application Details</span>
+      </h3>
+      <button type="button" onclick="UI.closeModal('app-detail-modal')" class="modal-close-btn">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="grid grid-cols-2 gap-md mb-md">
+        <div>
+          <span class="text-xs text-muted block">Application Reference</span>
+          <span class="font-bold text-base text-primary" id="modal-app-ref">--</span>
+        </div>
+        <div>
+          <span class="text-xs text-muted block">Current Status</span>
+          <span id="modal-app-status-badge">--</span>
+        </div>
+        <div>
+          <span class="text-xs text-muted block">Applicant Reference</span>
+          <span class="font-bold text-sm" id="modal-applicant-ref">--</span>
+        </div>
+        <div>
+          <span class="text-xs text-muted block">Submission Date</span>
+          <span class="text-sm font-medium" id="modal-submission-date">--</span>
+        </div>
+      </div>
+
+      <div class="divider my-md"></div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-md mb-md">
+        <div class="form-group">
+          <label class="form-label" for="modal-status-select">Update Workflow Status</label>
+          <select id="modal-status-select" class="form-control">
+            <option value="Pending">Pending</option>
+            <option value="Under Review">Under Review</option>
+            <option value="Approved">Approved</option>
+            <option value="Completed">Completed</option>
+            <option value="Rejected">Rejected</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="modal-staff-select">Assign Processing Officer</label>
+          <select id="modal-staff-select" class="form-control">
+            <option value="">-- Unassigned --</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Associated Documents Preview -->
+      <div>
+        <h4 class="text-sm font-bold mb-xs">Attached Documents</h4>
+        <div id="modal-docs-list" class="flex flex-col gap-xs">
+          <span class="text-xs text-muted">No documents uploaded.</span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer flex justify-between flex-wrap gap-sm">
+      <button type="button" onclick="deleteApplicationConfirm()" class="btn btn-outline text-error">
+        <span class="material-symbols-outlined">delete</span> Delete
+      </button>
+      <div class="flex items-center gap-sm flex-wrap">
+        <button type="button" id="admin-auth-sig-btn" onclick="adminAuthorizeSignature()" class="btn btn-outline text-success" title="Issue Government Digital Signature">
+          <span class="material-symbols-outlined">draw</span> Authorize Signature
+        </button>
+        <a id="admin-pdf-btn" href="#" class="btn btn-outline text-primary" style="display:none;" target="_blank">
+          <span class="material-symbols-outlined">download</span> PDF
+        </a>
+        <button type="button" onclick="UI.closeModal('app-detail-modal')" class="btn btn-outline">Cancel</button>
+        <button type="button" onclick="saveApplicationChanges()" class="btn btn-primary">
+          <span class="material-symbols-outlined">save</span> Save Changes
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  let allApplications = [];
+  let allStaff = [];
+  let allDocuments = [];
+  let currentApp = null;
+
+  document.addEventListener('DOMContentLoaded', () => {
+    // Auth Guard
+    if (!Auth.requireAuth(['administrator'])) return;
+
+    loadApplicationsData();
+  });
+
+  window.addEventListener('languageChanged', () => {
+    if (typeof I18n !== 'undefined') I18n.applyTranslations();
+    loadApplicationsData();
+  });
+
+  async function loadApplicationsData() {
+    UI.showLoading('Loading application records...');
+    try {
+      const [appsRes, staffRes, docsRes] = await Promise.all([
+        API.get('/applications/'),
+        API.get('/staff/'),
+        API.get('/documents/')
+      ]);
+
+      allApplications = Array.isArray(appsRes) ? appsRes : (appsRes.results || []);
+      allStaff = Array.isArray(staffRes) ? staffRes : (staffRes.results || []);
+      allDocuments = Array.isArray(docsRes) ? docsRes : (docsRes.results || []);
+
+      populateStaffDropdowns();
+      updateStats();
+      filterApplications();
+    } catch (err) {
+      console.error('Error fetching applications data:', err);
+      UI.showToast(err.message || 'Could not load applications data.', 'error');
+      document.getElementById('applications-table-body').innerHTML = `
+        <tr><td colspan="7" class="text-center text-error py-lg">Failed to load data: ${err.message}</td></tr>
+      `;
+    } finally {
+      UI.hideLoading();
+    }
+  }
+
+  function populateStaffDropdowns() {
+    const filterStaffSelect = document.getElementById('filter-staff');
+    const modalStaffSelect = document.getElementById('modal-staff-select');
+
+    // Filter dropdown options
+    let filterOptionsHtml = '<option value="All">All Staff Officers</option><option value="Unassigned">Unassigned Only</option>';
+    let modalOptionsHtml = '<option value="">-- Unassigned --</option>';
+
+    allStaff.forEach(st => {
+      filterOptionsHtml += `<option value="${st.staff_id}">${st.full_name} (${st.status})</option>`;
+      modalOptionsHtml += `<option value="${st.staff_id}">${st.full_name} (#ST-${st.staff_id})</option>`;
+    });
+
+    filterStaffSelect.innerHTML = filterOptionsHtml;
+    modalStaffSelect.innerHTML = modalOptionsHtml;
+  }
+
+  function updateStats() {
+    const total = allApplications.length;
+    const pending = allApplications.filter(a => a.status === 'Pending').length;
+    const review = allApplications.filter(a => a.status === 'Under Review').length;
+    const approved = allApplications.filter(a => a.status === 'Approved').length;
+    const completed = allApplications.filter(a => a.status === 'Completed').length;
+    const rejected = allApplications.filter(a => a.status === 'Rejected').length;
+
+    document.getElementById('stat-total').textContent = total;
+    document.getElementById('stat-pending').textContent = pending;
+    document.getElementById('stat-review').textContent = review;
+    document.getElementById('stat-approved').textContent = approved;
+    document.getElementById('stat-completed').textContent = completed;
+    document.getElementById('stat-rejected').textContent = rejected;
+  }
+
+  function filterApplications() {
+    const query = (document.getElementById('search-app').value || '').toLowerCase().trim();
+    const statusFilter = document.getElementById('filter-status').value;
+    const staffFilter = document.getElementById('filter-staff').value;
+
+    const filtered = allApplications.filter(app => {
+      // Search by ID, applicant ID, or applicant name/email
+      const matchSearch = !query ||
+        String(app.application_id).includes(query) ||
+        String(app.applicant).includes(query) ||
+        (app.applicant_name && app.applicant_name.toLowerCase().includes(query)) ||
+        (app.applicant_email && app.applicant_email.toLowerCase().includes(query));
+
+      // Status
+      const matchStatus = (statusFilter === 'All') || (app.status === statusFilter);
+
+      // Staff
+      let matchStaff = true;
+      if (staffFilter === 'Unassigned') {
+        matchStaff = !app.staff;
+      } else if (staffFilter !== 'All') {
+        matchStaff = String(app.staff) === String(staffFilter);
+      }
+
+      return matchSearch && matchStatus && matchStaff;
+    });
+
+    renderApplicationsTable(filtered);
+  }
+
+  function renderApplicationsTable(apps) {
+    const tbody = document.getElementById('applications-table-body');
+    document.getElementById('apps-count-text').textContent = `Showing ${apps.length} of ${allApplications.length} applications`;
+
+    if (!apps.length) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="7" class="text-center py-xl">
+            <span class="material-symbols-outlined text-muted" style="font-size:3rem;">search_off</span>
+            <p class="text-muted mt-sm mb-0" data-i18n="label_no_data">No applications matched the criteria.</p>
+          </td>
+        </tr>
+      `;
+      if (typeof I18n !== 'undefined') I18n.applyTranslations(tbody);
+      return;
+    }
+
+    const manageLabel = (typeof I18n !== 'undefined') ? I18n.t('btn_edit', 'Manage') : 'Manage';
+    const unassignedLabel = (typeof I18n !== 'undefined') ? I18n.t('label_none', 'Unassigned') : 'Unassigned';
+
+    tbody.innerHTML = apps.map(app => {
+      // Find staff name
+      const staffMember = allStaff.find(s => s.staff_id === app.staff);
+      const staffText = staffMember 
+        ? `<span class="font-medium text-xs text-primary">${staffMember.full_name}</span>`
+        : `<span class="text-xs text-muted italic">${unassignedLabel}</span>`;
+
+      // Use applicant_name/email from serializer (no extra API call needed)
+      const applicantName = app.applicant_name || `Citizen #CIT-${String(app.applicant).padStart(4, '0')}`;
+      const applicantEmail = app.applicant_email || '';
+
+      const subDate = app.submission_date ? UI.formatDate(app.submission_date) : '--';
+      const updatedDate = app.last_updated ? UI.formatDateTime(app.last_updated) : '--';
+
+      return `
+        <tr>
+          <td class="font-bold text-primary">#NP-${String(app.application_id).padStart(4, '0')}</td>
+          <td>
+            <div class="flex flex-col">
+              <span class="font-medium text-sm">${applicantName}</span>
+              <span class="text-xs text-muted">${applicantEmail || 'ID: #CIT-' + String(app.applicant).padStart(4, '0')}</span>
+            </div>
+          </td>
+          <td>${staffText}</td>
+          <td class="text-xs text-muted">${subDate}</td>
+          <td>${UI.renderStatusBadge(app.status)}</td>
+          <td class="text-xs text-muted">${updatedDate}</td>
+          <td>
+            <button type="button" onclick="openAppDetailModal(${app.application_id})" class="btn btn-sm btn-outline">
+              <span class="material-symbols-outlined">edit_note</span> ${manageLabel}
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    if (typeof I18n !== 'undefined') {
+      I18n.applyTranslations();
+    }
+  }
+
+  window.addEventListener('languageChanged', () => {
+    filterApplications();
+  });
+
+  function openAppDetailModal(appId) {
+    currentApp = allApplications.find(a => a.application_id === appId);
+    if (!currentApp) return;
+
+    document.getElementById('detail-modal-title').textContent = `Manage Application #NP-${String(currentApp.application_id).padStart(4, '0')}`;
+    document.getElementById('modal-app-ref').textContent = `#NP-${String(currentApp.application_id).padStart(4, '0')}`;
+    document.getElementById('modal-app-status-badge').innerHTML = UI.renderStatusBadge(currentApp.status);
+    // Show applicant name if available, fallback to ID
+    const displayApplicant = currentApp.applicant_name
+      ? `${currentApp.applicant_name} (ID: #CIT-${String(currentApp.applicant).padStart(4, '0')})`
+      : `Citizen ID #CIT-${String(currentApp.applicant).padStart(4, '0')}`;
+    document.getElementById('modal-applicant-ref').textContent = displayApplicant;
+    document.getElementById('modal-submission-date').textContent = currentApp.submission_date ? UI.formatDateTime(currentApp.submission_date) : '--';
+
+    document.getElementById('modal-status-select').value = currentApp.status;
+    document.getElementById('modal-staff-select').value = currentApp.staff || '';
+
+    // PDF button
+    const pdfBtn = document.getElementById('admin-pdf-btn');
+    if (currentApp.status === 'Approved' || currentApp.status === 'Completed') {
+      pdfBtn.href = `/api/applications/${currentApp.application_id}/download-pdf/`;
+      pdfBtn.style.display = 'inline-flex';
+    } else {
+      pdfBtn.style.display = 'none';
+    }
+
+    // Attached docs
+    const docs = allDocuments.filter(d => d.application === currentApp.application_id);
+    const docsList = document.getElementById('modal-docs-list');
+    if (docs.length) {
+      docsList.innerHTML = docs.map(d => `
+        <div class="flex items-center justify-between p-xs bg-surface rounded border border-outline-variant text-xs">
+          <span class="font-medium">${d.document_type}</span>
+          <span class="badge ${d.verification_status === 'Verified' ? 'badge-success' : (d.verification_status === 'Rejected' ? 'badge-error' : 'badge-warning')}">${d.verification_status}</span>
+        </div>
+      `).join('');
+    } else {
+      docsList.innerHTML = '<span class="text-xs text-muted">No documents uploaded for this application yet.</span>';
+    }
+
+    UI.openModal('app-detail-modal');
+  }
+
+  async function adminAuthorizeSignature() {
+    if (!currentApp) return;
+
+    UI.showLoading(`Authorizing Digital Signature for #NP-${currentApp.application_id}...`);
+    try {
+      const res = await API.post(`/applications/${currentApp.application_id}/authorize-signature/`);
+      UI.showToast(`Digital Signature Authorized! Serial: ${res.certificate_serial}. Application marked Approved.`, 'success');
+      UI.closeModal('app-detail-modal');
+      await loadApplicationsData();
+    } catch (err) {
+      console.error('Signature authorization error:', err);
+      UI.showToast(err.message || 'Failed to authorize digital signature.', 'error');
+    } finally {
+      UI.hideLoading();
+    }
+  }
+
+  async function saveApplicationChanges() {
+    if (!currentApp) return;
+
+    const newStatus = document.getElementById('modal-status-select').value;
+    const newStaff = document.getElementById('modal-staff-select').value || null;
+
+    UI.showLoading('Updating application...');
+    try {
+      await API.patch(`/applications/${currentApp.application_id}/`, {
+        status: newStatus,
+        staff: newStaff
+      });
+
+      UI.showToast(`Application #NP-${currentApp.application_id} updated successfully.`, 'success');
+      UI.closeModal('app-detail-modal');
+      await loadApplicationsData();
+    } catch (err) {
+      console.error('Save error:', err);
+      UI.showToast(err.message || 'Could not update application.', 'error');
+    } finally {
+      UI.hideLoading();
+    }
+  }
+
+  async function deleteApplicationConfirm() {
+    if (!currentApp) return;
+
+    const confirmed = confirm(`Are you sure you want to permanently delete Application #NP-${currentApp.application_id}? This will remove all associated documents and queue tokens.`);
+    if (!confirmed) return;
+
+    UI.showLoading('Deleting application...');
+    try {
+      await API.delete(`/applications/${currentApp.application_id}/`);
+      UI.showToast(`Application #NP-${currentApp.application_id} deleted.`, 'info');
+      UI.closeModal('app-detail-modal');
+      await loadApplicationsData();
+    } catch (err) {
+      console.error('Delete error:', err);
+      UI.showToast(err.message || 'Failed to delete application.', 'error');
+    } finally {
+      UI.hideLoading();
+    }
+  }
+</script>
+{% endblock %}

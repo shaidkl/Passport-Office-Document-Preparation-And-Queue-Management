@@ -114,6 +114,7 @@
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   display: flex;
   flex-direction: column;
+  cursor: pointer;
 }
 
 .process-card:hover {

@@ -31,16 +31,24 @@ class AuthManager {
 
   /**
    * Perform login through /api/login/
+   * Supports email or username identifier.
    */
-  static async login(email, password) {
-    const result = await API.post('/login/', { email, password });
+  static async login(identifier, password) {
+    const result = await API.post('/login/', {
+      email: identifier,
+      username: identifier,
+      password: password
+    });
     if (result && result.token) {
       localStorage.setItem(this.TOKEN_KEY, result.token);
       localStorage.setItem(this.USER_KEY, JSON.stringify({
         user_id: result.user_id,
         role: result.role,
         name: result.name,
+        username: result.username || null,
         email: result.email,
+        department: result.department || null,
+        designation: result.designation || null,
       }));
       return result;
     }

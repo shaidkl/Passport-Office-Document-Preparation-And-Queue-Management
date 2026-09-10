@@ -18,6 +18,10 @@ const UI = {
       document.body.appendChild(container);
     }
 
+    const translatedMessage = (typeof I18n !== 'undefined' && I18n.translateError)
+      ? I18n.translateError(message)
+      : message;
+
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
 
@@ -28,7 +32,7 @@ const UI = {
 
     toast.innerHTML = `
       <span class="material-symbols-outlined text-${type}">${iconName}</span>
-      <div style="flex: 1; font-size: 0.875rem;">${message}</div>
+      <div style="flex: 1; font-size: 0.875rem;">${translatedMessage}</div>
       <button type="button" style="background:none; border:none; color:var(--outline); cursor:pointer;" onclick="this.parentElement.remove()">
         <span class="material-symbols-outlined" style="font-size: 1.125rem;">close</span>
       </button>
@@ -49,7 +53,12 @@ const UI = {
   /**
    * Show full-screen loading spinner
    */
-  showLoading(text = 'Processing, please wait...') {
+  showLoading(text = null) {
+    const defaultText = (typeof I18n !== 'undefined' && I18n.t)
+      ? I18n.t('processing_please_wait', 'Processing, please wait...')
+      : 'Processing, please wait...';
+    const msg = text || defaultText;
+
     let overlay = document.getElementById('global-loading-overlay');
     if (!overlay) {
       overlay = document.createElement('div');
@@ -57,12 +66,12 @@ const UI = {
       overlay.className = 'loading-overlay';
       overlay.innerHTML = `
         <div class="spinner"></div>
-        <p id="loading-text" style="font-weight: 600; color: var(--primary); font-size: 0.9375rem;">${text}</p>
+        <p id="loading-text" style="font-weight: 600; color: var(--primary); font-size: 0.9375rem;">${msg}</p>
       `;
       document.body.appendChild(overlay);
     } else {
       const label = overlay.querySelector('#loading-text');
-      if (label) label.textContent = text;
+      if (label) label.textContent = msg;
     }
     overlay.classList.add('active');
   },
@@ -83,6 +92,7 @@ const UI = {
   openModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
+      modal.style.display = 'flex';
       modal.classList.add('show');
       document.body.style.overflow = 'hidden';
     }
@@ -95,9 +105,11 @@ const UI = {
     const modal = document.getElementById(modalId);
     if (modal) {
       modal.classList.remove('show');
+      modal.style.display = 'none';
       document.body.style.overflow = '';
     }
   },
+
 
   /**
    * Toggle Mobile Drawer
@@ -156,10 +168,11 @@ const UI = {
   },
 
   /**
-   * Render appropriate status badge HTML
+   * Render appropriate status badge HTML with automatic bilingual translation
    */
   renderStatusBadge(status) {
-    const s = (status || '').toLowerCase();
+    if (!status) return '<span class="badge badge-pending">Unknown</span>';
+    const s = String(status).toLowerCase();
     let badgeClass = 'badge-pending';
     if (s.includes('review')) badgeClass = 'badge-review';
     else if (s.includes('approv') || s.includes('verifi')) badgeClass = 'badge-approved';
@@ -168,9 +181,13 @@ const UI = {
     else if (s.includes('wait')) badgeClass = 'badge-waiting';
     else if (s.includes('serv') || s.includes('call')) badgeClass = 'badge-serving';
     else if (s.includes('active')) badgeClass = 'badge-active';
-    else if (s.includes('inactive')) badgeClass = 'badge-inactive';
+    else if (s.includes('expired') || s.includes('inactiv')) badgeClass = 'badge-inactive';
 
-    return `<span class="badge ${badgeClass}">${status || 'Unknown'}</span>`;
+    const display = (typeof I18n !== 'undefined' && I18n.translateStatus)
+      ? I18n.translateStatus(status)
+      : status;
+
+    return `<span class="badge ${badgeClass}" data-raw-status="${status}">${display}</span>`;
   }
 };
 

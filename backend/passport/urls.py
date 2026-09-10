@@ -36,6 +36,13 @@ router.register(
     basename='staff'
 )
 
+# Admin Staff Management alias
+router.register(
+    r'admin/staff',
+    StaffViewSet,
+    basename='admin-staff'
+)
+
 # Administrator
 router.register(
     r'administrators',
