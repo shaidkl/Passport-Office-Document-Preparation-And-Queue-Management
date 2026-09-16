@@ -29,16 +29,22 @@ class WorkflowManager {
       description: 'Upload citizenship, NID, and photo',
     },
     {
+      key: 'fee',
+      label: 'Payment',
+      icon: 'payments',
+      description: 'Pay the statutory application fee',
+    },
+    {
       key: 'verification',
       label: 'Verification',
       icon: 'fact_check',
       description: 'Staff review and verification of documents',
     },
     {
-      key: 'fee',
-      label: 'Payment',
-      icon: 'payments',
-      description: 'Pay the statutory application fee',
+      key: 'biometrics',
+      label: 'Biometrics',
+      icon: 'face',
+      description: 'Complete biometric verification with an authorized officer',
     },
     {
       key: 'signature',
@@ -48,15 +54,15 @@ class WorkflowManager {
     },
     {
       key: 'queue',
-      label: 'Queue',
+      label: 'Queue / Processing',
       icon: 'confirmation_number',
-      description: 'Queue token assignment',
+      description: 'Queue token assignment and staff processing',
     },
     {
       key: 'passport_ready',
-      label: 'Completed',
+      label: 'Passport',
       icon: 'verified',
-      description: 'Virtual e-Passport issued & tracking',
+      description: 'Passport generation after processing completes',
     },
   ];
 
@@ -71,8 +77,8 @@ class WorkflowManager {
 
     const docSummary = state.document_summary || {};
     const totalDocs = docSummary.total || 0;
-    const verifiedDocs = docSummary.verified || 0;
     const rejectedDocs = docSummary.rejected || 0;
+    const verifiedDocs = docSummary.verified || 0;
     const pendingDocs = docSummary.pending || 0;
 
     // 1. Rejected documents take highest priority — applicant must correct
@@ -90,41 +96,49 @@ class WorkflowManager {
       return 'documents';
     }
 
-    // Check if application is Approved or all documents are Verified
-    const isApproved = (state.status === 'Approved');
-    const isCompleted = (state.status === 'Completed');
-    const isDocsVerified = (totalDocs > 0 && pendingDocs === 0 && rejectedDocs === 0 && verifiedDocs === totalDocs);
-    const isApprovedOrVerified = isApproved || isCompleted || isDocsVerified;
-
-    // 3. Documents uploaded but still awaiting staff verification
-    if (!isApprovedOrVerified) {
-      return 'verification';
+    if (state.has_identity_document === false) {
+      return 'documents';
     }
 
-    // 4. STRICT PAYMENT GATE — backend must confirm payment_status === 'VERIFIED'
+    // Required uploads unlock payment. Staff review starts only after the
+    // payment gateway has verified the citizen's payment.
     const isPaymentVerified = (state.payment_status === 'VERIFIED') || (state.is_payment_verified === true);
     const isPaymentCompleted = isPaymentVerified ||
       (state.steps && state.steps.find(s => s.key === 'fee')?.status === 'Completed');
 
-    if (!isPaymentCompleted && !isCompleted) {
+    if (!isPaymentCompleted) {
       return 'fee'; // Payment step
     }
 
-    // 5. Digital Signature stage: check if digital signature completed
+    const allDocumentsVerified = totalDocs > 0 &&
+      verifiedDocs === totalDocs && pendingDocs === 0 && rejectedDocs === 0;
+    if (!allDocumentsVerified) {
+      return 'verification';
+    }
+
+    // 5. Biometrics must be verified by an authorized staff member.
+    const isBiometricsVerified = state.biometric_status === 'Verified' ||
+      (state.steps && state.steps.find(s => s.key === 'biometrics')?.status === 'Completed');
+
+    if (!isBiometricsVerified) {
+      return 'biometrics';
+    }
+
+    // 6. Digital Signature stage: check if digital signature completed
     const isSigDone = state.is_signature_verified === true ||
       (state.steps && state.steps.find(s => s.key === 'signature')?.status === 'Completed');
 
-    if (!isSigDone && !isCompleted) {
+    if (!isSigDone) {
       return 'signature'; // Digital Signature step
     }
 
-    // 6. Queue stage: check if queue token exists
-    const hasQueueToken = !!state.queue_token;
-    if (!hasQueueToken && !isCompleted) {
-      return 'queue'; // Queue step
+    // 7. Queue stage remains active until staff processing is completed.
+    const queueToken = state.queue_token;
+    if (!queueToken || queueToken.queue_status !== 'Completed') {
+      return 'queue';
     }
 
-    // 7. Completed / Virtual Passport Ready
+    // 8. Completed / Virtual Passport Ready
     return 'passport_ready';
   }
 
@@ -137,7 +151,7 @@ class WorkflowManager {
       return stepKey === 'application';
     }
     const currentStep = this.getCurrentWorkflowStep(state);
-    const ORDER = ['application', 'documents', 'verification', 'fee', 'signature', 'queue', 'passport_ready'];
+    const ORDER = ['application', 'documents', 'fee', 'verification', 'biometrics', 'signature', 'queue', 'passport_ready'];
     
     let target = stepKey;
     if (target === 'payment') target = 'fee';
@@ -335,7 +349,9 @@ class WorkflowManager {
         return {
           type: 'awaiting_verification',
           title: isNe ? 'कागजात पुनरावलोकनमा' : 'Documents Under Review',
-          description: isNe ? `${docSummary.total || 0} कागजात पेश गरियो। अधिकृत प्रमाणीकरणको प्रतीक्षामा छ।` : `${docSummary.total || 0} document(s) submitted. Awaiting officer verification.`,
+          description: (typeof I18n !== 'undefined')
+            ? I18n.format('workflow_documents_review_after_payment_desc', 'Payment is confirmed. {count} document(s) are awaiting officer verification.', { count: docSummary.total || 0 })
+            : `Payment is confirmed. ${docSummary.total || 0} document(s) are awaiting officer verification.`,
           buttonLabel: isNe ? 'स्थिति हेर्नुहोस्' : 'View Status',
           buttonAction: null,
           buttonUrl: '/applicant/documents/',
@@ -347,10 +363,13 @@ class WorkflowManager {
 
       case 'fee': {
         const fee = state.fee_amount || 5000;
-        const isApproved = (state.status === 'Approved');
-        const cardDesc = isNe
-          ? (isApproved ? 'तपाईंको आवेदन स्वीकृत भएको छ। कृपया दस्तुर भुक्तानी गर्नुहोस्।' : `कागजात प्रमाणित भयो! रु. ${parseFloat(fee).toLocaleString()} दस्तुर भुक्तानी गर्नुहोस्।`)
-          : (isApproved ? 'Your application has been approved. Please complete the application fee payment.' : `Documents verified! Pay the statutory fee of NPR ${parseFloat(fee).toLocaleString()} to proceed.`);
+        const cardDesc = (typeof I18n !== 'undefined')
+          ? I18n.format(
+              'workflow_payment_after_upload_desc',
+              'Your required documents are uploaded. Pay NPR {amount} so staff verification can begin.',
+              { amount: parseFloat(fee).toLocaleString() }
+            )
+          : `Your required documents are uploaded. Pay NPR ${parseFloat(fee).toLocaleString()} so staff verification can begin.`;
 
         if (state.payment_status === 'QR_GENERATED' || state.payment_status === 'PENDING') {
           return {
@@ -378,17 +397,36 @@ class WorkflowManager {
         };
       }
 
+      case 'biometrics': {
+        const biometricFailed = state.biometric_status === 'Failed';
+        return {
+          type: 'awaiting_biometrics',
+          title: (typeof I18n !== 'undefined')
+            ? I18n.t(biometricFailed ? 'workflow_biometrics_failed_title' : 'workflow_biometrics_waiting_title', biometricFailed ? 'Biometric Verification Failed' : 'Awaiting Biometric Verification')
+            : (biometricFailed ? 'Biometric Verification Failed' : 'Awaiting Biometric Verification'),
+          description: biometricFailed
+            ? ((typeof I18n !== 'undefined') ? I18n.t('workflow_biometrics_failed_desc', 'The biometric match was unsuccessful. Please contact the passport office for another supervised capture.') : 'The biometric match was unsuccessful. Please contact the passport office for another supervised capture.')
+            : ((typeof I18n !== 'undefined') ? I18n.t('workflow_biometrics_waiting_desc', 'Your payment is verified. An authorized staff member must complete biometric verification before issuance.') : 'Your payment is verified. An authorized staff member must complete biometric verification before issuance.'),
+          buttonLabel: (typeof I18n !== 'undefined') ? I18n.t('btn_refresh_status', 'Refresh Status') : 'Refresh Status',
+          buttonAction: null,
+          buttonUrl: null,
+          icon: biometricFailed ? 'face_retouching_off' : 'face',
+          color: biometricFailed ? 'error' : 'secondary',
+          isWaiting: true,
+        };
+      }
+
       case 'signature':
         return {
           type: 'awaiting_signature',
           title: isNe ? 'डिजिटल हस्ताक्षर' : 'Digital Signature',
-          description: isNe ? 'भुक्तानी सफलतापूर्वक सम्पन्न भयो। आवेदन डिजिटल हस्ताक्षरको लागि तयार छ।' : 'Payment completed successfully. Your application is ready for digital signature.',
-          buttonLabel: isNe ? 'डिजिटल हस्ताक्षर गर्नुहोस्' : 'Sign Application',
-          buttonAction: 'handleSignApplication()',
+          description: isNe ? 'भुक्तानी र बायोमेट्रिक्स प्रमाणित भयो। सरकारी अधिकृतको हस्ताक्षर प्रतीक्षामा छ।' : 'Payment and biometrics are verified. An authorized officer must now issue the government digital signature.',
+          buttonLabel: isNe ? 'स्थिति रिफ्रेस गर्नुहोस्' : 'Refresh Status',
+          buttonAction: null,
           buttonUrl: null,
           icon: 'draw',
           color: 'primary',
-          isWaiting: false,
+          isWaiting: true,
         };
 
       case 'queue': {
@@ -398,7 +436,7 @@ class WorkflowManager {
           return {
             type: 'view_queue',
             title: isNe ? 'तपाईंको लाम टोकन' : 'Your Queue Token',
-            description: isNe ? `टोकन T-${String(qt.token_number).padStart(3, '0')} जारी भयो। स्थिति: ${qStatus}` : `Token T-${String(qt.token_number).padStart(3, '0')} assigned. Status: ${qt.queue_status}`,
+            description: isNe ? `टोकन T-${String(qt.token_number).padStart(3, '0')} जारी भयो। प्रक्रिया स्थिति: ${qStatus}` : `Processing token T-${String(qt.token_number).padStart(3, '0')} assigned. Status: ${qStatus}`,
             buttonLabel: isNe ? 'लाम टोकन हेर्नुहोस्' : 'View Queue Token',
             buttonAction: null,
             buttonUrl: '/applicant/queue/',
@@ -410,7 +448,7 @@ class WorkflowManager {
         return {
           type: 'awaiting_queue',
           title: isNe ? 'लाम टोकन निर्धारण' : 'Queue Token Assignment',
-          description: isNe ? 'डिजिटल हस्ताक्षर प्रमाणीकरण भयो। लाम टोकन तयार गरिँदैछ।' : 'Digital signature authorized. Generating your queue token.',
+          description: isNe ? 'डिजिटल हस्ताक्षर प्रमाणीकरण भयो। प्रशोधन टोकन तयार गरिँदैछ।' : 'Digital signature authorized. Assigning your processing token.',
           buttonLabel: isNe ? 'लाम टोकन हेर्नुहोस्' : 'View Queue Token',
           buttonAction: null,
           buttonUrl: '/applicant/queue/',
@@ -423,11 +461,11 @@ class WorkflowManager {
       case 'passport_ready':
         return {
           type: 'passport_ready',
-          title: isNe ? '🎉 भर्चुअल ई-राहदानी तयार' : '🎉 Virtual e-Passport Ready',
+          title: isNe ? '🎉 राहदानी तयार' : '🎉 Passport Ready',
           description: isNe ? `आवेदन स्वीकृत र आधिकारिक रूपमा डिजिटल प्रमाणित भयो। आफ्नो भर्चुअल ई-राहदानी डाउनलोड गर्नुहोस्।` : `Application #${state.reference} approved and digitally certified. Download your official Virtual e-Passport.`,
           buttonLabel: isNe ? 'पीडीएफ डाउनलोड' : 'Download PDF',
-          buttonAction: null,
-          buttonUrl: `/api/applications/${state.application_id}/download-pdf/`,
+          buttonAction: 'downloadVirtualPassport()',
+          buttonUrl: null,
           icon: 'badge',
           color: 'success',
         };
@@ -441,7 +479,7 @@ class WorkflowManager {
    */
   static renderProgressTracker(state) {
     const effectiveState = state || { has_application: false, current_step: 'application' };
-    const ORDER = ['application', 'documents', 'verification', 'fee', 'signature', 'queue', 'passport_ready'];
+    const ORDER = ['application', 'documents', 'fee', 'verification', 'biometrics', 'signature', 'queue', 'passport_ready'];
     let currentKey = this.getCurrentWorkflowStep(effectiveState);
     
     let currentIdx = ORDER.indexOf(currentKey);
@@ -474,9 +512,11 @@ class WorkflowManager {
 
       const stepKey = `wf_${step.key === 'fee' ? 'payment' : (step.key === 'passport_ready' ? 'completed' : step.key)}`;
       const stepLabel = (typeof I18n !== 'undefined' && I18n.t) ? I18n.t(stepKey, step.label) : step.label;
+      const stepDescriptionKey = `wf_desc_${step.key === 'fee' ? 'payment' : (step.key === 'passport_ready' ? 'completed' : step.key)}`;
+      const stepDescription = (typeof I18n !== 'undefined' && I18n.t) ? I18n.t(stepDescriptionKey, step.description) : step.description;
 
       return `
-        <div class="wf-step wf-step-${stateClass}" title="${step.description}">
+        <div class="wf-step wf-step-${stateClass}" title="${stepDescription}">
           <div class="wf-step-icon">
             <span class="material-symbols-outlined">${iconName}</span>
           </div>

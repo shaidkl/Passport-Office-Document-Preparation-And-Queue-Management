@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Requirements & Fees — Nepal Passport Portal{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/public.css?v=20260914-3">
+{% endblock %}
+
+{% block content %}
+<section class="public-guide-hero">
+  <div class="container public-guide-hero-inner">
+    <a href="/" class="guide-back-link">
+      <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
+      <span data-i18n="back_to_home">Back to home</span>
+    </a>
+    <span class="section-eyebrow" data-i18n="requirements_eyebrow">Prepare before applying</span>
+    <h1 data-i18n="requirements_page_title">Requirements and passport fees</h1>
+    <p data-i18n="requirements_page_subtitle">Check the documents, photo, and service category before starting your application.</p>
+  </div>
+</section>
+
+<section class="public-guide-section requirements-content">
+  <div class="container">
+    <div class="requirements-grid">
+      <article class="requirements-card">
+        <span class="requirements-icon material-symbols-outlined" aria-hidden="true">id_card</span>
+        <h2 data-i18n="requirement_identity_title">Identity document</h2>
+        <p data-i18n="requirement_identity_desc">A clear copy of your Nepali citizenship certificate or National ID card.</p>
+      </article>
+      <article class="requirements-card">
+        <span class="requirements-icon material-symbols-outlined" aria-hidden="true">portrait</span>
+        <h2 data-i18n="requirement_photo_title">Passport photo</h2>
+        <p data-i18n="requirement_photo_desc">A recent, clear front-facing photo that meets the displayed upload rules.</p>
+      </article>
+      <article class="requirements-card">
+        <span class="requirements-icon material-symbols-outlined" aria-hidden="true">folder_shared</span>
+        <h2 data-i18n="requirement_supporting_title">Supporting documents</h2>
+        <p data-i18n="requirement_supporting_desc">Previous passport or other supporting proof when required by your selected service.</p>
+      </article>
+      <article class="requirements-card">
+        <span class="requirements-icon material-symbols-outlined" aria-hidden="true">phone_iphone</span>
+        <h2 data-i18n="requirement_contact_title">Active contact details</h2>
+        <p data-i18n="requirement_contact_desc">A valid Nepali mobile number for contact and a real email address you can access for account verification.</p>
+      </article>
+    </div>
+
+    <div class="fee-section-heading">
+      <span class="section-eyebrow" data-i18n="fees_eyebrow">Service categories</span>
+      <h2 data-i18n="tariff_title">Passport Categories &amp; Fee Structure</h2>
+      <p data-i18n="tariff_subtitle">Standard official fee tariffs established by the Ministry of Foreign Affairs, Government of Nepal.</p>
+    </div>
+
+    <div class="fee-card-grid">
+      <article class="fee-summary-card">
+        <span class="fee-card-label" data-i18n="standard_service">Standard service</span>
+        <h3 data-i18n="tier1_title">Ordinary e-Passport (34 Pages)</h3>
+        <strong data-i18n="tier1_price">NPR 5,000 / Standard Delivery</strong>
+        <p data-i18n="tier1_desc">Recommended for regular tourists, students, and travelers.</p>
+      </article>
+      <article class="fee-summary-card featured">
+        <span class="fee-card-label" data-i18n="frequent_traveler">Frequent traveler</span>
+        <h3 data-i18n="tier2_title">Ordinary e-Passport (66 Pages)</h3>
+        <strong data-i18n="tier2_price">NPR 10,000 / Standard Delivery</strong>
+        <p data-i18n="tier2_desc">Ideal for business travelers, frequent flyers, and expatriates.</p>
+      </article>
+      <article class="fee-summary-card">
+        <span class="fee-card-label" data-i18n="priority_service">Priority service</span>
+        <h3 data-i18n="tier3_title">Express Urgent Processing</h3>
+        <strong data-i18n="tier3_price">NPR 12,000 / Fast-Track Delivery</strong>
+        <p data-i18n="tier3_desc">Expedited priority queue for medical and official emergencies.</p>
+      </article>
+    </div>
+
+    <div class="payment-timing-note">
+      <span class="material-symbols-outlined" aria-hidden="true">info</span>
+      <span>
+        <strong data-i18n="payment_timing_title">Payment follows the required document uploads</strong>
+        <small data-i18n="payment_timing_desc">Upload the required identity document and passport photo, then pay so staff verification can begin.</small>
+      </span>
+    </div>
+
+    <div class="requirements-actions">
+      <a href="/applicant/apply/" class="btn btn-primary btn-lg">
+        <span class="material-symbols-outlined" aria-hidden="true">description</span>
+        <span data-i18n="simple_apply_button">Apply for Passport</span>
+      </a>
+      <a href="/how-to-apply/" class="btn btn-outline-primary btn-lg" data-i18n="nav_how_to_apply">How to Apply</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

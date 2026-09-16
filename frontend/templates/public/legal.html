@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}{{ policy.title }} — Nepal e-Passport Workflow Demo{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/public.css?v=20260915-1">
+{% endblock %}
+
+{% block content %}
+<section class="public-guide-hero">
+  <div class="container public-guide-hero-inner">
+    <a href="/" class="guide-back-link">
+      <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
+      <span data-i18n="back_to_home">Back to home</span>
+    </a>
+    <span class="section-eyebrow" data-i18n="legal_eyebrow">Project information</span>
+    <h1 data-i18n="{{ policy.title_key }}">{{ policy.title }}</h1>
+    <p data-i18n="{{ policy.intro_key }}">{{ policy.intro }}</p>
+  </div>
+</section>
+
+<section class="public-guide-section">
+  <div class="container">
+    <div class="requirements-grid">
+      {% for title_key, title, desc_key, description in policy.sections %}
+      <article class="requirements-card">
+        <span class="requirements-icon material-symbols-outlined" aria-hidden="true">policy</span>
+        <h2 data-i18n="{{ title_key }}">{{ title }}</h2>
+        <p data-i18n="{{ desc_key }}">{{ description }}</p>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endblock %}

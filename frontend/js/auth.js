@@ -1,14 +1,14 @@
 /**
  * Authentication Manager for Nepal Passport Management System
- * Handles session tokens, roles, profile storage, login/logout, and page access guards.
+ * Handles secure cookie sessions, roles, profile storage, login/logout, and page access guards.
  */
 
 class AuthManager {
-  static TOKEN_KEY = 'passport_token';
   static USER_KEY = 'passport_user';
+  static profilePhotoObjectUrl = null;
 
   static isAuthenticated() {
-    return !!localStorage.getItem(this.TOKEN_KEY);
+    return !!this.getUser();
   }
 
   static getUser() {
@@ -26,33 +26,96 @@ class AuthManager {
   }
 
   static getToken() {
-    return localStorage.getItem(this.TOKEN_KEY);
+    return null;
+  }
+
+  static loginUrlForRole(role) {
+    if (role === 'staff') return '/staff/login/';
+    if (role === 'administrator') return '/admin-portal/login/';
+    return '/login/';
+  }
+
+  static async loadVerifiedProfilePhoto(user = this.getUser()) {
+    const role = user ? user.role : null;
+    if (!user || !user.user_id || !['citizen', 'applicant'].includes(role)) return;
+
+    try {
+      const response = await fetch(`/api/applicants/${user.user_id}/profile-photo/`, {
+        headers: {
+          // DRF negotiates the request before the FileResponse is returned.
+          // Accept any response here, then enforce an image content type below.
+          'Accept': '*/*'
+        },
+        credentials: 'same-origin'
+      });
+      if (!response.ok) return;
+
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.startsWith('image/')) return;
+
+      const photoBlob = await response.blob();
+      const photoUrl = URL.createObjectURL(photoBlob);
+      if (this.profilePhotoObjectUrl) {
+        URL.revokeObjectURL(this.profilePhotoObjectUrl);
+      }
+      this.profilePhotoObjectUrl = photoUrl;
+
+      document.querySelectorAll('.auth-user-avatar').forEach(element => {
+        element.textContent = '';
+        element.setAttribute('aria-label', `${user.name || 'Citizen'} verified profile photo`);
+        element.classList.add('has-profile-photo');
+        element.style.backgroundImage = `url("${photoUrl}")`;
+      });
+      return true;
+    } catch (error) {
+      console.warn('Verified profile photo could not be loaded.', error);
+      return false;
+    }
   }
 
   /**
    * Perform login through /api/login/
    * Supports email or username identifier.
    */
-  static async login(identifier, password) {
+  static storeAuthenticatedUser(result) {
+    localStorage.removeItem('passport_token');
+    localStorage.setItem(this.USER_KEY, JSON.stringify({
+      user_id: result.user_id,
+      role: result.role,
+      name: result.name,
+      username: result.username || null,
+      email: result.email,
+      department: result.department || null,
+      designation: result.designation || null,
+    }));
+  }
+
+  static async login(identifier, password, portalRole = null, rememberMe = false) {
     const result = await API.post('/login/', {
       email: identifier,
       username: identifier,
-      password: password
+      password: password,
+      remember_me: rememberMe,
+      ...(portalRole ? { portal_role: portalRole } : {})
     });
-    if (result && result.token) {
-      localStorage.setItem(this.TOKEN_KEY, result.token);
-      localStorage.setItem(this.USER_KEY, JSON.stringify({
-        user_id: result.user_id,
-        role: result.role,
-        name: result.name,
-        username: result.username || null,
-        email: result.email,
-        department: result.department || null,
-        designation: result.designation || null,
-      }));
+    if (result && result.mfa_required) return result;
+    if (result && result.user_id) {
+      this.storeAuthenticatedUser(result);
       return result;
     }
-    throw new Error('Authentication failed: Missing token in response.');
+    throw new Error('Authentication failed: Missing account details in response.');
+  }
+
+  static async completeMfa(challengeId, code) {
+    const result = await API.post('/login/mfa/verify/', {
+      challenge_id: challengeId,
+      code,
+    });
+    if (result && result.user_id) {
+      this.storeAuthenticatedUser(result);
+      return result;
+    }
+    throw new Error('Authentication failed: Missing account details in response.');
   }
 
   /**
@@ -66,10 +129,22 @@ class AuthManager {
    * Log out and clear state
    */
   static logout(redirect = true) {
-    localStorage.removeItem(this.TOKEN_KEY);
+    const role = this.getRole();
+    const csrfToken = (typeof API !== 'undefined') ? API.getCsrfToken() : null;
+    fetch('/api/logout/', {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        ...(csrfToken ? { 'X-CSRFToken': csrfToken } : {}),
+      },
+      credentials: 'same-origin',
+      keepalive: true,
+    }).catch(() => {});
+    localStorage.removeItem('passport_token');
     localStorage.removeItem(this.USER_KEY);
     if (redirect) {
-      window.location.href = '/login/?msg=logged_out';
+      const loginUrl = this.loginUrlForRole(role);
+      window.location.href = `${loginUrl}?msg=logged_out`;
     }
   }
 
@@ -79,7 +154,15 @@ class AuthManager {
   static requireAuth(allowedRoles = []) {
     if (!this.isAuthenticated()) {
       const currentPath = encodeURIComponent(window.location.pathname);
-      window.location.href = `/login/?next=${currentPath}`;
+      const requiredRole = window.location.pathname.startsWith('/admin-portal/')
+        ? 'administrator'
+        : window.location.pathname.startsWith('/staff/')
+          ? 'staff'
+          : allowedRoles.length === 1
+            ? allowedRoles[0]
+            : null;
+      const loginUrl = this.loginUrlForRole(requiredRole);
+      window.location.href = `${loginUrl}?next=${currentPath}`;
       return false;
     }
 
@@ -124,6 +207,7 @@ class AuthManager {
         const initials = (user.name || 'U').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
         el.textContent = initials;
       });
+      this.loadVerifiedProfilePhoto(user);
 
       // Update portal link if present
       const portalLink = document.getElementById('header-portal-link');

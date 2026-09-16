@@ -1,608 +1,422 @@
+"""Generate a TD3-sized digital passport record.
+
+The PDF deliberately does not reproduce Nepal's protected passport artwork,
+security printing, or contactless chip. It mirrors the public ICAO TD3 page
+dimensions and machine-readable data structure while remaining unmistakably a
+portal-issued digital record that is not valid for physical travel.
+"""
+
 import io
-import os
-import struct
-import time
+import re
+import unicodedata
 import zlib
-from datetime import datetime
+from datetime import date, datetime
+
+from PIL import Image, ImageOps
 
 
-def escape_pdf_text(text):
-    """Escapes special characters in PDF strings."""
-    if not text:
-        return ""
-    return str(text).replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+POINTS_PER_MM = 72 / 25.4
+PAGE_WIDTH = 125 * POINTS_PER_MM
+PAGE_HEIGHT = 88 * POINTS_PER_MM
+MRZ_WEIGHTS = (7, 3, 1)
+MRZ_VALUES = {str(number): number for number in range(10)}
+MRZ_VALUES.update({chr(code): code - 55 for code in range(65, 91)})
+MRZ_VALUES["<"] = 0
 
 
-def _extract_image_for_pdf(img_path):
-    """
-    Extracts raw image stream, dimensions, and PDF dictionary parameters
-    for JPEG or PNG without requiring external third-party dependencies.
-    """
-    if not img_path or not os.path.exists(img_path):
+def escape_pdf_text(value):
+    """Escape text used inside a PDF literal string."""
+    text = "" if value is None else str(value)
+    text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
+    return text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+
+
+def get_passport_page_count(application):
+    """Return the physical booklet page option selected by the applicant."""
+    category = (application.passport_category or "").lower()
+    match = re.search(r"\b(34|66)\b", category)
+    return int(match.group(1)) if match else 34
+
+
+def _pdf_date(value, fallback="NOT RECORDED"):
+    if isinstance(value, datetime):
+        value = value.date()
+    if isinstance(value, date):
+        return value.strftime("%d %b %Y").upper()
+    return fallback
+
+
+def _mrz_date(value):
+    if isinstance(value, datetime):
+        value = value.date()
+    if isinstance(value, date):
+        return value.strftime("%y%m%d")
+    return "<<<<<<"
+
+
+def _mrz_clean(value, separator="<"):
+    normalized = unicodedata.normalize("NFKD", str(value or ""))
+    ascii_value = normalized.encode("ascii", "ignore").decode("ascii").upper()
+    return re.sub(r"[^A-Z0-9]", separator, ascii_value)
+
+
+def _mrz_check(value):
+    total = sum(MRZ_VALUES.get(char, 0) * MRZ_WEIGHTS[index % 3] for index, char in enumerate(value))
+    return str(total % 10)
+
+
+def _split_name(full_name):
+    parts = [part for part in re.split(r"\s+", str(full_name or "").strip()) if part]
+    if not parts:
+        return "NOT RECORDED", ""
+    if len(parts) == 1:
+        return parts[0], ""
+    return parts[-1], " ".join(parts[:-1])
+
+
+def _document_number(application):
+    """Return the allocated nine-character sequential passport number."""
+    passport_number = str(getattr(application, "passport_number", "") or "").upper()
+    if not re.fullmatch(r"NP\d{7}", passport_number):
+        raise ValueError("A valid sequential passport number is required.")
+    return passport_number
+
+
+def build_td3_mrz(application):
+    """Build the two 44-character TD3 MRZ lines, including all check digits."""
+    applicant = application.applicant
+    surname, given_names = _split_name(applicant.full_name)
+    mrz_name = f"{_mrz_clean(surname)}<<{_mrz_clean(given_names)}"
+    line_one = ("P<NPL" + mrz_name)[:44].ljust(44, "<")
+
+    document_number = _mrz_clean(_document_number(application))[:9].ljust(9, "<")
+    birth_date = _mrz_date(getattr(applicant, "date_of_birth", None))
+    expiry_date = _mrz_date(getattr(application, "expiry_date", None))
+    sex_value = str(getattr(applicant, "gender", "") or "").strip().upper()
+    sex = {"MALE": "M", "FEMALE": "F"}.get(sex_value, "X")
+    optional_data = "<" * 14
+
+    document_check = _mrz_check(document_number)
+    birth_check = _mrz_check(birth_date)
+    expiry_check = _mrz_check(expiry_date)
+    optional_check = _mrz_check(optional_data)
+    composite_source = (
+        document_number
+        + document_check
+        + birth_date
+        + birth_check
+        + expiry_date
+        + expiry_check
+        + optional_data
+        + optional_check
+    )
+    composite_check = _mrz_check(composite_source)
+    line_two = (
+        document_number
+        + document_check
+        + "NPL"
+        + birth_date
+        + birth_check
+        + sex
+        + expiry_date
+        + expiry_check
+        + optional_data
+        + optional_check
+        + composite_check
+    )
+    return line_one, line_two
+
+
+def _rgb(red, green, blue):
+    return f"{red:.3f} {green:.3f} {blue:.3f}"
+
+
+def _text(commands, x, y, value, size=7, font="F1", color=(0.06, 0.14, 0.24)):
+    commands.append(
+        f"BT /{font} {size:.2f} Tf {_rgb(*color)} rg {x:.2f} {y:.2f} Td "
+        f"({escape_pdf_text(value)}) Tj ET"
+    )
+
+
+def _line(commands, x1, y1, x2, y2, color=(0.72, 0.77, 0.82), width=0.5):
+    commands.append(
+        f"{_rgb(*color)} RG {width:.2f} w {x1:.2f} {y1:.2f} m {x2:.2f} {y2:.2f} l S"
+    )
+
+
+def _rect(commands, x, y, width, height, stroke=(0.25, 0.35, 0.45), fill=None, line_width=0.6):
+    if fill:
+        commands.append(f"{_rgb(*fill)} rg {x:.2f} {y:.2f} {width:.2f} {height:.2f} re f")
+    if stroke:
+        commands.append(
+            f"{_rgb(*stroke)} RG {line_width:.2f} w "
+            f"{x:.2f} {y:.2f} {width:.2f} {height:.2f} re S"
+        )
+
+
+def _common_page_markings(commands, page_number, total_pages):
+    _text(
+        commands,
+        12,
+        PAGE_HEIGHT - 10,
+        "DIGITAL RECORD - NOT VALID FOR PHYSICAL TRAVEL",
+        size=5.2,
+        font="F2",
+        color=(0.55, 0.12, 0.12),
+    )
+    _text(
+        commands,
+        PAGE_WIDTH - 45,
+        7,
+        f"{page_number} / {total_pages}",
+        size=5.5,
+        color=(0.35, 0.4, 0.45),
+    )
+
+
+def _compressed_stream(commands):
+    return zlib.compress("\n".join(commands).encode("latin-1", "replace"), level=9)
+
+
+def _prepare_portrait(application):
+    """Return an RGB JPEG suitable for a portrait XObject, if one is available."""
+    photo_document = (
+        application.documents.filter(document_type__icontains="photo", verification_status="Verified")
+        .order_by("-upload_date")
+        .first()
+    )
+    if not photo_document or not photo_document.file_path:
         return None
+
     try:
-        with open(img_path, 'rb') as f:
-            data = f.read()
-
-        # 1. JPEG image
-        if data.startswith(b'\xff\xd8'):
-            i = 2
-            length = len(data)
-            w, h = 300, 390
-            while i < length - 8:
-                if data[i] != 0xFF:
-                    i += 1
-                    continue
-                marker = data[i+1]
-                if marker in (0xC0, 0xC1, 0xC2, 0xC3):
-                    h = (data[i+5] << 8) + data[i+6]
-                    w = (data[i+7] << 8) + data[i+8]
-                    break
-                elif marker in (0xD8, 0xD9):
-                    i += 2
-                    continue
-                else:
-                    seg_len = (data[i+2] << 8) + data[i+3]
-                    i += 2 + seg_len
-            return {
-                'width': w,
-                'height': h,
-                'colorspace': '/DeviceRGB',
-                'bpc': 8,
-                'filter': '/DCTDecode',
-                'extra_dict': '',
-                'stream': data
-            }
-
-        # 2. PNG image
-        elif data.startswith(b'\x89PNG\r\n\x1a\n'):
-            w, h = struct.unpack(">II", data[16:24])
-            bit_depth = data[24]
-            color_type = data[25]
-            idat = bytearray()
-            pos = 8
-            while pos < len(data) - 12:
-                chunk_len = struct.unpack(">I", data[pos:pos+4])[0]
-                chunk_type = data[pos+4:pos+8]
-                if chunk_type == b'IDAT':
-                    idat.extend(data[pos+8:pos+8+chunk_len])
-                pos += 12 + chunk_len
-
-            colors = 4 if color_type == 6 else (3 if color_type == 2 else 1)
-            colorspace = '/DeviceRGB' if colors >= 3 else '/DeviceGray'
-            extra_dict = f"/DecodeParms << /Predictor 15 /Columns {w} /Colors {colors} /BitsPerComponent {bit_depth} >>"
-            return {
-                'width': w,
-                'height': h,
-                'colorspace': colorspace,
-                'bpc': bit_depth,
-                'filter': '/FlateDecode',
-                'extra_dict': extra_dict,
-                'stream': bytes(idat)
-            }
-    except Exception:
+        photo_document.file_path.open("rb")
+        try:
+            image = Image.open(photo_document.file_path)
+            image.load()
+        finally:
+            photo_document.file_path.close()
+        image = ImageOps.exif_transpose(image).convert("RGB")
+        portrait = ImageOps.fit(image, (450, 600), method=Image.Resampling.LANCZOS, centering=(0.5, 0.43))
+        output = io.BytesIO()
+        portrait.save(output, format="JPEG", quality=88, optimize=True)
+        return {"data": output.getvalue(), "width": 450, "height": 600}
+    except (OSError, ValueError):
         return None
-    return None
+
+
+def _notice_page(application, total_pages):
+    signature = getattr(application, "digital_signature", None)
+    document_number = _document_number(application)
+    reference = f"NP-{application.submission_date.year}-{application.application_id:04d}"
+    commands = []
+    _rect(commands, 0, 0, PAGE_WIDTH, PAGE_HEIGHT, stroke=None, fill=(0.965, 0.972, 0.980))
+    _common_page_markings(commands, 1, total_pages)
+
+    _rect(commands, 12, 145, PAGE_WIDTH - 24, 72, stroke=(0.04, 0.18, 0.34), fill=(0.04, 0.18, 0.34))
+    _text(commands, 24, 195, "GOVERNMENT OF NEPAL", size=8, font="F2", color=(1, 1, 1))
+    _text(commands, 24, 180, "DEPARTMENT OF PASSPORTS", size=14, font="F2", color=(1, 1, 1))
+    _text(commands, 24, 164, "PORTAL-ISSUED DIGITAL PASSPORT RECORD", size=8, color=(0.88, 0.92, 0.97))
+
+    _text(commands, 18, 128, "IMPORTANT VALIDATION NOTICE", size=8, font="F2", color=(0.55, 0.08, 0.08))
+    _text(commands, 18, 114, "This PDF is an electronic portal record. It is not the physical ePassport,", size=6.8)
+    _text(commands, 18, 104, "contains no contactless chip, and cannot be used for border crossing or visas.", size=6.8)
+    _text(commands, 18, 94, "Protected security artwork and manufacturing features are intentionally omitted.", size=6.8)
+
+    _line(commands, 18, 84, PAGE_WIDTH - 18, 84)
+    _text(commands, 18, 71, "RECORD DETAILS", size=7, font="F2")
+    _text(commands, 18, 58, f"Application reference: {reference}", size=6.4)
+    _text(commands, 18, 48, f"Document reference: {document_number}", size=6.4)
+    _text(commands, 18, 38, f"Selected booklet: {total_pages} pages", size=6.4)
+
+    if signature:
+        _text(commands, 178, 71, "DIGITAL VERIFICATION", size=7, font="F2")
+        _text(commands, 178, 58, f"Certificate: {signature.certificate_serial}", size=5.6)
+        _text(commands, 178, 48, f"Algorithm: {signature.algorithm}", size=5.6)
+        _text(commands, 178, 38, f"Key ID: {signature.key_id}", size=5.6)
+        _text(commands, 178, 28, f"Payload hash: {signature.payload_hash[:28]}...", size=5.2, font="F3")
+    else:
+        _text(commands, 178, 58, "No digital signature is attached.", size=6, color=(0.55, 0.08, 0.08))
+
+    return _compressed_stream(commands)
+
+
+def _field(commands, x, y, label, value, value_size=7.1):
+    _text(commands, x, y + 7, label.upper(), size=4.6, font="F2", color=(0.35, 0.4, 0.45))
+    _text(commands, x, y - 1, value, size=value_size, font="F2")
+
+
+def _data_page(application, total_pages, has_portrait):
+    applicant = application.applicant
+    surname, given_names = _split_name(applicant.full_name)
+    line_one, line_two = build_td3_mrz(application)
+    issue_date = getattr(application, "issue_date", None)
+    expiry_date = getattr(application, "expiry_date", None)
+    gender = str(getattr(applicant, "gender", "") or "").strip().upper()
+    sex = {"MALE": "M", "FEMALE": "F"}.get(gender, "X")
+    place_of_birth = getattr(applicant, "place_of_birth", None) or "NOT RECORDED"
+
+    commands = []
+    _rect(commands, 0, 0, PAGE_WIDTH, PAGE_HEIGHT, stroke=None, fill=(0.975, 0.972, 0.945))
+    _common_page_markings(commands, 2, total_pages)
+    _rect(commands, 10, 205, PAGE_WIDTH - 20, 26, stroke=None, fill=(0.08, 0.24, 0.37))
+    _text(commands, 17, 219, "NEPAL / NPL", size=10, font="F2", color=(1, 1, 1))
+    _text(commands, 97, 219, "PASSPORT DATA - DIGITAL RECORD", size=8, font="F2", color=(1, 1, 1))
+
+    photo_x, photo_y, photo_width, photo_height = 14, 73, 64, 86
+    _rect(commands, photo_x, photo_y, photo_width, photo_height, stroke=(0.25, 0.31, 0.37), fill=(0.9, 0.91, 0.9))
+    if has_portrait:
+        commands.append(
+            f"q {photo_width:.2f} 0 0 {photo_height:.2f} {photo_x:.2f} {photo_y:.2f} cm /Im1 Do Q"
+        )
+    else:
+        _text(commands, photo_x + 9, photo_y + 43, "NO VERIFIED", size=5.8, font="F2", color=(0.45, 0.45, 0.45))
+        _text(commands, photo_x + 14, photo_y + 34, "PORTRAIT", size=5.8, font="F2", color=(0.45, 0.45, 0.45))
+
+    _field(commands, 14, 176, "Type", "P / ORDINARY")
+    _field(commands, 100, 187, "Issuing state", "NPL")
+    _field(commands, 180, 187, "Document number", _document_number(application), value_size=8)
+    _field(commands, 100, 166, "Surname", surname)
+    _field(commands, 100, 145, "Given names", given_names or "-")
+    _field(commands, 100, 124, "Nationality", "NEPALI")
+    _field(commands, 180, 124, "Date of birth", _pdf_date(getattr(applicant, "date_of_birth", None)))
+    _field(commands, 290, 124, "Sex", sex)
+    _field(commands, 100, 103, "Place of birth", place_of_birth, value_size=6.3)
+    _field(commands, 100, 82, "Date of issue", _pdf_date(issue_date), value_size=6.4)
+    _field(commands, 180, 82, "Date of expiry", _pdf_date(expiry_date), value_size=6.4)
+    _field(commands, 264, 82, "Authority", "DOP NEPAL", value_size=6.4)
+    _text(commands, 100, 66, "Holder signature: not captured in this digital record", size=5.1, color=(0.38, 0.4, 0.42))
+
+    _rect(commands, 10, 14, PAGE_WIDTH - 20, 43, stroke=(0.2, 0.25, 0.3), fill=(0.94, 0.94, 0.90), line_width=0.7)
+    _text(commands, 20, 40, line_one, size=8.4, font="F3", color=(0.02, 0.02, 0.02))
+    _text(commands, 20, 25, line_two, size=8.4, font="F3", color=(0.02, 0.02, 0.02))
+    return _compressed_stream(commands)
+
+
+def _visa_page(application, page_number, total_pages):
+    commands = []
+    _rect(commands, 0, 0, PAGE_WIDTH, PAGE_HEIGHT, stroke=None, fill=(0.975, 0.972, 0.945))
+    _common_page_markings(commands, page_number, total_pages)
+    _text(commands, 16, PAGE_HEIGHT - 28, "VISAS", size=9, font="F2", color=(0.15, 0.25, 0.32))
+    _text(
+        commands,
+        PAGE_WIDTH - 100,
+        PAGE_HEIGHT - 28,
+        _document_number(application),
+        size=6,
+        font="F3",
+        color=(0.4, 0.43, 0.45),
+    )
+    _line(commands, 14, PAGE_HEIGHT - 35, PAGE_WIDTH - 14, PAGE_HEIGHT - 35, color=(0.62, 0.66, 0.67))
+    _rect(commands, 14, 22, PAGE_WIDTH - 28, PAGE_HEIGHT - 66, stroke=(0.76, 0.77, 0.73), line_width=0.45)
+    _text(
+        commands,
+        73,
+        PAGE_HEIGHT / 2,
+        "DIGITAL COPY - NOT VALID FOR VISA OR TRAVEL",
+        size=8.5,
+        font="F2",
+        color=(0.84, 0.82, 0.77),
+    )
+    _text(
+        commands,
+        17,
+        13,
+        "Security printing, chip data, and anti-counterfeit artwork are not reproduced.",
+        size=4.7,
+        color=(0.45, 0.47, 0.47),
+    )
+    return _compressed_stream(commands)
 
 
 def generate_passport_pdf(application):
-    """
-    Generates a valid PDF-1.4 Virtual e-Passport certificate for the given Application.
-    Embeds the applicant's verified passport-size photo and accurate selected package/page count.
-    Returns bytes of the PDF file.
-    """
-    applicant = application.applicant
-    sig = getattr(application, 'digital_signature', None)
-    token = getattr(application, 'queue_token', None)
+    """Return a complete TD3-sized PDF for an approved passport application."""
+    total_pages = get_passport_page_count(application)
+    portrait = _prepare_portrait(application)
 
-    # Passport details
-    app_id_str = f"NP-2026-{application.application_id:04d}"
-    full_name = applicant.full_name.upper() if applicant else "CITIZEN USER"
-    nationality = (applicant.nationality or "NEPALI").upper() if applicant else "NEPALI"
-    dob = str(applicant.date_of_birth) if (applicant and applicant.date_of_birth) else "1995-01-01"
-    gender = (applicant.gender or "MALE").upper() if applicant else "MALE"
-    passport_type_str = getattr(application, 'passport_type', 'Ordinary e-Passport')
-    pages_str = getattr(application, 'passport_pages', '34 Pages')
-    # Issue & Expiry Date handling from Application model
+    objects = {}
+    next_object_id = 1
 
-    if getattr(application, 'issue_date', None):
-        issue_date = application.issue_date.strftime("%Y-%m-%d")
-    elif application.submission_date:
-        issue_date = application.submission_date.strftime("%Y-%m-%d")
-    else:
-        issue_date = datetime.now().strftime("%Y-%m-%d")
+    catalog_id = next_object_id
+    next_object_id += 1
+    pages_id = next_object_id
+    next_object_id += 1
+    font_regular_id = next_object_id
+    next_object_id += 1
+    font_bold_id = next_object_id
+    next_object_id += 1
+    font_mrz_id = next_object_id
+    next_object_id += 1
 
-    if getattr(application, 'expiry_date', None):
-        expiry_date = application.expiry_date.strftime("%Y-%m-%d")
-    else:
-        try:
-            from django.conf import settings
-            validity = getattr(settings, 'PASSPORT_VALIDITY_YEARS', 10)
-            sub_dt = application.issue_date or application.submission_date or datetime.now()
-            expiry_date = sub_dt.replace(year=sub_dt.year + validity).strftime("%Y-%m-%d")
-        except Exception:
-            expiry_date = "2036-09-08"
+    objects[font_regular_id] = b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"
+    objects[font_bold_id] = b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>"
+    objects[font_mrz_id] = b"<< /Type /Font /Subtype /Type1 /BaseFont /Courier-Bold >>"
 
-
-    # Signature details
-    sig_authority = sig.signing_authority if sig else "Department of Passports, Government of Nepal"
-    cert_serial = sig.certificate_serial if sig else f"NPL-DOP-PKI-2026-{application.application_id:04d}"
-    sig_algo = sig.algorithm if sig else "RSA-SHA256"
-    sig_hash = sig.signature_hash if sig else f"SHA256:NPL{application.application_id}{int(time.time())}"
-    token_str = f"T-{token.token_number:03d}" if token else "T-101"
-
-    # Retrieve verified Passport Photo document
-    img_info = None
-    if hasattr(application, 'documents'):
-        photo_doc = application.documents.filter(
-            document_type__icontains='photo',
-            verification_status='Verified'
-        ).order_by('-document_id').first()
-        if photo_doc and photo_doc.file_path:
-            try:
-                img_info = _extract_image_for_pdf(photo_doc.file_path.path)
-            except Exception:
-                try:
-                    from django.conf import settings
-                    full_p = os.path.join(settings.MEDIA_ROOT, str(photo_doc.file_path))
-                    img_info = _extract_image_for_pdf(full_p)
-                except Exception:
-                    img_info = None
-
-    # MRZ lines (ICAO standard 44 chars)
-    name_parts = full_name.split()
-    surname = name_parts[-1] if len(name_parts) > 1 else name_parts[0]
-    given_names = " ".join(name_parts[:-1]) if len(name_parts) > 1 else ""
-    mrz_name = f"{surname}<<{given_names.replace(' ', '<')}".ljust(39, '<')[:39]
-    mrz_line1 = f"P<NPL{mrz_name}"[:44]
-
-    dob_compact = dob.replace("-", "")[2:] if len(dob) >= 10 else "950101"
-    exp_compact = expiry_date.replace("-", "")[2:] if len(expiry_date) >= 10 else "360908"
-    gender_char = gender[0] if gender else "M"
-    pass_clean = f"NP{application.application_id:07d}"
-    mrz_line2 = f"{pass_clean}9NPL{dob_compact}5{gender_char}{exp_compact}2<<<<<<<<<<<<<<04"[:44]
-
-    # Content Stream Commands (Origin at bottom-left: 595 x 842 pts - A4)
-    # Coordinate system: (0,0) is bottom-left, (595, 842) is top-right.
-    stream_cmds = [
-        # 1. Outer & Inner Border (Government Style)
-        "q",
-        "0.05 0.15 0.35 rg",  # Primary Navy Blue
-        "0.05 0.15 0.35 RG",
-        "2 w",
-        "25 25 545 792 re S",
-        "0.85 0.70 0.20 RG",  # Gold accent inner border
-        "1.5 w",
-        "29 29 537 784 re S",
-        "Q",
-
-        # 2. Header Banner Background
-        "q",
-        "0.08 0.18 0.38 rg",
-        "31 730 533 81 re f",
-        "Q",
-
-        # Header Text
-        "BT",
-        "/F2 16 Tf",
-        "1 1 1 rg",  # White
-        "170 785 Td",
-        f"({escape_pdf_text('GOVERNMENT OF NEPAL')}) Tj",
-        "ET",
-
-        "BT",
-        "/F1 11 Tf",
-        "0.9 0.85 0.5 rg",  # Soft Gold
-        "155 768 Td",
-        f"({escape_pdf_text('MINISTRY OF FOREIGN AFFAIRS  |  DEPARTMENT OF PASSPORTS')}) Tj",
-        "ET",
-
-        "BT",
-        "/F2 13 Tf",
-        "1 1 1 rg",
-        "190 745 Td",
-        f"({escape_pdf_text('OFFICIAL VIRTUAL e-PASSPORT')}) Tj",
-        "ET",
-
-        # 3. Subheader Status Strip
-        "q",
-        "0.92 0.95 0.98 rg",
-        "31 700 533 28 re f",
-        "0.8 0.85 0.9 RG",
-        "0.5 w",
-        "31 700 533 28 re S",
-        "Q",
-
-        "BT",
-        "/F2 8.5 Tf",
-        "0.1 0.3 0.2 rg",
-        "42 710 Td",
-        f"({escape_pdf_text('DOCUMENT STATUS: VALID & CERTIFIED')}) Tj",
-        "ET",
-
-        "BT",
-        "/F1 8.5 Tf",
-        "0.3 0.3 0.4 rg",
-        "235 710 Td",
-        f"({escape_pdf_text('ICAO 9303 COMPLIANT  |  DIGITAL PASS: ' + app_id_str)}) Tj",
-        "ET",
-
-        "BT",
-        "/F2 8.5 Tf",
-        "0.6 0.2 0.1 rg",
-        "465 710 Td",
-        f"({escape_pdf_text('TOKEN: ' + token_str)}) Tj",
-        "ET",
-
-        # 4. Citizen Credentials Frame
-        "q",
-        "0.97 0.97 0.98 rg",
-        "45 420 505 260 re f",
-        "0.8 0.8 0.85 RG",
-        "1 w",
-        "45 420 505 260 re S",
-        "Q",
-    ]
-
-    if img_info:
-        # Render verified applicant photograph inside frame
-        stream_cmds.extend([
-            "q",
-            "60 520 100 130 re W n",  # Clip path to frame bounds
-            "100 0 0 130 60 520 cm",   # Coordinate transform matrix
-            "/ImPhoto Do",
-            "Q",
-            "q",
-            "0.6 0.7 0.8 RG",
-            "1.5 w",
-            "60 520 100 130 re S",    # Outer photo border
-            "Q",
-        ])
-    else:
-        # Clean placeholder frame
-        stream_cmds.extend([
-            "q",
-            "0.90 0.92 0.95 rg",
-            "60 520 100 130 re f",
-            "0.7 0.75 0.8 RG",
-            "1 w",
-            "60 520 100 130 re S",
-            "Q",
-            "BT",
-            "/F2 9 Tf",
-            "0.4 0.4 0.5 rg",
-            "82 585 Td",
-            "(DIGITAL) Tj",
-            "ET",
-            "BT",
-            "/F2 9 Tf",
-            "0.4 0.4 0.5 rg",
-            "86 570 Td",
-            "(PHOTO) Tj",
-            "ET",
-            "BT",
-            "/F1 7 Tf",
-            "0.1 0.6 0.2 rg",
-            "68 535 Td",
-            "(BIOMETRIC MATCH) Tj",
-            "ET",
-        ])
-
-    stream_cmds.extend([
-        # Credentials Fields (Right Side)
-        # Field 1: Full Name
-        "BT",
-        "/F1 8 Tf",
-        "0.5 0.5 0.5 rg",
-        "180 635 Td",
-        "(Full Legal Name / Pura Naam:) Tj",
-        "ET",
-        "BT",
-        "/F2 12 Tf",
-        "0.05 0.15 0.35 rg",
-        "180 620 Td",
-        f"({escape_pdf_text(full_name)}) Tj",
-        "ET",
-
-        # Field 2: Passport Number
-        "BT",
-        "/F1 8 Tf",
-        "0.5 0.5 0.5 rg",
-        "380 635 Td",
-        "(Passport No. / Rahadani No:) Tj",
-        "ET",
-        "BT",
-        "/F2 12 Tf",
-        "0.75 0.1 0.1 rg",
-        "380 620 Td",
-        f"({escape_pdf_text(app_id_str)}) Tj",
-        "ET",
-
-        # Field 3: Nationality & Category
-        "BT",
-        "/F1 8 Tf",
-        "0.5 0.5 0.5 rg",
-        "180 590 Td",
-        "(Nationality / Rastriyata:) Tj",
-        "ET",
-        "BT",
-        "/F2 10 Tf",
-        "0.1 0.1 0.1 rg",
-        "180 577 Td",
-        f"({escape_pdf_text(nationality)}) Tj",
-        "ET",
-
-        "BT",
-        "/F1 8 Tf",
-        "0.5 0.5 0.5 rg",
-        "380 590 Td",
-        "(Passport Type & Pages:) Tj",
-        "ET",
-        "BT",
-        "/F2 10 Tf",
-        "0.1 0.1 0.1 rg",
-        "380 577 Td",
-        f"({escape_pdf_text(passport_type_str + '  |  ' + pages_str)}) Tj",
-        "ET",
-
-        # Field 4: DOB & Gender
-        "BT",
-        "/F1 8 Tf",
-        "0.5 0.5 0.5 rg",
-        "180 550 Td",
-        "(Date of Birth / Janma Miti:) Tj",
-        "ET",
-        "BT",
-        "/F2 10 Tf",
-        "0.1 0.1 0.1 rg",
-        "180 537 Td",
-        f"({escape_pdf_text(dob)}) Tj",
-        "ET",
-
-        "BT",
-        "/F1 8 Tf",
-        "0.5 0.5 0.5 rg",
-        "380 550 Td",
-        "(Sex / Gender:) Tj",
-        "ET",
-        "BT",
-        "/F2 10 Tf",
-        "0.1 0.1 0.1 rg",
-        "380 537 Td",
-        f"({escape_pdf_text(gender)}) Tj",
-        "ET",
-
-        # Field 5: Dates of Issue & Expiry
-        "BT",
-        "/F1 8 Tf",
-        "0.5 0.5 0.5 rg",
-        "180 510 Td",
-        "(Date of Issue / Jari Miti:) Tj",
-        "ET",
-        "BT",
-        "/F2 10 Tf",
-        "0.1 0.1 0.1 rg",
-        "180 497 Td",
-        f"({escape_pdf_text(issue_date)}) Tj",
-        "ET",
-
-        "BT",
-        "/F1 8 Tf",
-        "0.5 0.5 0.5 rg",
-        "380 510 Td",
-        "(Date of Expiry / Myad Sakine Miti:) Tj",
-        "ET",
-        "BT",
-        "/F2 10 Tf",
-        "0.1 0.1 0.1 rg",
-        "380 497 Td",
-        f"({escape_pdf_text(expiry_date)}) Tj",
-        "ET",
-
-        # Field 6: Issuing Authority & Biometrics
-        "BT",
-        "/F1 8 Tf",
-        "0.5 0.5 0.5 rg",
-        "180 470 Td",
-        "(Issuing Authority:) Tj",
-        "ET",
-        "BT",
-        "/F2 10 Tf",
-        "0.1 0.1 0.1 rg",
-        "180 457 Td",
-        "(DEPARTMENT OF PASSPORTS, KATHMANDU, NEPAL) Tj",
-        "ET",
-
-        "BT",
-        "/F1 8 Tf",
-        "0.5 0.5 0.5 rg",
-        "180 440 Td",
-        "(Biometric Authentication:) Tj",
-        "ET",
-        "BT",
-        "/F2 9 Tf",
-        "0.08 0.5 0.15 rg",
-        "285 440 Td",
-        "(VERIFIED - SYSTEM AUTHENTICATED) Tj",
-        "ET",
-
-        # 5. Machine Readable Zone (MRZ Box)
-        "q",
-        "0.08 0.1 0.18 rg",  # Dark Slate Background for MRZ
-        "45 320 505 80 re f",
-        "0.7 0.6 0.2 RG",
-        "1.5 w",
-        "45 320 505 80 re S",
-        "Q",
-
-        "BT",
-        "/F3 12 Tf",  # Courier Monospace for ICAO MRZ
-        "1 1 0.9 rg",
-        "60 365 Td",
-        f"({escape_pdf_text(mrz_line1)}) Tj",
-        "ET",
-
-        "BT",
-        "/F3 12 Tf",
-        "1 1 0.9 rg",
-        "60 340 Td",
-        f"({escape_pdf_text(mrz_line2)}) Tj",
-        "ET",
-
-        # 6. Official Government Digital Signature Box
-        "q",
-        "0.96 0.97 0.99 rg",
-        "45 140 505 160 re f",
-        "0.75 0.8 0.88 RG",
-        "1 w",
-        "45 140 505 160 re S",
-        "Q",
-
-        "BT",
-        "/F2 11 Tf",
-        "0.05 0.15 0.35 rg",
-        "60 275 Td",
-        "(GOVERNMENT DIGITAL SIGNATURE & CRYPTOGRAPHIC VERIFICATION) Tj",
-        "ET",
-
-        "BT",
-        "/F2 9 Tf",
-        "0.1 0.55 0.2 rg",
-        "450 275 Td",
-        "(STATUS: SIGNED & VALID) Tj",
-        "ET",
-
-        "BT",
-        "/F1 8 Tf",
-        "0.3 0.3 0.3 rg",
-        "60 250 Td",
-        f"({escape_pdf_text('Certifying Authority: ' + sig_authority)}) Tj",
-        "ET",
-
-        "BT",
-        "/F1 8 Tf",
-        "0.3 0.3 0.3 rg",
-        "60 232 Td",
-        f"({escape_pdf_text('Certificate Serial Number: ' + cert_serial)}) Tj",
-        "ET",
-
-        "BT",
-        "/F1 8 Tf",
-        "0.3 0.3 0.3 rg",
-        "60 214 Td",
-        f"({escape_pdf_text('Signing Algorithm: ' + sig_algo)}) Tj",
-        "ET",
-
-        "BT",
-        "/F3 7 Tf",
-        "0.2 0.2 0.3 rg",
-        "60 196 Td",
-        f"({escape_pdf_text('Cryptographic Hash: ' + sig_hash[:70])}) Tj",
-        "ET",
-
-        "BT",
-        "/F1 8 Tf",
-        "0.4 0.4 0.4 rg",
-        "60 178 Td",
-        f"({escape_pdf_text('Verification Timestamp: ' + issue_date + '  |  Digitally verified by Dept of Passports')}) Tj",
-        "ET",
-
-        "BT",
-        "/F1 7 Tf",
-        "0.5 0.5 0.5 rg",
-        "60 152 Td",
-        "(Notice: This document is an authentic electronic certificate issued under the Passport Queue Management System.) Tj",
-        "ET",
-
-        # 7. Official Legal Footer
-        "BT",
-        "/F1 8 Tf",
-        "0.4 0.4 0.4 rg",
-        "120 55 Td",
-        "(Department of Passports  |  Tripureshwor, Kathmandu, Nepal  |  www.nepalpassport.gov.np) Tj",
-        "ET",
-
-        "BT",
-        "/F1 7 Tf",
-        "0.6 0.6 0.6 rg",
-        "180 42 Td",
-        "(Official Academic Capstone Implementation  |  All rights reserved) Tj",
-        "ET",
-    ])
-
-    stream_content = "\n".join(stream_cmds).encode("latin-1", "replace")
-    stream_len = len(stream_content)
-
-    # Build PDF Objects
-    objects = []
-    
-    # 1 0 obj: Catalog
-    objects.append(b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n")
-    
-    # 2 0 obj: Pages
-    objects.append(b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n")
-    
-    # 3 0 obj: Page
-    xobject_res = " /XObject << /ImPhoto 8 0 R >>" if img_info else ""
-    page_obj_str = (
-        b"3 0 obj\n"
-        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842]\n"
-        b"/Contents 4 0 R\n"
-        + f"/Resources << /Font << /F1 5 0 R /F2 6 0 R /F3 7 0 R >>{xobject_res} >>\n".encode("ascii")
-        + b">>\nendobj\n"
-    )
-    objects.append(page_obj_str)
-
-    # 4 0 obj: Content Stream
-    stream_header = f"4 0 obj\n<< /Length {stream_len} >>\nstream\n".encode("ascii")
-    stream_footer = b"\nendstream\nendobj\n"
-    objects.append(stream_header + stream_content + stream_footer)
-
-    # 5 0 obj: Font F1 (Helvetica)
-    objects.append(b"5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n")
-
-    # 6 0 obj: Font F2 (Helvetica-Bold)
-    objects.append(b"6 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>\nendobj\n")
-
-    # 7 0 obj: Font F3 (Courier - Monospace for MRZ & Hash)
-    objects.append(b"7 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>\nendobj\n")
-
-    # 8 0 obj: Image XObject (if photo present)
-    if img_info:
-        img_stream = img_info['stream']
-        img_len = len(img_stream)
-        extra_d = f" {img_info['extra_dict']}" if img_info.get('extra_dict') else ""
-        img_header = (
-            f"8 0 obj\n"
-            f"<< /Type /XObject /Subtype /Image /Width {img_info['width']} /Height {img_info['height']} "
-            f"/ColorSpace {img_info['colorspace']} /BitsPerComponent {img_info['bpc']} "
-            f"/Filter {img_info['filter']}{extra_d} /Length {img_len} >>\nstream\n"
+    image_id = None
+    if portrait:
+        image_id = next_object_id
+        next_object_id += 1
+        image_header = (
+            f"<< /Type /XObject /Subtype /Image /Width {portrait['width']} "
+            f"/Height {portrait['height']} /ColorSpace /DeviceRGB /BitsPerComponent 8 "
+            f"/Filter /DCTDecode /Length {len(portrait['data'])} >>\nstream\n"
         ).encode("ascii")
-        img_footer = b"\nendstream\nendobj\n"
-        objects.append(img_header + img_stream + img_footer)
+        objects[image_id] = image_header + portrait["data"] + b"\nendstream"
 
-    # Assemble complete PDF file with correct byte offsets in xref
+    page_ids = []
+    for page_number in range(1, total_pages + 1):
+        if page_number == 1:
+            stream = _notice_page(application, total_pages)
+        elif page_number == 2:
+            stream = _data_page(application, total_pages, bool(portrait))
+        else:
+            stream = _visa_page(application, page_number, total_pages)
+
+        content_id = next_object_id
+        next_object_id += 1
+        objects[content_id] = (
+            f"<< /Length {len(stream)} /Filter /FlateDecode >>\nstream\n".encode("ascii")
+            + stream
+            + b"\nendstream"
+        )
+
+        page_id = next_object_id
+        next_object_id += 1
+        page_ids.append(page_id)
+        resource_parts = [
+            f"/Font << /F1 {font_regular_id} 0 R /F2 {font_bold_id} 0 R /F3 {font_mrz_id} 0 R >>"
+        ]
+        if page_number == 2 and image_id:
+            resource_parts.append(f"/XObject << /Im1 {image_id} 0 R >>")
+        resources = " ".join(resource_parts)
+        objects[page_id] = (
+            f"<< /Type /Page /Parent {pages_id} 0 R "
+            f"/MediaBox [0 0 {PAGE_WIDTH:.2f} {PAGE_HEIGHT:.2f}] "
+            f"/Resources << {resources} >> /Contents {content_id} 0 R >>"
+        ).encode("ascii")
+
+    kids = " ".join(f"{page_id} 0 R" for page_id in page_ids)
+    objects[pages_id] = f"<< /Type /Pages /Kids [{kids}] /Count {total_pages} >>".encode("ascii")
+    objects[catalog_id] = f"<< /Type /Catalog /Pages {pages_id} 0 R >>".encode("ascii")
+
+    max_object_id = next_object_id - 1
     output = io.BytesIO()
     output.write(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+    offsets = {0: 0}
+    for object_id in range(1, max_object_id + 1):
+        offsets[object_id] = output.tell()
+        output.write(f"{object_id} 0 obj\n".encode("ascii"))
+        output.write(objects[object_id])
+        output.write(b"\nendobj\n")
 
-    offsets = []
-    for obj in objects:
-        offsets.append(output.tell())
-        output.write(obj)
-
-    xref_pos = output.tell()
-    num_objects = len(objects) + 1  # 0 is the special null entry
-
-    output.write(f"xref\n0 {num_objects}\n".encode("ascii"))
+    xref_offset = output.tell()
+    output.write(f"xref\n0 {max_object_id + 1}\n".encode("ascii"))
     output.write(b"0000000000 65535 f \n")
-    for offset in offsets:
-        output.write(f"{offset:010d} 00000 n \n".encode("ascii"))
-
-    trailer = (
-        f"trailer\n"
-        f"<< /Size {num_objects} /Root 1 0 R >>\n"
-        f"startxref\n{xref_pos}\n%%EOF\n"
-    ).encode("ascii")
-    output.write(trailer)
-
+    for object_id in range(1, max_object_id + 1):
+        output.write(f"{offsets[object_id]:010d} 00000 n \n".encode("ascii"))
+    output.write(
+        (
+            f"trailer\n<< /Size {max_object_id + 1} /Root {catalog_id} 0 R >>\n"
+            f"startxref\n{xref_offset}\n%%EOF"
+        ).encode("ascii")
+    )
     return output.getvalue()

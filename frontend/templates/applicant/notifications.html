@@ -3,8 +3,8 @@
 {% block title %}Notifications — Nepal Passport Portal{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="/static/css/applicant.css">
-<style>
+<link rel="stylesheet" href="/static/css/applicant.css?v=20260913-4">
+<style nonce="{{ csp_nonce }}">
   .notif-item {
     display: flex;
     gap: var(--spacing-md);
@@ -85,7 +85,7 @@
         <button type="button" onclick="markAllRead()" class="btn btn-outline btn-sm">
           <span class="material-symbols-outlined">done_all</span> <span data-i18n="notif_mark_all_read">Mark All Read</span>
         </button>
-        <button type="button" onclick="loadNotifications()" class="btn btn-outline btn-sm" title="Refresh">
+        <button type="button" onclick="loadNotifications()" class="btn btn-outline btn-sm" title="Refresh" data-i18n-title="btn_refresh">
           <span class="material-symbols-outlined">refresh</span>
         </button>
       </div>
@@ -113,7 +113,8 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
+  const esc = value => UI.escapeHtml(value);
   let allNotifications = [];
   let currentFilter = 'all';
 
@@ -214,9 +215,9 @@
           <div style="flex:1;">
             <div class="flex items-center gap-sm mb-xs flex-wrap">
               <span class="badge badge-${isUnread ? 'review' : 'inactive'}" style="font-size:0.65rem;">${isUnread ? unreadLabel : readLabel}</span>
-              ${n.type ? `<span class="text-xs text-muted">${n.type}</span>` : ''}
+              ${n.type ? `<span class="text-xs text-muted">${esc(n.type)}</span>` : ''}
             </div>
-            <p class="text-sm font-medium m-0" style="color:var(--on-surface);">${n.message}</p>
+            <p class="text-sm font-medium m-0" style="color:var(--on-surface);">${esc(n.message)}</p>
             <span class="text-xs text-muted block mt-xs">${UI.formatDateTime(n.created_at)}</span>
           </div>
         </div>`;

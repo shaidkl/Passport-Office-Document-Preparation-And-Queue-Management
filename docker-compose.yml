@@ -1,0 +1,45 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: passport_db
+      POSTGRES_USER: passport_app
+      POSTGRES_PASSWORD: local-demo-database-password
+    volumes:
+      - passport_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U passport_app -d passport_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DJANGO_DEBUG: "true"
+      DJANGO_SECRET_KEY: "local-compose-demonstration-only"
+      DJANGO_ALLOWED_HOSTS: "127.0.0.1,localhost,0.0.0.0"
+      DB_ENGINE: "django.db.backends.postgresql"
+      DB_NAME: "passport_db"
+      DB_USER: "passport_app"
+      DB_PASSWORD: "local-demo-database-password"
+      DB_HOST: "db"
+      DB_PORT: "5432"
+      EMAIL_BACKEND: "django.core.mail.backends.smtp.EmailBackend"
+      EMAIL_HOST: "${EMAIL_HOST:-}"
+      EMAIL_PORT: "${EMAIL_PORT:-587}"
+      EMAIL_HOST_USER: "${EMAIL_HOST_USER:-}"
+      EMAIL_HOST_PASSWORD: "${EMAIL_HOST_PASSWORD:-}"
+      EMAIL_USE_TLS: "${EMAIL_USE_TLS:-true}"
+      DEFAULT_FROM_EMAIL: "${DEFAULT_FROM_EMAIL:-}"
+      MALWARE_SCAN_ENABLED: "false"
+      PERSONNEL_MFA_REQUIRED: "false"
+      ESEWA_ENVIRONMENT: "sandbox"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  passport_postgres_data:

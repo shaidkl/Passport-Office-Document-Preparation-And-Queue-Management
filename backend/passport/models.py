@@ -1,5 +1,48 @@
 from django.db import models
-from django.contrib.auth.hashers import make_password
+from django.contrib.auth.hashers import identify_hasher, make_password
+from django.conf import settings
+from django.utils import timezone
+from datetime import timedelta
+import hashlib
+import secrets
+import uuid
+
+
+def generate_auth_token():
+    """Compatibility callable retained for historical migration 0016."""
+    return secrets.token_hex(32)
+
+
+def hash_auth_token(raw_token):
+    return hashlib.sha256(raw_token.encode('utf-8')).hexdigest()
+
+
+def _password_changed(model, pk_name, instance):
+    pk = getattr(instance, pk_name, None)
+    if not pk:
+        return False
+    old_password = model.objects.filter(**{pk_name: pk}).values_list('password', flat=True).first()
+    return bool(old_password and old_password != instance.password)
+
+
+def _revoke_user_tokens(user_type, user_id):
+    AuthToken.objects.filter(
+        user_type=user_type,
+        user_id=user_id,
+        revoked_at__isnull=True,
+    ).update(revoked_at=timezone.now())
+
+
+def _prepare_password(value):
+    """Hash raw passwords while preserving encoded and unusable values."""
+    value = str(value or '')
+    if value.startswith('!'):
+        return value
+    try:
+        identify_hasher(value)
+        return value
+    except ValueError:
+        return make_password(value)
 
 
 # 1. APPLICANT
@@ -14,11 +57,26 @@ class Applicant(models.Model):
     gender = models.CharField(max_length=20)
     nationality = models.CharField(max_length=50, default="Nepali")
     address = models.CharField(max_length=255)
+    email_verified_at = models.DateTimeField(default=timezone.now, null=True, blank=True)
+
+    @property
+    def is_email_verified(self):
+        return self.email_verified_at is not None
+
+    @property
+    def phone_number(self):
+        return self.phone
+
+    @phone_number.setter
+    def phone_number(self, value):
+        self.phone = value
 
     def save(self, *args, **kwargs):
-        if not self.password.startswith("pbkdf2_"):
-            self.password = make_password(self.password)
+        password_changed = _password_changed(Applicant, 'applicant_id', self)
+        self.password = _prepare_password(self.password)
         super().save(*args, **kwargs)
+        if password_changed:
+            _revoke_user_tokens('applicant', self.applicant_id)
 
     def __str__(self):
         return self.full_name
@@ -50,8 +108,8 @@ class Staff(models.Model):
         self.phone = value
 
     def save(self, *args, **kwargs):
-        if not self.password.startswith("pbkdf2_"):
-            self.password = make_password(self.password)
+        password_changed = _password_changed(Staff, 'staff_id', self)
+        self.password = _prepare_password(self.password)
         # Sync status and is_active
         if not self.is_active or self.status == "Inactive":
             self.status = "Inactive"
@@ -60,6 +118,8 @@ class Staff(models.Model):
             self.status = "Active"
             self.is_active = True
         super().save(*args, **kwargs)
+        if password_changed:
+            _revoke_user_tokens('staff', self.staff_id)
 
     def __str__(self):
         return f"{self.full_name} ({self.username or self.email})"
@@ -92,9 +152,11 @@ class Administrator(models.Model):
         self.phone = value
 
     def save(self, *args, **kwargs):
-        if not self.password.startswith("pbkdf2_"):
-            self.password = make_password(self.password)
+        password_changed = _password_changed(Administrator, 'admin_id', self)
+        self.password = _prepare_password(self.password)
         super().save(*args, **kwargs)
+        if password_changed:
+            _revoke_user_tokens('administrator', self.admin_id)
 
     def __str__(self):
         return f"{self.full_name} ({self.username or self.email})"
@@ -121,6 +183,13 @@ class Application(models.Model):
     ]
 
     application_id = models.AutoField(primary_key=True)
+
+    tracking_reference = models.UUIDField(
+        default=uuid.uuid4,
+        unique=True,
+        editable=False,
+        db_index=True,
+    )
 
     # APPLICANT 1 : N APPLICATION
     applicant = models.ForeignKey(
@@ -181,6 +250,32 @@ class Application(models.Model):
         default="NEW"
     )
 
+    # Application-location and appointment fields retained by the production
+    # database. Defaults keep the shorter online application form valid while
+    # allowing appointment details to be assigned later in the workflow.
+    applying_within_nepal = models.BooleanField(default=True)
+
+    appointment_date = models.DateField(
+        null=True,
+        blank=True
+    )
+
+    appointment_office = models.CharField(
+        max_length=150,
+        default="Department of Passports, Tripureshwor"
+    )
+
+    appointment_time = models.TimeField(
+        null=True,
+        blank=True
+    )
+
+    national_id_number = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True
+    )
+
     issue_date = models.DateField(
         null=True,
         blank=True
@@ -191,13 +286,22 @@ class Application(models.Model):
         blank=True
     )
 
+    passport_number = models.CharField(
+        max_length=9,
+        unique=True,
+        null=True,
+        blank=True,
+        editable=False,
+        help_text="Sequential number assigned only when passport processing completes.",
+    )
+
     @property
     def passport_status(self):
         """
         Determines if an issued passport is ACTIVE or EXPIRED based on timezone.localdate().
         Returns None if passport has not been issued (no expiry date recorded).
         """
-        if not self.expiry_date:
+        if self.status not in ['Approved', 'Completed'] or not self.expiry_date:
             return None
         from django.utils import timezone
         today = timezone.localdate()
@@ -219,19 +323,31 @@ class Application(models.Model):
         if self.pk:
             existing_apps = existing_apps.exclude(pk=self.pk)
 
-        # 1. Reject if an active application already exists
-        active_app = existing_apps.filter(status__in=['Pending', 'Under Review', 'Approved']).first()
+        # 1. Reject if an in-progress or unsigned pre-payment application exists.
+        # A signed Approved record represents the issued passport and must be
+        # evaluated using its expiry date below.
+        active_app = existing_apps.filter(status__in=['Pending', 'Under Review']).first()
+        if not active_app:
+            for approved_app in existing_apps.filter(status='Approved').order_by('-application_id'):
+                signature = getattr(approved_app, 'digital_signature', None)
+                if not (signature and signature.is_valid and approved_app.expiry_date):
+                    active_app = approved_app
+                    break
         if active_app:
             raise ValidationError(
                 f"You already have an active passport application (#NP-{active_app.application_id:04d}). Another application cannot be submitted."
             )
 
         # 2. Check completed / issued passports
-        completed_passports = existing_apps.filter(status='Completed').order_by('-application_id')
+        completed_passports = existing_apps.filter(
+            status__in=['Approved', 'Completed'],
+            digital_signature__is_valid=True,
+            expiry_date__isnull=False,
+        ).order_by('-application_id')
         latest_completed = completed_passports.first()
 
         is_renewal_request = (
-            self.application_type == 'RENEWAL' or 
+            self.application_type == 'RENEWAL' or
             'renewal' in (self.service_type or '').lower()
         )
 
@@ -246,14 +362,6 @@ class Application(models.Model):
                 if not is_renewal_request:
                     raise ValidationError(
                         "Your previous passport has expired. You must apply for a Renewal through the Renewal workflow, not a new passport application."
-                    )
-                active_renewal = existing_apps.filter(
-                    application_type='RENEWAL',
-                    status__in=['Pending', 'Under Review', 'Approved']
-                ).first()
-                if active_renewal:
-                    raise ValidationError(
-                        f"You already have an active renewal application (#NP-{active_renewal.application_id:04d}). Another renewal application cannot be submitted."
                     )
         else:
             if is_renewal_request:
@@ -324,11 +432,21 @@ class Application(models.Model):
         Computes the real-time status of all 9 steps for this application
         based on active PostgreSQL records.
         """
-        # Step 1: Online Registration
+        def ordered_steps(steps):
+            for index, workflow_step in enumerate(steps, start=1):
+                workflow_step['step'] = index
+            return steps
+
+        # Keep the step presentation here, while deriving every workflow gate
+        # from the same facts used by the API and download authorization.
+        from .workflow_service import build_workflow_facts
+        facts = build_workflow_facts(self)
+
+        # Step 1: Citizen Registration / Login
         step1 = {
             "step": 1,
             "key": "registration",
-            "title": "Online Registration",
+            "title": "Citizen Registration / Login",
             "status": "Completed",
             "details": f"Registered citizen: {self.applicant.full_name if self.applicant else 'Citizen User'}",
             "action_url": "/applicant/profile/",
@@ -346,16 +464,17 @@ class Application(models.Model):
             "action_label": "Application Details"
         }
 
-        # Step 3: Upload Documents
-        docs = list(self.documents.all()) if hasattr(self, 'documents') else []
+        # Step 3: Upload Required Documents
+        docs = facts['documents']
         doc_count = len(docs)
-        verified_count = sum(1 for d in docs if d.verification_status == 'Verified')
-        rejected_count = sum(1 for d in docs if d.verification_status == 'Rejected')
+        verified_count = len(facts['verified_documents'])
+        rejected_count = len(facts['rejected_documents'])
 
-        has_photo = any('photo' in (d.document_type or '').lower() for d in docs)
-        photo_doc = next((d for d in docs if 'photo' in (d.document_type or '').lower()), None)
-        photo_verified = bool(photo_doc and photo_doc.verification_status == 'Verified')
-        photo_rejected = bool(photo_doc and photo_doc.verification_status == 'Rejected')
+        photo_doc = facts['photo']
+        has_photo = bool(photo_doc)
+        photo_verified = facts['photo_verified']
+        photo_rejected = facts['photo_rejected']
+        has_identity = facts['has_identity']
 
         if doc_count == 0:
             doc_status = "Action Required"
@@ -363,64 +482,57 @@ class Application(models.Model):
         elif not has_photo:
             doc_status = "Action Required"
             doc_details = "Passport-size photo is required before continuing."
+        elif not has_identity:
+            doc_status = "Action Required"
+            doc_details = "Citizenship Certificate or National ID is required before continuing."
         elif photo_rejected:
             doc_status = "Action Required"
             doc_details = f"Passport photo rejected: {photo_doc.rejection_reason or 'Please re-upload a valid photo.'}"
         elif rejected_count > 0:
             doc_status = "Action Required"
             doc_details = f"{rejected_count} document(s) flagged/rejected. Please re-upload."
-        elif verified_count == doc_count and doc_count > 0 and photo_verified:
-            doc_status = "Completed"
-            doc_details = f"All {doc_count} submitted document(s) verified by staff"
         else:
-            doc_status = "Pending Verification"
-            doc_details = f"{verified_count} of {doc_count} document(s) verified by staff"
+            doc_status = "Completed"
+            doc_details = f"All {doc_count} required document upload(s) received"
 
         step3 = {
             "step": 3,
             "key": "documents",
-            "title": "Upload Documents",
+            "title": "Upload Required Documents",
             "status": doc_status,
             "details": doc_details,
             "action_url": "/applicant/documents/",
             "action_label": "Upload / View Documents",
             "has_photo": has_photo,
             "photo_verified": photo_verified,
+            "has_identity_document": has_identity,
         }
 
-        # Step 4: Queue Token Generation
-        token = getattr(self, 'queue_token', None)
-        if token:
-            token_status = "Completed"
-            q_pos = self.queue_position
-            pos_text = f" • Position #{q_pos} in line" if q_pos > 0 else ""
-            token_details = f"Token T-{token.token_number:03d} (Status: {token.queue_status}{pos_text})"
-        else:
-            token_status = "In Progress"
-            token_details = "Digital queue token pending allocation"
+        # Step 8: Queue / Processing. This remains locked until signing.
+        token = facts['queue_token']
+        token_status = "Locked"
+        token_details = "Locked until the government digital signature is authorized"
 
         step4 = {
             "step": 4,
             "key": "queue",
-            "title": "Queue Token Generation",
+            "title": "Queue / Processing",
             "status": token_status,
             "details": token_details,
             "action_url": "/applicant/queue/",
             "action_label": "View Token"
         }
-        # Step 5: Fee Assessment & Payment
-        from django.db.models import Q
-        verified_payment = None
+        # Step 4: Payment
+        verified_payment = facts['verified_payment']
         active_payment = None
         if hasattr(self, 'payments'):
-            verified_payment = self.payments.filter(
-                Q(status='VERIFIED') | Q(payment_status='Completed')
-            ).order_by('-payment_id').first()
-            active_payment = self.payments.order_by('-payment_id').first()
+            active_payment = self.payments.exclude(
+                payment_reference__isnull=True
+            ).exclude(payment_reference='').order_by('-payment_id').first()
 
         fee_val = self.fee_amount
         # STRICT PAYMENT GATE: Only actual verified payment record marks payment as verified
-        is_payment_verified = bool(verified_payment)
+        is_payment_verified = facts['payment_verified']
 
         if verified_payment:
             fee_status = "Completed"
@@ -428,9 +540,16 @@ class Application(models.Model):
             ref = verified_payment.payment_reference or verified_payment.transaction_id or f"TXN-{verified_payment.payment_id}"
             fee_details = f"Fee of NPR {verified_payment.amount:,.0f} verified via {gw} (Ref: {ref})"
             action_label = "Payment Receipt"
-        elif active_payment and active_payment.status in ['PENDING', 'QR_GENERATED', 'PAYMENT_INITIATED']:
+        elif not (has_photo and has_identity) or rejected_count > 0:
+            fee_status = "Locked"
+            fee_details = "Payment unlocks after all required current documents are uploaded"
+            action_label = "Upload Documents First"
+        elif active_payment and active_payment.status in ['PENDING', 'QR_GENERATED', 'PAYMENT_INITIATED', 'PAID']:
             fee_status = "Payment Initiated"
-            fee_details = f"QR generated for NPR {active_payment.amount:,.0f} ({active_payment.payment_reference}) — Scan to verify"
+            fee_details = (
+                f"eSewa payment of NPR {active_payment.amount:,.0f} "
+                f"({active_payment.payment_reference}) is awaiting completion or verification"
+            )
             action_label = "Continue Payment"
         else:
             fee_status = "Payment Required"
@@ -440,7 +559,7 @@ class Application(models.Model):
         step5 = {
             "step": 5,
             "key": "fee",
-            "title": "Fee Assessment & Payment",
+            "title": "Payment",
             "status": fee_status,
             "details": fee_details,
             "action_url": "/applicant/apply/",
@@ -449,12 +568,14 @@ class Application(models.Model):
             "fee_amount": fee_val,
         }
 
-        # Dynamic Locking: If payment is not verified, strictly lock subsequent stages
+        document_review_complete = facts['documents_complete']
+
+        # Payment precedes staff document verification and every later stage.
         if not is_payment_verified:
             step6 = {
                 "step": 6,
                 "key": "biometrics",
-                "title": "Digital Biometrics Match",
+                "title": "Biometrics Verification",
                 "status": "Completed" if getattr(self, 'biometric_status', None) == 'Verified' else "Locked",
                 "details": "Biometrics verified" if getattr(self, 'biometric_status', None) == 'Verified' else "Locked until application fee payment is verified with the gateway",
                 "action_url": "/applicant/apply/",
@@ -463,16 +584,16 @@ class Application(models.Model):
             step7 = {
                 "step": 7,
                 "key": "verification",
-                "title": "Staff Verification",
-                "status": "Completed" if self.status in ['Approved', 'Completed'] else "Locked",
-                "details": "Application reviewed and approved by staff" if self.status in ['Approved', 'Completed'] else "Locked until payment verification and biometrics are completed",
-                "action_url": "/applicant/apply/",
-                "action_label": "Officer Review" if self.status in ['Approved', 'Completed'] else "Awaiting Fee"
+                "title": "Staff Document Verification",
+                "status": "Completed" if document_review_complete else "Locked",
+                "details": "All current documents verified by staff" if document_review_complete else "Locked until application fee payment is verified",
+                "action_url": "/applicant/documents/",
+                "action_label": "View Document Status" if document_review_complete else "Awaiting Fee"
             }
             step8 = {
                 "step": 8,
                 "key": "signature",
-                "title": "Government Digital Signature",
+                "title": "Digital Signature",
                 "status": "Locked",
                 "details": "Locked until payment is verified with the gateway",
                 "action_url": "/applicant/apply/",
@@ -481,19 +602,22 @@ class Application(models.Model):
             step9 = {
                 "step": 9,
                 "key": "passport_ready",
-                "title": "Virtual Passport Ready",
+                "title": "Passport Generation",
                 "status": "Locked",
                 "details": "Locked until application fee payment is verified with the gateway",
                 "action_url": "/applicant/apply/",
                 "action_label": "Locked",
                 "can_download": False
             }
-            return [step1, step2, step3, step4, step5, step6, step7, step8, step9]
+            return ordered_steps([step1, step2, step3, step5, step7, step6, step8, step4, step9])
 
-        # Step 6: Digital Biometrics Match (Unlocked if Payment Verified)
+        # Step 6: Biometrics Verification
         b_status = getattr(self, 'biometric_status', 'Pending') or 'Pending'
 
-        if b_status == 'Verified':
+        if not document_review_complete:
+            bio_status = "Locked"
+            bio_details = "Locked until all current required documents are verified by staff"
+        elif b_status == 'Verified':
             bio_status = "Completed"
             bio_details = "Digital biometrics and photograph verified against standards"
         elif b_status == 'Failed':
@@ -509,21 +633,21 @@ class Application(models.Model):
         step6 = {
             "step": 6,
             "key": "biometrics",
-            "title": "Digital Biometrics Match",
+            "title": "Biometrics Verification",
             "status": bio_status,
             "details": bio_details,
             "action_url": "/applicant/documents/",
             "action_label": "Biometric Details"
         }
 
-        # Step 7: Staff Verification
-        if self.status in ['Approved', 'Completed']:
+        # Step 5: Staff Document Verification
+        if rejected_count > 0:
+            staff_status = "Rejected"
+            staff_details = f"Document rejected: {self.processing_notes or 'A replacement upload is required'}"
+        elif document_review_complete:
             staff_status = "Completed"
             officer = self.staff.full_name if self.staff else "Desk Officer"
-            staff_details = f"Application reviewed and approved by {officer}"
-        elif self.status == 'Rejected':
-            staff_status = "Rejected"
-            staff_details = f"Application rejected: {self.processing_notes or 'Eligibility criteria not met'}"
+            staff_details = f"All current required documents verified by {officer}"
         elif self.status == 'Under Review':
             staff_status = "In Progress"
             staff_details = "Desk officer currently examining submitted documents and claims"
@@ -534,52 +658,76 @@ class Application(models.Model):
         step7 = {
             "step": 7,
             "key": "verification",
-            "title": "Staff Verification",
+            "title": "Staff Document Verification",
             "status": staff_status,
             "details": staff_details,
-            "action_url": "/staff/verify/",
-            "action_label": "Verification Status"
+            "action_url": "/applicant/documents/",
+            "action_label": "View Document Status"
         }
 
-        # Step 8: Government Digital Signature
-        sig = getattr(self, 'digital_signature', None)
-        if sig and sig.is_valid:
+        # Step 7: Digital Signature
+        sig = facts['signature']
+        if facts['signature_is_valid']:
             sig_status = "Completed"
             sig_details = f"Digitally signed by {sig.signing_authority} • Cert: {sig.certificate_serial} ({sig.algorithm})"
-        elif self.status in ['Approved', 'Completed'] and is_payment_verified:
+        elif document_review_complete and is_payment_verified and b_status == 'Verified':
             sig_status = "In Progress"
             sig_details = "Payment verified; ready for digital signature authorization"
+        elif not document_review_complete:
+            sig_status = "Locked"
+            sig_details = "Locked until all current required documents are verified"
+        elif b_status != 'Verified':
+            sig_status = "Locked"
+            sig_details = "Locked until biometric verification is completed"
         else:
             sig_status = "Not Started"
-            sig_details = "Executed automatically upon officer approval and payment verification"
+            sig_details = "Ready after document, payment, and biometric verification are completed"
 
         step8 = {
             "step": 8,
             "key": "signature",
-            "title": "Government Digital Signature",
+            "title": "Digital Signature",
             "status": sig_status,
             "details": sig_details,
             "action_url": "/applicant/dashboard/",
             "action_label": "View Signature"
         }
 
-        # Step 9: Virtual Passport Ready
-        # STRICT ISSUANCE GATE: Must be Approved/Completed, payment verified, digital signature valid, photo verified
-        can_download = bool(
-            (self.status in ['Approved', 'Completed']) and
-            is_payment_verified and
-            (sig and sig.is_valid) and
-            photo_verified
-        )
+        # The processing queue begins only after a valid signature exists.
+        if facts['signature_is_valid']:
+            if token:
+                q_pos = self.queue_position
+                pos_text = f" • Position #{q_pos} in line" if q_pos > 0 else ""
+                token_status = "Completed" if token.queue_status == "Completed" else "In Progress"
+                token_details = (
+                    f"Token T-{token.token_number:03d} "
+                    f"(Status: {token.queue_status}{pos_text})"
+                )
+            else:
+                token_status = "In Progress"
+                token_details = "Digital signature authorized; processing token is being assigned"
+            step4.update({
+                "status": token_status,
+                "details": token_details,
+                "action_label": "View Processing Token",
+            })
+
+        # Step 9: Passport Generation
+        queue_processing_complete = facts['queue_complete']
+        # STRICT ISSUANCE GATE: every preceding stage, including processing, must be complete.
+        can_download = facts['can_download']
         if can_download:
             passport_status = "Completed"
             passport_details = "Official Virtual e-Passport is active, certified, and ready for use"
         elif not is_payment_verified:
             passport_status = "Locked"
             passport_details = "Locked until application fee payment is verified with the gateway"
-        elif not (sig and sig.is_valid):
+        elif not facts['signature_is_valid']:
             passport_status = "Locked"
             passport_details = "Locked until government digital signature is authorized"
+        elif not queue_processing_complete:
+            passport_status = "Locked"
+            passport_details = "Locked until queue processing is completed by staff"
         elif not photo_verified:
             passport_status = "Locked"
             passport_details = "Locked until passport-size photo is verified by staff"
@@ -593,7 +741,7 @@ class Application(models.Model):
         step9 = {
             "step": 9,
             "key": "passport_ready",
-            "title": "Virtual Passport Ready",
+            "title": "Passport Generation",
             "status": passport_status,
             "details": passport_details,
             "action_url": f"/api/applications/{self.application_id}/download-pdf/",
@@ -601,7 +749,34 @@ class Application(models.Model):
             "can_download": can_download
         }
 
-        return [step1, step2, step3, step4, step5, step6, step7, step8, step9]
+        return ordered_steps([step1, step2, step3, step5, step7, step6, step8, step4, step9])
+
+    def get_current_documents(self):
+        """Return the newest active version of each logical document requirement."""
+        if not hasattr(self, 'documents'):
+            return []
+
+        current_documents = []
+        seen_types = set()
+        for document in self.documents.all().order_by('-document_id'):
+            type_key = self.document_type_group(document.document_type)
+            if type_key in seen_types:
+                continue
+            seen_types.add(type_key)
+            current_documents.append(document)
+        return current_documents
+
+    @staticmethod
+    def document_type_group(document_type):
+        """Group Citizenship and National ID as alternative identity evidence."""
+        type_key = (document_type or '').strip().casefold()
+        if (
+            'citizenship' in type_key
+            or type_key.startswith('national id')
+            or type_key == 'nid'
+        ):
+            return 'identity-document'
+        return type_key
 
     def __str__(self):
         return f"Application #{self.application_id}"
@@ -668,9 +843,24 @@ class DigitalSignature(models.Model):
         related_name="digital_signature"
     )
 
-    signature_hash = models.CharField(
-        max_length=255
+    # Base64-encoded RSA-PSS signature. The historical field name is retained
+    # so existing API clients do not break.
+    signature_hash = models.TextField()
+
+    payload_hash = models.CharField(max_length=64, blank=True, default="")
+
+    credential_schema = models.CharField(
+        max_length=50,
+        default="np-passport-credential-v1",
     )
+
+    verification_code = models.UUIDField(
+        default=uuid.uuid4,
+        unique=True,
+        editable=False,
+    )
+
+    key_id = models.CharField(max_length=100, blank=True, default="")
 
     signing_authority = models.CharField(
         max_length=150,
@@ -684,7 +874,7 @@ class DigitalSignature(models.Model):
 
     algorithm = models.CharField(
         max_length=50,
-        default="RSA-SHA256"
+        default="RSA-PSS-SHA256"
     )
 
     signed_at = models.DateTimeField(
@@ -697,8 +887,25 @@ class DigitalSignature(models.Model):
         default=False
     )
 
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
     def __str__(self):
         return f"Sig #{self.signature_id} for App #{self.application_id} ({self.algorithm})"
+
+
+class PassportNumberSequence(models.Model):
+    """Single locked row used to allocate gap-free issued passport numbers."""
+
+    sequence_id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+    last_value = models.PositiveBigIntegerField(default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Passport number sequence"
+        verbose_name_plural = "Passport number sequence"
+
+    def __str__(self):
+        return f"Passport sequence at {self.last_value}"
 
 # 7. QUEUE TOKEN
 
@@ -908,6 +1115,7 @@ class Payment(models.Model):
         ("Bank Transfer", "Bank Transfer"),
         ("Digital Wallet", "Digital Wallet"),
         ("Sandbox Gateway", "Sandbox Gateway"),
+        ("Online", "Online"),
     ]
 
     payment_id = models.AutoField(primary_key=True)
@@ -1048,9 +1256,10 @@ class Payment(models.Model):
 class AuthToken(models.Model):
     token_id = models.AutoField(primary_key=True)
 
-    token = models.CharField(
-        max_length=255,
-        unique=True
+    token_hash = models.CharField(
+        max_length=64,
+        unique=True,
+        db_index=True,
     )
 
     user_type = models.CharField(
@@ -1063,5 +1272,46 @@ class AuthToken(models.Model):
         auto_now_add=True
     )
 
+    expires_at = models.DateTimeField()
+
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
+    last_used_at = models.DateTimeField(null=True, blank=True)
+
+    @classmethod
+    def issue(cls, user_type, user_id):
+        raw_token = secrets.token_urlsafe(48)
+        ttl = max(1, getattr(settings, 'AUTH_TOKEN_TTL_MINUTES', 720))
+        token = cls.objects.create(
+            token_hash=hash_auth_token(raw_token),
+            user_type=user_type,
+            user_id=user_id,
+            expires_at=timezone.now() + timedelta(minutes=ttl),
+        )
+        return raw_token, token
+
+    @property
+    def is_active(self):
+        return self.revoked_at is None and self.expires_at > timezone.now()
+
+    def revoke(self):
+        if self.revoked_at is None:
+            self.revoked_at = timezone.now()
+            self.save(update_fields=['revoked_at'])
+
     def __str__(self):
-        return self.token
+        return f"Session #{self.token_id} ({self.user_type}:{self.user_id})"
+
+
+class LoginAttempt(models.Model):
+    """Hashed account/IP counters used for login throttling and lockout."""
+
+    key_hash = models.CharField(max_length=64, unique=True)
+    scope = models.CharField(max_length=20, choices=[('account', 'Account'), ('ip', 'IP')])
+    attempts = models.PositiveIntegerField(default=0)
+    window_started_at = models.DateTimeField(default=timezone.now)
+    last_failed_at = models.DateTimeField(null=True, blank=True)
+    locked_until = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.scope} login limiter ({self.attempts})"

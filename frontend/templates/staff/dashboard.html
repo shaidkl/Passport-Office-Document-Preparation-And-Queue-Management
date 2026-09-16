@@ -58,7 +58,7 @@
       </div>
 
       <div class="flex items-center gap-sm">
-        <button type="button" onclick="loadStaffWorkspace()" class="btn btn-outline" title="Refresh queue">
+        <button type="button" onclick="loadStaffWorkspace()" class="btn btn-outline" title="Refresh queue" data-i18n-title="title_refresh_queue">
           <span class="material-symbols-outlined">sync</span>
           <span data-i18n="staff_sync_queue">Sync Queue</span>
         </button>
@@ -288,11 +288,11 @@
             <p class="text-xs text-muted m-0" data-i18n="staff_biometrics_desc">Validate facial features and fingerprint scans against national identity database.</p>
           </div>
           <div class="flex items-center gap-xs">
-            <button type="button" onclick="handleBiometricsAction('Verified')" class="btn btn-outline-success btn-sm">
+            <button type="button" onclick="handleBiometricsAction('Verified')" class="btn btn-outline-success btn-sm" id="modal-btn-bio-verify">
               <span class="material-symbols-outlined" style="font-size: 16px;">fingerprint</span>
               <span data-i18n="staff_bio_verify_btn">Mark Biometrics Verified</span>
             </button>
-            <button type="button" onclick="handleBiometricsAction('Failed')" class="btn btn-outline-danger btn-sm">
+            <button type="button" onclick="handleBiometricsAction('Failed')" class="btn btn-outline-danger btn-sm" id="modal-btn-bio-fail">
               <span class="material-symbols-outlined" style="font-size: 16px;">cancel</span>
               <span data-i18n="staff_bio_fail_btn">Flag Biometrics Failed</span>
             </button>
@@ -300,20 +300,16 @@
         </div>
       </div>
 
-      <!-- Digital Signature & Final Decision -->
+      <!-- Digital Signature & Processing Queue -->
       <div class="card" style="border: 1px solid var(--primary-container); background: #f8fafc;">
         <div class="card-body">
-          <strong class="text-sm block text-primary mb-xs" data-i18n="staff_signature_stage">Stage 8 &amp; 9: Government Digital Signature &amp; Issuance</strong>
-          <p class="text-xs text-muted mb-md" data-i18n="staff_signature_desc">Authorizing this step issues an encrypted Government RSA-SHA256 digital certificate and generates the downloadable Virtual e-Passport.</p>
+          <strong class="text-sm block text-primary mb-xs" data-i18n="staff_signature_stage">Stage 7: Government Digital Signature</strong>
+          <p class="text-xs text-muted mb-md" data-i18n="staff_signature_desc">Authorization creates the government digital signature and assigns the application to the processing queue. Passport generation remains locked until processing is completed.</p>
           <div class="flex flex-wrap items-center justify-between gap-md">
             <div class="flex items-center gap-xs">
               <button type="button" onclick="handleAuthorizeSignature()" class="btn btn-success" id="modal-btn-signature">
                 <span class="material-symbols-outlined">verified_user</span>
-                <span data-i18n="staff_authorize_btn">Authorize Digital Signature &amp; Approve</span>
-              </button>
-              <button type="button" onclick="handleModalRejectApp()" class="btn btn-outline-danger" id="modal-btn-reject">
-                <span class="material-symbols-outlined">close</span>
-                <span data-i18n="btn_reject_application">Reject Application</span>
+                <span data-i18n="staff_authorize_btn">Authorize Signature &amp; Queue</span>
               </button>
             </div>
             <button type="button" onclick="UI.closeModal('app-workspace-modal')" class="btn btn-outline" data-i18n="staff_close_workspace">Close Workspace</button>
@@ -328,13 +324,113 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
+  const esc = value => UI.escapeHtml(value);
   let activeToken = null;
   let queueTokensList = [];
   let applicationsList = [];
   let deskSummaryData = null;
   let currentModalApp = null;
   let currentModalDocs = [];
+  const documentActionInFlight = new Set();
+
+  function documentsForApplication(response, applicationId) {
+    const documents = Array.isArray(response) ? response : (response.results || []);
+    return documents.filter(doc => String(doc.application) === String(applicationId));
+  }
+
+  function currentApplicationDocument(documentId) {
+    if (!currentModalApp) return null;
+    return currentModalDocs.find(doc =>
+      String(doc.document_id) === String(documentId) &&
+      String(doc.application) === String(currentModalApp.application_id)
+    ) || null;
+  }
+
+  async function refreshCurrentApplicationDocuments() {
+    if (!currentModalApp) return;
+    const applicationId = currentModalApp.application_id;
+    const [response, refreshedApplication] = await Promise.all([
+      API.get(`/documents/?application=${encodeURIComponent(applicationId)}`),
+      API.get(`/applications/${applicationId}/`)
+    ]);
+    currentModalDocs = documentsForApplication(response, applicationId);
+    currentModalApp = refreshedApplication;
+    updateModalFinalReviewControls();
+  }
+
+  function updateModalFinalReviewControls() {
+    if (!currentModalApp) return;
+    const paymentStep = Array.isArray(currentModalApp.workflow_steps)
+      ? currentModalApp.workflow_steps.find(step => step.key === 'fee')
+      : null;
+    const verificationStep = Array.isArray(currentModalApp.workflow_steps)
+      ? currentModalApp.workflow_steps.find(step => step.key === 'verification')
+      : null;
+    const signatureStep = Array.isArray(currentModalApp.workflow_steps)
+      ? currentModalApp.workflow_steps.find(step => step.key === 'signature')
+      : null;
+    const isPaymentVerified = Boolean(paymentStep && (paymentStep.is_verified === true || paymentStep.status === 'Completed'));
+    const isDocumentReviewComplete = Boolean(verificationStep && verificationStep.status === 'Completed');
+    const isSignatureComplete = Boolean(signatureStep && signatureStep.status === 'Completed');
+    const biometricsAreFinal = currentModalApp.biometric_status === 'Verified' || isSignatureComplete;
+    const bioVerifyButton = document.getElementById('modal-btn-bio-verify');
+    const bioFailButton = document.getElementById('modal-btn-bio-fail');
+    const signatureButton = document.getElementById('modal-btn-signature');
+    if (bioVerifyButton) bioVerifyButton.disabled = !isPaymentVerified || !isDocumentReviewComplete || biometricsAreFinal;
+    if (bioFailButton) bioFailButton.disabled = !isPaymentVerified || !isDocumentReviewComplete || biometricsAreFinal;
+    if (signatureButton) {
+      signatureButton.disabled = !isPaymentVerified || !isDocumentReviewComplete || currentModalApp.biometric_status !== 'Verified' || isSignatureComplete;
+      signatureButton.title = !isPaymentVerified
+        ? t('msg_payment_first', 'Payment must be verified first.')
+        : (!isDocumentReviewComplete
+            ? t('msg_verify_documents_first', 'Verify all current required documents first.')
+            : (currentModalApp.biometric_status !== 'Verified' ? t('msg_verify_biometrics_first', 'Verify biometrics first.') : t('title_authorize_final_approval', 'Authorize signature and create the processing token.')));
+    }
+  }
+
+  function applyDocumentDecision(docId, result) {
+    const doc = currentApplicationDocument(docId);
+    if (!doc || !result) return;
+    if (result.verification_status) doc.verification_status = result.verification_status;
+    if (Object.prototype.hasOwnProperty.call(result, 'rejection_reason')) {
+      doc.rejection_reason = result.rejection_reason || '';
+    }
+    if (Object.prototype.hasOwnProperty.call(result, 'is_inspected')) {
+      doc.is_inspected = Boolean(result.is_inspected);
+    }
+    if (result.application_status && currentModalApp) {
+      currentModalApp.status = result.application_status;
+      const application = applicationsList.find(app =>
+        String(app.application_id) === String(currentModalApp.application_id)
+      );
+      if (application) application.status = result.application_status;
+      const statusBadge = document.getElementById('modal-app-status-badge');
+      if (statusBadge) statusBadge.innerHTML = UI.renderStatusBadge(result.application_status);
+      const pendingCount = document.getElementById('stat-pending-verifications');
+      if (pendingCount) {
+        pendingCount.textContent = applicationsList.filter(app =>
+          app.status === 'Pending' || app.status === 'Under Review'
+        ).length;
+      }
+      renderQueueTable();
+    }
+  }
+
+  async function handleInspectDocument(docId) {
+    const doc = currentApplicationDocument(docId);
+    if (!doc || !currentModalApp) {
+      UI.showToast(t('msg_doc_wrong_application', 'This document does not belong to the application being inspected.'), 'error');
+      return;
+    }
+    try {
+      await API.openFile(`/documents/${docId}/view-file/?application=${encodeURIComponent(currentModalApp.application_id)}`);
+      await refreshCurrentApplicationDocuments();
+      renderModalDocsTable();
+    } catch (error) {
+      console.error('Inspect document error:', error);
+    }
+  }
 
   document.addEventListener('DOMContentLoaded', () => {
     // 1. Guard page for Staff / Administrator
@@ -367,7 +463,7 @@
     if (unameEl) unameEl.textContent = user.username ? `@${user.username}` : (user.email || '');
     if (roleEl) {
       const parts = [user.department, user.designation].filter(Boolean);
-      roleEl.textContent = parts.length ? parts.join(' • ') : 'Active Duty';
+      roleEl.textContent = parts.length ? parts.join(' • ') : t('status_active_duty', 'Active Duty');
     }
     if (avatarEl && user.full_name) {
       avatarEl.textContent = user.full_name.substring(0, 2).toUpperCase();
@@ -375,7 +471,7 @@
   }
 
   async function loadStaffWorkspace() {
-    UI.showLoading('Syncing desk queue...');
+    UI.showLoading(t('loading_syncing_queue', 'Syncing desk queue...'));
 
     try {
       // 1. Fetch Real-time Desk Summary
@@ -398,7 +494,7 @@
 
     } catch (err) {
       console.error('Error loading staff workspace:', err);
-      UI.showToast('Could not load queue tokens. Please check your network.', 'error');
+      UI.showToast(t('msg_load_queue_tokens_error', 'Could not load queue tokens. Please check your network.'), 'error');
     } finally {
       UI.hideLoading();
     }
@@ -433,17 +529,17 @@
     if (activeToken) {
       tokenNumEl.textContent = `T-${activeToken.token_number}`;
       badgeEl.innerHTML = UI.renderStatusBadge(activeToken.queue_status);
-      appRefEl.textContent = `App Ref: #NP-${String(activeToken.application).padStart(4, '0')}`;
-      appDateEl.textContent = `Called on: ${activeToken.called_time ? UI.formatDateTime(activeToken.called_time) : 'Active Desk'}`;
+      appRefEl.textContent = `${t('label_application_reference', 'Application Ref')}: #NP-${String(activeToken.application).padStart(4, '0')}`;
+      appDateEl.textContent = `${t('label_called_on', 'Called on')}: ${activeToken.called_time ? UI.formatDateTime(activeToken.called_time) : t('status_active_desk', 'Active Desk')}`;
 
       btnServing.disabled = activeToken.queue_status === 'Serving';
       btnComplete.disabled = false;
       btnSkip.disabled = false;
     } else {
       tokenNumEl.textContent = '--';
-      badgeEl.innerHTML = '<span class="badge badge-inactive">No Token Called</span>';
-      appRefEl.textContent = 'Ref: None';
-      appDateEl.textContent = 'Awaiting Next Citizen';
+      badgeEl.innerHTML = `<span class="badge badge-inactive">${t('status_no_token_called', 'No Token Called')}</span>`;
+      appRefEl.textContent = t('legacy_ref_none', 'Ref: None');
+      appDateEl.textContent = t('status_awaiting_next_citizen', 'Awaiting Next Citizen');
 
       btnServing.disabled = true;
       btnComplete.disabled = true;
@@ -458,19 +554,38 @@
     if (!applicationsList || applicationsList.length === 0) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="5" class="text-center text-muted py-lg">No pending applications found in queue.</td>
+          <td colspan="5" class="text-center text-muted py-lg">${t('empty_no_pending_queue_applications', 'No pending applications found in queue.')}</td>
         </tr>
       `;
-      countEl.textContent = '0 records';
+      countEl.textContent = I18n.format('record_count', '{count} records', { count: 0 });
       return;
     }
 
-    countEl.textContent = `${applicationsList.length} applications`;
+    countEl.textContent = I18n.format('application_count', '{count} applications', { count: applicationsList.length });
 
     tbody.innerHTML = applicationsList.map(app => {
       const token = queueTokensList.find(t => t.application === app.application_id);
-      const tokenText = token ? `T-${token.token_number}` : 'Unassigned';
-      const citizenName = app.applicant_name || `Applicant #${app.applicant}`;
+      const tokenText = token ? `T-${token.token_number}` : t('label_none', 'Unassigned');
+      const citizenName = app.applicant_name || `${t('label_applicant', 'Applicant')} #${app.applicant}`;
+      const paymentStep = Array.isArray(app.workflow_steps)
+        ? app.workflow_steps.find(step => step.key === 'fee')
+        : null;
+      const signatureStep = Array.isArray(app.workflow_steps)
+        ? app.workflow_steps.find(step => step.key === 'signature')
+        : null;
+      const isPaymentVerified = Boolean(paymentStep && (paymentStep.is_verified === true || paymentStep.status === 'Completed'));
+      const isFinalApproved = Boolean(
+        (app.status === 'Approved' || app.status === 'Completed') &&
+        signatureStep && signatureStep.status === 'Completed'
+      );
+      let approvalControl;
+      if (isFinalApproved) {
+        approvalControl = `<button type="button" class="btn btn-success btn-sm" disabled title="${t('title_biometrics_signature_complete', 'Biometrics and digital signature completed')}"><span class="material-symbols-outlined" style="font-size:16px;">verified</span> ${t('status_approved', 'Approved')}</button>`;
+      } else if (isPaymentVerified) {
+        approvalControl = `<button type="button" onclick="openApplicationWorkspaceModal(${app.application_id})" class="btn btn-warning btn-sm" title="${t('title_review_paid_application', 'Review paid application documents, biometrics, and signature')}"><span class="material-symbols-outlined" style="font-size:16px;">fact_check</span> ${t('status_staff_review', 'Staff Review')}</button>`;
+      } else {
+        approvalControl = `<button type="button" class="btn btn-outline btn-sm" disabled title="${t('title_waiting_citizen_payment', 'Waiting for citizen payment')}"><span class="material-symbols-outlined" style="font-size:16px;">payments</span> ${t('status_awaiting_citizen_payment', 'Awaiting Citizen Payment')}</button>`;
+      }
 
       return `
         <tr>
@@ -479,22 +594,17 @@
             <span class="text-xs text-muted font-mono">${tokenText}</span>
           </td>
           <td>
-            <span class="text-sm font-semibold block text-on-surface">${citizenName}</span>
-            <span class="text-xs text-muted">${app.applicant_email || 'Citizen Portal Application'}</span>
+            <span class="text-sm font-semibold block text-on-surface">${esc(citizenName)}</span>
+            <span class="text-xs text-muted">${esc(app.applicant_email || t('label_citizen_portal_application', 'Citizen Portal Application'))}</span>
           </td>
           <td class="text-xs text-muted">${UI.formatDate(app.submission_date)}</td>
           <td>${UI.renderStatusBadge(app.status)}</td>
           <td>
             <div class="flex items-center gap-xs">
-              <button type="button" onclick="openApplicationWorkspaceModal(${app.application_id})" class="btn btn-outline btn-sm" title="Inspect & Review Documents">
-                <span class="material-symbols-outlined" style="font-size: 16px;">visibility</span> Inspect
+              <button type="button" onclick="openApplicationWorkspaceModal(${app.application_id})" class="btn btn-outline btn-sm" title="${t('title_inspect_review_documents', 'Inspect & Review Documents')}">
+                <span class="material-symbols-outlined" style="font-size: 16px;">visibility</span> ${t('btn_inspect', 'Inspect')}
               </button>
-              <button type="button" onclick="handleApproveApplication(${app.application_id})" class="btn btn-success btn-sm" title="Approve Application">
-                <span class="material-symbols-outlined" style="font-size: 16px;">check</span> Approve
-              </button>
-              <button type="button" onclick="handleRejectApplication(${app.application_id})" class="btn btn-danger btn-sm" title="Reject Application">
-                <span class="material-symbols-outlined" style="font-size: 16px;">close</span> Reject
-              </button>
+              ${approvalControl}
             </div>
           </td>
         </tr>
@@ -503,7 +613,7 @@
   }
 
   async function openApplicationWorkspaceModal(appId) {
-    UI.showLoading('Loading application details & documents...');
+    UI.showLoading(t('loading_application_documents', 'Loading application details & documents...'));
     try {
       const [app, docs] = await Promise.all([
         API.get(`/applications/${appId}/`),
@@ -511,23 +621,53 @@
       ]);
 
       currentModalApp = app;
-      currentModalDocs = Array.isArray(docs) ? docs : (docs.results || []);
+      currentModalDocs = documentsForApplication(docs, app.application_id);
 
       document.getElementById('modal-app-ref').textContent = `#NP-${String(app.application_id).padStart(4, '0')}`;
-      document.getElementById('modal-applicant-name').textContent = app.applicant_name || `Applicant #${app.applicant}`;
-      document.getElementById('modal-applicant-citizenship').textContent = app.citizenship_number || 'Provided';
-      document.getElementById('modal-app-category').textContent = `${app.passport_category || 'Ordinary'} (${app.service_type || 'New'})`;
+      document.getElementById('modal-applicant-name').textContent = app.applicant_name || `${t('label_applicant', 'Applicant')} #${app.applicant}`;
+      document.getElementById('modal-applicant-citizenship').textContent = app.citizenship_number || t('status_provided', 'Provided');
+      document.getElementById('modal-app-category').textContent = `${I18n.translateText(app.passport_category || 'Ordinary')} (${I18n.translateText(app.service_type || 'New')})`;
       document.getElementById('modal-app-status-badge').innerHTML = UI.renderStatusBadge(app.status);
       document.getElementById('modal-applicant-phone').textContent = app.applicant_phone || '—';
       document.getElementById('modal-applicant-email').textContent = app.applicant_email || '—';
-      document.getElementById('modal-app-fee').textContent = `NPR ${app.fee_amount || '5,000'}`;
-      document.getElementById('modal-app-biometrics').textContent = app.biometric_status || 'Pending';
+      const paymentStep = Array.isArray(app.workflow_steps)
+        ? app.workflow_steps.find(step => step.key === 'fee')
+        : null;
+      const signatureStep = Array.isArray(app.workflow_steps)
+        ? app.workflow_steps.find(step => step.key === 'signature')
+        : null;
+      const verificationStep = Array.isArray(app.workflow_steps)
+        ? app.workflow_steps.find(step => step.key === 'verification')
+        : null;
+      const isPaymentVerified = Boolean(paymentStep && (paymentStep.is_verified === true || paymentStep.status === 'Completed'));
+      const isSignatureComplete = Boolean(signatureStep && signatureStep.status === 'Completed');
+      const isDocumentReviewComplete = Boolean(verificationStep && verificationStep.status === 'Completed');
+      const paymentLabel = isPaymentVerified
+        ? I18n.translateStatus('Verified')
+        : t('status_awaiting_citizen_payment', 'Awaiting Citizen Payment');
+      document.getElementById('modal-app-fee').textContent = `NPR ${app.fee_amount || '5,000'} — ${paymentLabel}`;
+      document.getElementById('modal-app-biometrics').textContent = I18n.translateStatus(app.biometric_status || 'Pending');
+
+      const bioVerifyButton = document.getElementById('modal-btn-bio-verify');
+      const bioFailButton = document.getElementById('modal-btn-bio-fail');
+      const signatureButton = document.getElementById('modal-btn-signature');
+      const biometricsAreFinal = app.biometric_status === 'Verified' || isSignatureComplete;
+      bioVerifyButton.disabled = !isPaymentVerified || !isDocumentReviewComplete || biometricsAreFinal;
+      bioFailButton.disabled = !isPaymentVerified || !isDocumentReviewComplete || biometricsAreFinal;
+      signatureButton.disabled = !isPaymentVerified || !isDocumentReviewComplete || app.biometric_status !== 'Verified' || isSignatureComplete;
+      signatureButton.title = !isPaymentVerified
+        ? t('msg_payment_first', 'Payment must be verified first.')
+        : (!isDocumentReviewComplete
+            ? t('msg_verify_documents_first', 'Verify all current required documents first.')
+            : (app.biometric_status !== 'Verified' ? t('msg_verify_biometrics_first', 'Verify biometrics first.') : t('title_authorize_final_approval', 'Authorize signature and create the processing token.')));
+
+      updateModalFinalReviewControls();
 
       renderModalDocsTable();
       UI.openModal('app-workspace-modal');
     } catch (err) {
       console.error('Error opening workspace modal:', err);
-      UI.showToast('Could not load application details.', 'error');
+      UI.showToast(t('msg_load_application_details_error', 'Could not load application details.'), 'error');
     } finally {
       UI.hideLoading();
     }
@@ -538,100 +678,178 @@
     const countEl = document.getElementById('modal-doc-count');
 
     if (!currentModalDocs || currentModalDocs.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-md">No uploaded documents found for this application.</td></tr>`;
-      countEl.textContent = '0 documents';
+      tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-md">${t('empty_no_application_documents', 'No uploaded documents found for this application.')}</td></tr>`;
+      countEl.textContent = I18n.format('document_count_many', '{count} documents', { count: 0 });
       return;
     }
 
-    countEl.textContent = `${currentModalDocs.length} documents uploaded`;
+    countEl.textContent = I18n.format('documents_uploaded_count', '{count} documents uploaded', { count: currentModalDocs.length });
+    const paymentStep = Array.isArray(currentModalApp?.workflow_steps)
+      ? currentModalApp.workflow_steps.find(step => step.key === 'fee')
+      : null;
+    const isPaymentVerified = Boolean(paymentStep && (paymentStep.is_verified === true || paymentStep.status === 'Completed'));
 
     tbody.innerHTML = currentModalDocs.map(doc => {
       const statusBadge = doc.verification_status === 'Verified'
-        ? '<span class="badge badge-approved">Verified</span>'
+        ? `<span class="badge badge-approved">${I18n.translateStatus('Verified')}</span>`
         : (doc.verification_status === 'Rejected'
-          ? '<span class="badge badge-error">Rejected</span>'
-          : '<span class="badge badge-pending">Pending Review</span>');
+          ? `<span class="badge badge-error">${I18n.translateStatus('Rejected')}</span>`
+          : `<span class="badge badge-pending">${I18n.translateStatus('Pending Review')}</span>`);
 
-      const token = Auth.getToken();
-      const viewUrl = `/api/documents/${doc.document_id}/view-file/${token ? `?token=${encodeURIComponent(token)}` : ''}`;
       const fileLink = doc.document_id
-        ? `<a href="${viewUrl}" target="_blank" class="text-xs text-primary font-bold flex items-center gap-xs"><span class="material-symbols-outlined" style="font-size:14px;">open_in_new</span> View File</a>`
-        : '<span class="text-xs text-muted">Digital Record</span>';
+        ? `<button type="button" onclick="handleInspectDocument(${doc.document_id})" class="text-xs text-primary font-bold flex items-center gap-xs" style="border:0;background:none;padding:0;cursor:pointer;"><span class="material-symbols-outlined" style="font-size:14px;">open_in_new</span> ${t('btn_inspect_file', 'Inspect File')}</button>`
+        : `<span class="text-xs text-muted">${t('label_digital_record', 'Digital Record')}</span>`;
 
+      const isPending = doc.verification_status === 'Pending';
+      const isBusy = documentActionInFlight.has(String(doc.document_id));
+      const verifyDisabled = !isPending || !isPaymentVerified || !doc.is_inspected || isBusy;
+      const rejectDisabled = !isPending || !isPaymentVerified || isBusy;
+      const verifyTitle = !isPaymentVerified
+        ? t('msg_payment_first', 'Payment must be verified first.')
+        : (!isPending
+        ? I18n.format('decision_is_final', 'Decision is final: {status}', { status: I18n.translateStatus(doc.verification_status) })
+        : (!doc.is_inspected ? t('msg_inspect_before_verify', 'Inspect the file before verifying it.') : t('btn_verify_document', 'Verify Document')));
+      const decisionControls = isPending
+        ? `<div class="flex items-center gap-xs">
+            <button type="button" onclick="handleVerifyDoc(${doc.document_id})" class="btn btn-outline-success btn-xs" title="${verifyTitle}" ${verifyDisabled ? 'disabled' : ''}>
+              <span class="material-symbols-outlined" style="font-size:14px;">check</span> ${isBusy ? t('state_saving', 'Saving…') : t('btn_verify_short', 'Verify')}
+            </button>
+            <button type="button" onclick="handleRejectDoc(${doc.document_id})" class="btn btn-outline-danger btn-xs" title="${isPaymentVerified ? t('btn_reject_document', 'Reject Document') : t('msg_payment_first', 'Payment must be verified first.')}" ${rejectDisabled ? 'disabled' : ''}>
+              <span class="material-symbols-outlined" style="font-size:14px;">close</span> ${t('btn_reject_short', 'Reject')}
+            </button>
+          </div>`
+        : `<span class="text-xs font-semibold text-muted" title="${t('title_final_decision', 'A final decision cannot be changed on this record.')}">${t('status_decision_final', 'Decision final')}</span>`;
 
       return `
         <tr>
-          <td><strong class="text-sm">${doc.document_type}</strong></td>
-          <td>${fileLink}</td>
+          <td><strong class="text-sm">${esc(I18n.translateDocType(doc.document_type))}</strong></td>
+          <td>${fileLink}${doc.is_inspected ? `<span class="text-xs text-success block mt-xs">${t('legacy_inspection', 'Inspected')}</span>` : ''}</td>
           <td>${statusBadge}</td>
-          <td>
-            <div class="flex items-center gap-xs">
-              <button type="button" onclick="handleVerifyDoc(${doc.document_id})" class="btn btn-outline-success btn-xs" title="Verify Document">
-                <span class="material-symbols-outlined" style="font-size:14px;">check</span> Verify
-              </button>
-              <button type="button" onclick="handleRejectDoc(${doc.document_id})" class="btn btn-outline-danger btn-xs" title="Reject Document">
-                <span class="material-symbols-outlined" style="font-size:14px;">close</span> Reject
-              </button>
-            </div>
-          </td>
+          <td>${decisionControls}</td>
         </tr>
       `;
     }).join('');
   }
 
   async function handleVerifyDoc(docId) {
-    UI.showLoading('Verifying document...');
+    const doc = currentApplicationDocument(docId);
+    if (!doc) {
+      UI.showToast(t('msg_doc_wrong_application', 'This document does not belong to the application being inspected.'), 'error');
+      return;
+    }
+    if (doc.verification_status !== 'Pending') {
+      UI.showToast(I18n.format('document_already_final', 'This document already has a final {status} decision.', { status: I18n.translateStatus(doc.verification_status) }), 'warning');
+      return;
+    }
+    const paymentStep = Array.isArray(currentModalApp?.workflow_steps)
+      ? currentModalApp.workflow_steps.find(step => step.key === 'fee')
+      : null;
+    if (!paymentStep || (paymentStep.is_verified !== true && paymentStep.status !== 'Completed')) {
+      UI.showToast(t('msg_payment_first', 'Payment must be verified first.'), 'warning');
+      return;
+    }
+    if (!doc.is_inspected) {
+      UI.showToast(t('msg_inspect_before_verify', 'Inspect the document file before verifying it.'), 'warning');
+      return;
+    }
+    const actionKey = String(docId);
+    if (documentActionInFlight.has(actionKey)) return;
+    documentActionInFlight.add(actionKey);
+    renderModalDocsTable();
+
+    UI.showLoading(t('loading_verifying_document', 'Verifying document...'));
     try {
-      await API.post(`/documents/${docId}/verify-document/`, { remarks: 'Verified by Desk Officer' });
-      UI.showToast('Document verified successfully.', 'success');
-      // Refresh docs in modal
-      if (currentModalApp) {
-        const docs = await API.get(`/documents/?application=${currentModalApp.application_id}`);
-        currentModalDocs = Array.isArray(docs) ? docs : (docs.results || []);
-        renderModalDocsTable();
-      }
+      const result = await API.post(`/documents/${docId}/verify-document/`, {
+        application_id: currentModalApp.application_id,
+        remarks: 'Verified by Desk Officer'
+      });
+      applyDocumentDecision(docId, result);
+      renderModalDocsTable();
+      UI.showToast(t('msg_document_verified', 'Document verified successfully.'), 'success');
+      await refreshCurrentApplicationDocuments();
+      renderModalDocsTable();
     } catch (err) {
       console.error('Verify doc error:', err);
-      UI.showToast(err.message || 'Could not verify document.', 'error');
+      if (err.data?.current_status) {
+        applyDocumentDecision(docId, { verification_status: err.data.current_status });
+        renderModalDocsTable();
+      }
+      UI.showToast(err.message ? I18n.translateError(err.message) : t('msg_verify_document_failed', 'Could not verify document.'), 'error');
     } finally {
+      documentActionInFlight.delete(actionKey);
+      renderModalDocsTable();
       UI.hideLoading();
     }
   }
 
   async function handleRejectDoc(docId) {
-    const reason = prompt('Reason for rejecting this document:');
-    if (!reason) return;
+    const doc = currentApplicationDocument(docId);
+    if (!doc) {
+      UI.showToast(t('msg_doc_wrong_application', 'This document does not belong to the application being inspected.'), 'error');
+      return;
+    }
+    if (doc.verification_status !== 'Pending') {
+      UI.showToast(I18n.format('document_already_final', 'This document already has a final {status} decision.', { status: I18n.translateStatus(doc.verification_status) }), 'warning');
+      return;
+    }
+    const paymentStep = Array.isArray(currentModalApp?.workflow_steps)
+      ? currentModalApp.workflow_steps.find(step => step.key === 'fee')
+      : null;
+    if (!paymentStep || (paymentStep.is_verified !== true && paymentStep.status !== 'Completed')) {
+      UI.showToast(t('msg_payment_first', 'Payment must be verified first.'), 'warning');
+      return;
+    }
+    const actionKey = String(docId);
+    if (documentActionInFlight.has(actionKey)) return;
 
-    UI.showLoading('Rejecting document...');
+    const reason = prompt(t('prompt_reject_document', 'Reason for rejecting this document:'));
+    if (!reason || !reason.trim()) return;
+    documentActionInFlight.add(actionKey);
+    renderModalDocsTable();
+
+    UI.showLoading(t('loading_rejecting_document', 'Rejecting document...'));
     try {
-      await API.post(`/documents/${docId}/reject-document/`, { reason: reason });
-      UI.showToast('Document marked as Rejected.', 'info');
-      if (currentModalApp) {
-        const docs = await API.get(`/documents/?application=${currentModalApp.application_id}`);
-        currentModalDocs = Array.isArray(docs) ? docs : (docs.results || []);
-        renderModalDocsTable();
-      }
+      const result = await API.post(`/documents/${docId}/reject-document/`, {
+        application_id: currentModalApp.application_id,
+        reason: reason.trim()
+      });
+      applyDocumentDecision(docId, result);
+      renderModalDocsTable();
+      UI.showToast(t('msg_document_rejected', 'Document marked as Rejected.'), 'info');
+      await refreshCurrentApplicationDocuments();
+      renderModalDocsTable();
     } catch (err) {
       console.error('Reject doc error:', err);
-      UI.showToast(err.message || 'Could not reject document.', 'error');
+      if (err.data?.current_status) {
+        applyDocumentDecision(docId, { verification_status: err.data.current_status });
+        renderModalDocsTable();
+      }
+      UI.showToast(err.message ? I18n.translateError(err.message) : t('msg_reject_document_failed', 'Could not reject document.'), 'error');
     } finally {
+      documentActionInFlight.delete(actionKey);
+      renderModalDocsTable();
       UI.hideLoading();
     }
   }
 
   async function handleBiometricsAction(status) {
     if (!currentModalApp) return;
-    UI.showLoading(`Setting biometrics status to ${status}...`);
+    UI.showLoading(I18n.format('setting_biometrics_status', 'Setting biometrics status to {status}...', { status: I18n.translateStatus(status) }));
     try {
       await API.post(`/applications/${currentModalApp.application_id}/verify-biometrics/`, {
         biometric_status: status
       });
-      UI.showToast(`Biometric match updated to '${status}'.`, 'success');
-      document.getElementById('modal-app-biometrics').textContent = status;
+      UI.showToast(I18n.format('biometrics_status_updated', 'Biometric match updated to {status}.', { status: I18n.translateStatus(status) }), 'success');
+      document.getElementById('modal-app-biometrics').textContent = I18n.translateStatus(status);
       currentModalApp.biometric_status = status;
+      const signatureButton = document.getElementById('modal-btn-signature');
+      signatureButton.disabled = status !== 'Verified';
+      signatureButton.title = status === 'Verified'
+        ? t('title_authorize_final_approval', 'Authorize signature and create the processing token.')
+        : t('msg_verify_biometrics_first', 'Verify biometrics first.');
     } catch (err) {
       console.error('Biometrics error:', err);
-      UI.showToast(err.message || 'Could not update biometrics.', 'error');
+      UI.showToast(err.message ? I18n.translateError(err.message) : t('msg_update_biometrics_failed', 'Could not update biometrics.'), 'error');
     } finally {
       UI.hideLoading();
     }
@@ -639,56 +857,36 @@
 
   async function handleAuthorizeSignature() {
     if (!currentModalApp) return;
-    UI.showLoading('Issuing Government Digital Signature & Approving Application...');
+    UI.showLoading(t('issuing_signature_approval', 'Issuing government digital signature and assigning the processing token...'));
     try {
       const res = await API.post(`/applications/${currentModalApp.application_id}/authorize-signature/`, {});
-      UI.showToast(`Government PKI Digital Signature issued! Application #NP-${String(currentModalApp.application_id).padStart(4, '0')} Approved.`, 'success');
+      UI.showToast(I18n.format('government_signature_issued', 'Government digital signature issued. Application #NP-{id} is queued for processing.', {
+        id: String(currentModalApp.application_id).padStart(4, '0')
+      }), 'success');
       UI.closeModal('app-workspace-modal');
       loadStaffWorkspace();
     } catch (err) {
       console.error('Authorize signature error:', err);
-      UI.showToast(err.message || 'Could not authorize digital signature.', 'error');
-    } finally {
-      UI.hideLoading();
-    }
-  }
-
-  async function handleModalRejectApp() {
-    if (!currentModalApp) return;
-    const reason = prompt('Please specify the reason for rejecting this application:');
-    if (!reason) return;
-
-    UI.showLoading('Rejecting application...');
-    try {
-      await API.patch(`/applications/${currentModalApp.application_id}/`, {
-        status: 'Rejected',
-        processing_notes: reason
-      });
-      UI.showToast(`Application #NP-${String(currentModalApp.application_id).padStart(4, '0')} rejected.`, 'info');
-      UI.closeModal('app-workspace-modal');
-      loadStaffWorkspace();
-    } catch (err) {
-      console.error('Rejection error:', err);
-      UI.showToast(err.message || 'Could not reject application.', 'error');
+      UI.showToast(err.message ? I18n.translateError(err.message) : t('msg_signature_failed', 'Could not authorize digital signature.'), 'error');
     } finally {
       UI.hideLoading();
     }
   }
 
   async function handleCallNextToken() {
-    UI.showLoading('Calling next citizen token...');
+    UI.showLoading(t('loading_calling_next_token', 'Calling next citizen token...'));
 
     try {
       const res = await API.post('/queue-tokens/call-next/', {});
       if (res && res.token) {
-        UI.showToast(`Token T-${res.token.token_number} called to Desk Counter!`, 'success');
+        UI.showToast(I18n.format('token_called_to_counter', 'Token T-{token} called to desk counter.', { token: res.token.token_number }), 'success');
       } else {
-        UI.showToast(res.message || 'No pending citizens in waiting queue.', 'info');
+        UI.showToast(res.message ? I18n.translateError(res.message) : t('msg_no_queue_citizens', 'No pending citizens in waiting queue.'), 'info');
       }
       loadStaffWorkspace();
     } catch (err) {
       console.error('Call next error:', err);
-      UI.showToast(err.message || 'Could not call next token.', 'error');
+      UI.showToast(err.message ? I18n.translateError(err.message) : t('msg_call_token_failed', 'Could not call next token.'), 'error');
     } finally {
       UI.hideLoading();
     }
@@ -697,57 +895,24 @@
   async function handleUpdateTokenStatus(newStatus) {
     if (!activeToken) return;
 
-    UI.showLoading(`Updating token status to ${newStatus}...`);
+    UI.showLoading(I18n.format('updating_token_status', 'Updating token status to {status}...', { status: I18n.translateStatus(newStatus) }));
 
     try {
       await API.post(`/queue-tokens/${activeToken.token_id}/update-status/`, {
         queue_status: newStatus
       });
 
-      UI.showToast(`Token T-${activeToken.token_number} marked as ${newStatus}.`, 'success');
+      UI.showToast(I18n.format('token_status_updated', 'Token T-{token} marked as {status}.', {
+        token: activeToken.token_number, status: I18n.translateStatus(newStatus)
+      }), 'success');
       loadStaffWorkspace();
     } catch (err) {
       console.error('Update status error:', err);
-      UI.showToast(err.message || 'Could not update status.', 'error');
+      UI.showToast(err.message ? I18n.translateError(err.message) : t('msg_update_status_failed', 'Could not update status.'), 'error');
     } finally {
       UI.hideLoading();
     }
   }
 
-  async function handleApproveApplication(appId) {
-    UI.showLoading('Approving application...');
-    try {
-      await API.patch(`/applications/${appId}/`, {
-        status: 'Approved'
-      });
-      UI.showToast(`Application #NP-${String(appId).padStart(4, '0')} approved!`, 'success');
-      loadStaffWorkspace();
-    } catch (err) {
-      console.error('Approval error:', err);
-      UI.showToast(err.message || 'Could not approve application.', 'error');
-    } finally {
-      UI.hideLoading();
-    }
-  }
-
-  async function handleRejectApplication(appId) {
-    const reason = prompt('Please specify the reason for rejection:');
-    if (!reason) return;
-
-    UI.showLoading('Rejecting application...');
-    try {
-      await API.patch(`/applications/${appId}/`, {
-        status: 'Rejected',
-        processing_notes: reason
-      });
-      UI.showToast(`Application #NP-${String(appId).padStart(4, '0')} rejected.`, 'info');
-      loadStaffWorkspace();
-    } catch (err) {
-      console.error('Rejection error:', err);
-      UI.showToast(err.message || 'Could not reject application.', 'error');
-    } finally {
-      UI.hideLoading();
-    }
-  }
 </script>
 {% endblock %}

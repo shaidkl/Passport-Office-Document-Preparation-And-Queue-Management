@@ -9,11 +9,16 @@ const API_BASE_URL = (typeof window !== 'undefined' && window.location && window
   : '/api';
 
 class ApiClient {
-  /**
-   * Get the stored Bearer token
-   */
-  static getToken() {
-    return localStorage.getItem('passport_token') || null;
+  static translateMessage(message, fallback = '') {
+    const text = message || fallback;
+    return (typeof I18n !== 'undefined' && I18n.translateError)
+      ? I18n.translateError(text)
+      : text;
+  }
+
+  static getCsrfToken() {
+    const cookie = document.cookie.split('; ').find(row => row.startsWith('csrftoken='));
+    return cookie ? decodeURIComponent(cookie.split('=').slice(1).join('=')) : null;
   }
 
   /**
@@ -21,16 +26,14 @@ class ApiClient {
    */
   static async request(endpoint, options = {}) {
     const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
-    const token = this.getToken();
-
     const headers = {
       Accept: 'application/json',
       ...options.headers,
     };
-
-    // If there is an active session token and no custom Authorization header, attach Bearer
-    if (token && !headers['Authorization']) {
-      headers['Authorization'] = `Bearer ${token}`;
+    const method = (options.method || 'GET').toUpperCase();
+    if (!['GET', 'HEAD', 'OPTIONS', 'TRACE'].includes(method) && !headers['X-CSRFToken']) {
+      const csrfToken = this.getCsrfToken();
+      if (csrfToken) headers['X-CSRFToken'] = csrfToken;
     }
 
     // Set JSON content-type only if body is a plain object and NOT FormData
@@ -42,18 +45,20 @@ class ApiClient {
 
     try {
       const response = await fetch(url, {
-        method: options.method || 'GET',
+        method,
         headers,
         body,
+        credentials: 'same-origin',
       });
 
       // Handle 401 Unauthorized - token invalid or expired
       if (response.status === 401) {
         if (typeof Auth !== 'undefined' && Auth.isAuthenticated()) {
           console.warn('Session expired or unauthorized. Logging out.');
+          const loginUrl = Auth.loginUrlForRole(Auth.getRole());
           Auth.logout(false);
           if (!window.location.pathname.includes('/login')) {
-            window.location.href = '/login/?msg=session_expired';
+            window.location.href = `${loginUrl}?msg=session_expired`;
           }
         }
       }
@@ -92,7 +97,7 @@ class ApiClient {
 
       return data;
     } catch (err) {
-      console.error(`API Error [${options.method || 'GET'} ${url}]:`, err.message);
+      console.error(`API Error [${method} ${url}]:`, err.message);
       throw err;
     }
   }
@@ -133,6 +138,69 @@ class ApiClient {
       method: 'POST',
       body: formData,
     });
+  }
+
+  static async getBlob(endpoint) {
+    const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+    const headers = { Accept: '*/*' };
+
+    const response = await fetch(url, { method: 'GET', headers, credentials: 'same-origin' });
+    if (response.status === 401) {
+      if (typeof Auth !== 'undefined') Auth.logout(false);
+      throw new Error('Your session has expired. Please sign in again.');
+    }
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error((data && (data.error || data.detail)) || `Request failed with status ${response.status}`);
+    }
+    return response.blob();
+  }
+
+  static async getBlobUrl(endpoint) {
+    const blob = await this.getBlob(endpoint);
+    return URL.createObjectURL(blob);
+  }
+
+  static async openFile(endpoint) {
+    // Open synchronously so browsers treat this as part of the user's click.
+    // Passing "noopener" to window.open can return null even after creating a
+    // tab, which previously left that tab blank and redirected the dashboard.
+    const popup = window.open('about:blank', '_blank');
+    if (!popup) {
+      const error = new Error('The document tab was blocked. Allow pop-ups for this site and try again.');
+      alert(this.translateMessage(error.message));
+      throw error;
+    }
+
+    popup.opener = null;
+    const loadingMessage = (typeof I18n !== 'undefined') ? I18n.t('loading_document', 'Loading document...') : 'Loading document...';
+    popup.document.title = loadingMessage;
+    popup.document.body.textContent = loadingMessage;
+    try {
+      const objectUrl = await this.getBlobUrl(endpoint);
+      popup.location.replace(objectUrl);
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+    } catch (error) {
+      popup.close();
+      alert(this.translateMessage(error.message, 'Unable to open the file.'));
+      throw error;
+    }
+  }
+
+  static async downloadFile(endpoint, filename) {
+    try {
+      const objectUrl = await this.getBlobUrl(endpoint);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = filename || 'download';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+    } catch (error) {
+      alert(this.translateMessage(error.message, 'Unable to download the file.'));
+      throw error;
+    }
   }
 }
 

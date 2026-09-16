@@ -3,6 +3,17 @@
  */
 
 const UI = {
+  /** Escape untrusted values before inserting them into an HTML template. */
+  escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, character => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    })[character]);
+  },
+
   /**
    * Display a floating toast notification
    * @param {string} message 
@@ -21,6 +32,7 @@ const UI = {
     const translatedMessage = (typeof I18n !== 'undefined' && I18n.translateError)
       ? I18n.translateError(message)
       : message;
+    const safeMessage = this.escapeHtml(translatedMessage);
 
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
@@ -32,7 +44,7 @@ const UI = {
 
     toast.innerHTML = `
       <span class="material-symbols-outlined text-${type}">${iconName}</span>
-      <div style="flex: 1; font-size: 0.875rem;">${translatedMessage}</div>
+      <div style="flex: 1; font-size: 0.875rem;">${safeMessage}</div>
       <button type="button" style="background:none; border:none; color:var(--outline); cursor:pointer;" onclick="this.parentElement.remove()">
         <span class="material-symbols-outlined" style="font-size: 1.125rem;">close</span>
       </button>
@@ -66,7 +78,7 @@ const UI = {
       overlay.className = 'loading-overlay';
       overlay.innerHTML = `
         <div class="spinner"></div>
-        <p id="loading-text" style="font-weight: 600; color: var(--primary); font-size: 0.9375rem;">${msg}</p>
+        <p id="loading-text" style="font-weight: 600; color: var(--primary); font-size: 0.9375rem;">${this.escapeHtml(msg)}</p>
       `;
       document.body.appendChild(overlay);
     } else {
@@ -187,7 +199,7 @@ const UI = {
       ? I18n.translateStatus(status)
       : status;
 
-    return `<span class="badge ${badgeClass}" data-raw-status="${status}">${display}</span>`;
+    return `<span class="badge ${badgeClass}" data-raw-status="${this.escapeHtml(status)}">${this.escapeHtml(display)}</span>`;
   }
 };
 

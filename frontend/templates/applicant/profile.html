@@ -3,7 +3,7 @@
 {% block title %}My Profile — Nepal Passport Portal{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="/static/css/applicant.css">
+<link rel="stylesheet" href="/static/css/applicant.css?v=20260913-4">
 {% endblock %}
 
 {% block content %}
@@ -45,7 +45,7 @@
     <!-- Profile Header Card -->
     <div class="card mb-xl" style="background:linear-gradient(135deg,var(--primary) 0%,#1a3a6e 100%);color:#fff;padding:var(--spacing-xl);">
       <div class="flex items-center gap-lg flex-wrap">
-        <div style="width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.2);border:3px solid rgba(255,255,255,0.4);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <div style="width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.2);border:3px solid rgba(255,255,255,0.4);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;">
           <span class="auth-user-avatar" style="font-size:2rem;color:#fff;font-weight:700;">U</span>
         </div>
         <div>
@@ -98,6 +98,7 @@
             <div class="form-group">
               <label class="form-label" data-i18n="phone_label">Phone Number</label>
               <input type="tel" id="pf-phone" class="form-control" disabled>
+              <span class="form-helper" data-i18n="profile_phone_helper">Contact information — contact the office to change.</span>
             </div>
 
             <div class="form-group">
@@ -177,7 +178,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
   let currentProfile = null;
   let isEditMode = false;
 
@@ -219,6 +220,7 @@
     try {
       currentProfile = await API.get(`/applicants/${user.user_id}/`);
       renderProfile(currentProfile);
+      await Auth.loadVerifiedProfilePhoto(user);
     } catch (err) {
       UI.showToast(t('profile_load_error', 'Could not load profile information.'), 'error');
       document.getElementById('profile-loading').innerHTML = `<p class="text-error">${t('profile_load_error', 'Could not load profile. Please refresh.')}</p>`;
@@ -246,7 +248,7 @@
 
   function toggleEditMode() {
     isEditMode = !isEditMode;
-    const fields = ['pf-full-name', 'pf-phone', 'pf-dob', 'pf-gender', 'pf-nationality', 'pf-address'];
+    const fields = ['pf-full-name', 'pf-dob', 'pf-gender', 'pf-nationality', 'pf-address'];
     const actionsEl = document.getElementById('profile-actions');
     const editBtn = document.getElementById('edit-toggle-btn');
 
@@ -263,7 +265,7 @@
   function cancelEdit() {
     isEditMode = false;
     if (currentProfile) renderProfile(currentProfile);
-    const fields = ['pf-full-name', 'pf-phone', 'pf-dob', 'pf-gender', 'pf-nationality', 'pf-address'];
+    const fields = ['pf-full-name', 'pf-dob', 'pf-gender', 'pf-nationality', 'pf-address'];
     fields.forEach(id => document.getElementById(id).disabled = true);
     document.getElementById('profile-actions').setAttribute('style', 'display:none !important;');
     const editBtn = document.getElementById('edit-toggle-btn');
@@ -284,7 +286,6 @@
 
     const payload = {
       full_name: document.getElementById('pf-full-name').value.trim(),
-      phone: document.getElementById('pf-phone').value.trim(),
       date_of_birth: document.getElementById('pf-dob').value,
       gender: document.getElementById('pf-gender').value,
       nationality: document.getElementById('pf-nationality').value.trim(),

@@ -31,7 +31,7 @@
     </div>
 
     <!-- Registration Form -->
-    <form id="register-form" onsubmit="handleRegisterSubmit(event)" class="p-lg md:p-xl flex flex-col gap-lg">
+    <form id="register-form" onsubmit="handleRegisterSubmit(event)" class="p-lg md:p-xl flex flex-col gap-lg" novalidate>
 
       <!-- 1. Personal Details -->
       <div>
@@ -41,14 +41,32 @@
           <span data-i18n="register_section_personal">1. Personal Information</span>
         </h3>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-md">
-          <!-- Full Name -->
-          <div class="form-group md:col-span-2">
-            <label class="form-label" for="reg-full-name">
-              <span data-i18n="fullname_label">Full Legal Name (as in Citizenship / NID)</span> <span
-                class="required">*</span>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-md">
+          <!-- First Name -->
+          <div class="form-group">
+            <label class="form-label" for="reg-first-name">
+              <span data-i18n="first_name_label">First Name</span> <span class="required">*</span>
             </label>
-            <input type="text" id="reg-full-name" class="form-control" placeholder="e.g. Ram Bahadur Thapa" required>
+            <input type="text" id="reg-first-name" class="form-control" placeholder="e.g. Ram" data-i18n-placeholder="register_first_name_placeholder" autocomplete="given-name" maxlength="50" required>
+            <span id="reg-first-name-error" class="invalid-feedback" role="alert" style="display:none;"></span>
+          </div>
+
+          <!-- Middle Name -->
+          <div class="form-group">
+            <label class="form-label" for="reg-middle-name">
+              <span data-i18n="middle_name_label">Middle Name (optional)</span>
+            </label>
+            <input type="text" id="reg-middle-name" class="form-control" placeholder="e.g. Bahadur" data-i18n-placeholder="register_middle_name_placeholder" autocomplete="additional-name" maxlength="50">
+            <span id="reg-middle-name-error" class="invalid-feedback" role="alert" style="display:none;"></span>
+          </div>
+
+          <!-- Last Name -->
+          <div class="form-group">
+            <label class="form-label" for="reg-last-name">
+              <span data-i18n="last_name_label">Last Name</span> <span class="required">*</span>
+            </label>
+            <input type="text" id="reg-last-name" class="form-control" placeholder="e.g. Thapa" data-i18n-placeholder="register_last_name_placeholder" autocomplete="family-name" maxlength="50" required>
+            <span id="reg-last-name-error" class="invalid-feedback" role="alert" style="display:none;"></span>
           </div>
 
           <!-- Date of Birth -->
@@ -57,6 +75,7 @@
               <span data-i18n="dob_label">Date of Birth</span> <span class="required">*</span>
             </label>
             <input type="date" id="reg-dob" class="form-control" required>
+            <span id="reg-dob-error" class="invalid-feedback" role="alert" style="display:none;"></span>
           </div>
 
           <!-- Gender -->
@@ -70,6 +89,7 @@
               <option value="Female" data-i18n="gender_female">Female</option>
               <option value="Other" data-i18n="gender_other">Other</option>
             </select>
+            <span id="reg-gender-error" class="invalid-feedback" role="alert" style="display:none;"></span>
           </div>
 
           <!-- Nationality -->
@@ -77,7 +97,8 @@
             <label class="form-label" for="reg-nationality">
               <span data-i18n="vp_label_nationality">Nationality</span> <span class="required">*</span>
             </label>
-            <input type="text" id="reg-nationality" class="form-control" value="Nepali" required>
+            <input type="text" id="reg-nationality" class="form-control" value="Nepali" maxlength="50" required>
+            <span id="reg-nationality-error" class="invalid-feedback" role="alert" style="display:none;"></span>
           </div>
         </div>
       </div>
@@ -96,7 +117,8 @@
             <label class="form-label" for="reg-email">
               <span data-i18n="email_label">Email Address</span> <span class="required">*</span>
             </label>
-            <input type="email" id="reg-email" class="form-control" placeholder="citizen@example.com" required>
+            <input type="email" id="reg-email" class="form-control" placeholder="e.g. citizen@example.com" data-i18n-placeholder="register_email_placeholder" maxlength="254" required>
+            <span id="reg-email-error" class="invalid-feedback" role="alert" style="display:none;"></span>
             <span class="form-helper">This will be your login identifier.</span>
           </div>
 
@@ -105,8 +127,10 @@
             <label class="form-label" for="reg-phone">
               <span data-i18n="phone_label">Mobile Phone Number</span> <span class="required">*</span>
             </label>
-            <input type="tel" id="reg-phone" class="form-control" placeholder="e.g. 9841234567" required>
-            <span class="form-helper">SMS queue updates will be sent here.</span>
+            <input type="tel" id="reg-phone" class="form-control" placeholder="e.g. 9841234567" data-i18n-placeholder="register_phone_placeholder"
+              autocomplete="tel" inputmode="tel" maxlength="20" required>
+            <span id="reg-phone-error" class="invalid-feedback" role="alert" style="display:none;"></span>
+            <span class="form-helper" data-i18n="register_phone_format_help">Used as contact information only; no phone verification is required.</span>
           </div>
 
           <!-- Permanent Address -->
@@ -115,7 +139,8 @@
               <span data-i18n="address_label">Permanent Address</span> <span class="required">*</span>
             </label>
             <input type="text" id="reg-address" class="form-control"
-              placeholder="e.g. Ward No. 4, Kathmandu, Bagmati Province" required>
+              placeholder="e.g. Ward No. 4, Kathmandu, Bagmati Province" data-i18n-placeholder="register_address_placeholder" maxlength="255" required>
+            <span id="reg-address-error" class="invalid-feedback" role="alert" style="display:none;"></span>
           </div>
         </div>
       </div>
@@ -135,17 +160,19 @@
               <span data-i18n="password_label">Password</span> <span class="required">*</span>
             </label>
             <div style="position: relative;">
-              <input type="password" id="reg-password" class="form-control" placeholder="Minimum 6 characters"
-                minlength="6" required autocomplete="new-password">
+              <input type="password" id="reg-password" class="form-control" placeholder="Minimum 8 characters" data-i18n-placeholder="register_password_placeholder"
+                minlength="8" maxlength="128" required autocomplete="new-password">
               <button 
                 type="button" 
                 onclick="togglePasswordVisibility('reg-password', this)"
                 style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--outline); cursor: pointer;"
-                title="Toggle password visibility"
+                title="Show or hide password" data-i18n-title="register_toggle_password"
+                aria-label="Show or hide password" data-i18n-aria-label="register_toggle_password"
               >
                 <span class="material-symbols-outlined" style="font-size: 18px;">visibility</span>
               </button>
             </div>
+            <span id="reg-password-error" class="invalid-feedback" role="alert" style="display:none;"></span>
           </div>
 
           <!-- Confirm Password -->
@@ -155,16 +182,18 @@
             </label>
             <div style="position: relative;">
               <input type="password" id="reg-confirm-password" class="form-control" placeholder="Re-enter your password"
-                data-i18n-placeholder="confirm_password_label" minlength="6" required autocomplete="new-password">
+                data-i18n-placeholder="register_confirm_password_placeholder" minlength="8" maxlength="128" required autocomplete="new-password">
               <button 
                 type="button" 
                 onclick="togglePasswordVisibility('reg-confirm-password', this)"
                 style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--outline); cursor: pointer;"
-                title="Toggle password visibility"
+                title="Show or hide password" data-i18n-title="register_toggle_password"
+                aria-label="Show or hide password" data-i18n-aria-label="register_toggle_password"
               >
                 <span class="material-symbols-outlined" style="font-size: 18px;">visibility</span>
               </button>
             </div>
+            <span id="reg-confirm-password-error" class="invalid-feedback" role="alert" style="display:none;"></span>
           </div>
         </div>
       </div>
@@ -174,10 +203,10 @@
         <label class="flex items-start gap-sm text-sm text-muted" style="cursor: pointer;">
           <input type="checkbox" id="reg-terms" required style="margin-top: 3px;">
           <span data-i18n="app_declaration">
-            I declare that the details provided above are true, complete, and accurate according to my official
-            government identity records.
+            I declare that the details provided above are true, complete, and accurate according to my official government identity records.
           </span>
         </label>
+        <span id="reg-terms-error" class="invalid-feedback" role="alert" style="display:none;"></span>
       </div>
 
       <!-- Action Buttons -->
@@ -197,7 +226,93 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
+  function registrationText(key, fallback, values = {}) {
+    const translated = (typeof I18n !== 'undefined') ? I18n.t(key, fallback) : fallback;
+    return Object.entries(values).reduce(
+      (text, [name, value]) => text.replaceAll(`{${name}}`, String(value)),
+      translated
+    );
+  }
+
+  const registrationFields = {
+    first_name: ['reg-first-name', 'reg-first-name-error'],
+    middle_name: ['reg-middle-name', 'reg-middle-name-error'],
+    last_name: ['reg-last-name', 'reg-last-name-error'],
+    date_of_birth: ['reg-dob', 'reg-dob-error'],
+    gender: ['reg-gender', 'reg-gender-error'],
+    nationality: ['reg-nationality', 'reg-nationality-error'],
+    email: ['reg-email', 'reg-email-error'],
+    phone: ['reg-phone', 'reg-phone-error'],
+    address: ['reg-address', 'reg-address-error'],
+    password: ['reg-password', 'reg-password-error'],
+    confirm_password: ['reg-confirm-password', 'reg-confirm-password-error'],
+    accepted_terms: ['reg-terms', 'reg-terms-error'],
+  };
+
+  const registrationFieldAliases = {
+    terms: 'accepted_terms',
+  };
+
+  const registrationErrorText = {
+    en: {
+      first_name_required: 'Enter your first name.',
+      first_name_invalid: 'First name may contain letters, spaces, apostrophes, and hyphens only.',
+      middle_name_invalid: 'Middle name may contain letters, spaces, apostrophes, and hyphens only.',
+      last_name_required: 'Enter your last name.',
+      last_name_invalid: 'Last name may contain letters, spaces, apostrophes, and hyphens only.',
+      dob_required: 'Enter your date of birth.',
+      dob_invalid: 'Enter a valid date of birth.',
+      dob_future: 'Date of birth cannot be in the future.',
+      gender_required: 'Select your gender.',
+      nationality_required: 'Enter your nationality.',
+      email_required: 'Enter your email address.',
+      email_invalid: 'Enter a valid email address.',
+      email_duplicate: 'This email address is already registered.',
+      phone_required: 'Enter your mobile phone number.',
+      phone_invalid: 'Enter a valid 10-digit Nepali mobile number.',
+      phone_duplicate: 'This phone number is already registered.',
+      address_required: 'Enter your permanent address.',
+      password_required: 'Enter a password.',
+      password_length: 'Password must contain at least 8 characters.',
+      password_common: 'Choose a less common password.',
+      password_numeric: 'Password cannot contain only numbers.',
+      password_similar: 'Choose a password that is not similar to your name or email.',
+      confirm_required: 'Re-enter your password.',
+      password_mismatch: 'Passwords do not match.',
+      terms_required: 'Confirm that your registration details are accurate.',
+      required: 'This field is required.',
+    },
+    ne: {
+      first_name_required: 'आफ्नो पहिलो नाम लेख्नुहोस्।',
+      first_name_invalid: 'पहिलो नाममा अक्षर, खाली ठाउँ, अपोस्ट्रोफ र हाइफन मात्र राख्न मिल्छ।',
+      middle_name_invalid: 'बीचको नाममा अक्षर, खाली ठाउँ, अपोस्ट्रोफ र हाइफन मात्र राख्न मिल्छ।',
+      last_name_required: 'आफ्नो थर लेख्नुहोस्।',
+      last_name_invalid: 'थरमा अक्षर, खाली ठाउँ, अपोस्ट्रोफ र हाइफन मात्र राख्न मिल्छ।',
+      dob_required: 'आफ्नो जन्म मिति लेख्नुहोस्।',
+      dob_invalid: 'मान्य जन्म मिति लेख्नुहोस्।',
+      dob_future: 'जन्म मिति भविष्यको हुन सक्दैन।',
+      gender_required: 'लिङ्ग छान्नुहोस्।',
+      nationality_required: 'राष्ट्रियता लेख्नुहोस्।',
+      email_required: 'इमेल ठेगाना लेख्नुहोस्।',
+      email_invalid: 'मान्य इमेल ठेगाना लेख्नुहोस्।',
+      email_duplicate: 'यो इमेल ठेगाना पहिले नै दर्ता भएको छ।',
+      phone_required: 'मोबाइल नम्बर लेख्नुहोस्।',
+      phone_invalid: 'मान्य १० अङ्कको नेपाली मोबाइल नम्बर लेख्नुहोस्।',
+      phone_duplicate: 'यो मोबाइल नम्बर पहिले नै दर्ता भएको छ।',
+      address_required: 'स्थायी ठेगाना लेख्नुहोस्।',
+      password_required: 'पासवर्ड लेख्नुहोस्।',
+      password_length: 'पासवर्डमा कम्तीमा ८ अक्षर हुनुपर्छ।',
+      password_common: 'कम प्रचलित पासवर्ड छान्नुहोस्।',
+      password_numeric: 'पासवर्डमा अङ्क मात्र राख्न मिल्दैन।',
+      password_similar: 'नाम वा इमेलसँग नमिल्ने पासवर्ड छान्नुहोस्।',
+      confirm_required: 'पासवर्ड पुनः लेख्नुहोस्।',
+      password_mismatch: 'पासवर्डहरू मेल खाएनन्।',
+      terms_required: 'दर्ता विवरण सही भएको पुष्टि गर्नुहोस्।',
+      required: 'यो विवरण अनिवार्य छ।',
+    },
+  };
+
   document.addEventListener('DOMContentLoaded', () => {
     // If citizen is already logged in, redirect to dashboard
     if (Auth.isAuthenticated()) {
@@ -217,10 +332,21 @@
       const today = new Date().toISOString().split('T')[0];
       dobInput.setAttribute('max', today);
     }
+
+    Object.entries(registrationFields).forEach(([field, [inputId]]) => {
+      const input = document.getElementById(inputId);
+      const eventName = input?.type === 'checkbox' || input?.tagName === 'SELECT' ? 'change' : 'input';
+      input?.addEventListener(eventName, () => clearRegistrationFieldError(field));
+    });
   });
 
   window.addEventListener('languageChanged', () => {
     if (typeof I18n !== 'undefined') I18n.applyTranslations();
+    document.querySelectorAll('[data-registration-error-field]').forEach((element) => {
+      const field = element.dataset.registrationErrorField;
+      const rawMessage = element.dataset.registrationErrorRaw || '';
+      element.textContent = registrationErrorMessage(field, rawMessage);
+    });
   });
 
   function togglePasswordVisibility(inputId, btn) {
@@ -247,6 +373,130 @@
     UI.showToast(trMsg, 'error');
   }
 
+  function registrationErrorKey(field, rawMessage) {
+    const text = String(rawMessage || '').toLowerCase();
+    if (field === 'first_name' && text.includes('enter your first name')) return 'first_name_required';
+    if (field === 'last_name' && text.includes('enter your last name')) return 'last_name_required';
+    if (field === 'first_name' && (text.includes('may contain') || text.includes('valid'))) return 'first_name_invalid';
+    if (field === 'middle_name' && (text.includes('may contain') || text.includes('valid'))) return 'middle_name_invalid';
+    if (field === 'last_name' && (text.includes('may contain') || text.includes('valid'))) return 'last_name_invalid';
+    if (field === 'email' && text.includes('already registered')) return 'email_duplicate';
+    if (field === 'email' && (text.includes('valid') || text.includes('format'))) return 'email_invalid';
+    if (field === 'phone' && text.includes('already registered')) return 'phone_duplicate';
+    if (field === 'phone' && (text.includes('valid') || text.includes('10-digit'))) return 'phone_invalid';
+    if (field === 'date_of_birth' && text.includes('future')) return 'dob_future';
+    if (field === 'date_of_birth' && (text.includes('valid') || text.includes('format'))) return 'dob_invalid';
+    if (field === 'password' && (text.includes('8 character') || text.includes('too short'))) return 'password_length';
+    if (field === 'password' && text.includes('common')) return 'password_common';
+    if (field === 'password' && text.includes('numeric')) return 'password_numeric';
+    if (field === 'password' && text.includes('similar')) return 'password_similar';
+    if (field === 'confirm_password' && text.includes('match')) return 'password_mismatch';
+    if (field === 'accepted_terms') return 'terms_required';
+    if (text.includes('required') || text.includes('blank')) {
+      return ({
+        first_name: 'first_name_required',
+        last_name: 'last_name_required',
+        date_of_birth: 'dob_required',
+        gender: 'gender_required',
+        nationality: 'nationality_required',
+        email: 'email_required',
+        phone: 'phone_required',
+        address: 'address_required',
+        password: 'password_required',
+        confirm_password: 'confirm_required',
+      })[field] || 'required';
+    }
+    return null;
+  }
+
+  function registrationErrorMessage(field, rawMessage) {
+    const language = (typeof I18n !== 'undefined' && I18n.currentLang === 'ne') ? 'ne' : 'en';
+    const key = registrationErrorKey(field, rawMessage);
+    if (key && registrationErrorText[language][key]) return registrationErrorText[language][key];
+    return (typeof I18n !== 'undefined' && I18n.translateError)
+      ? I18n.translateError(rawMessage)
+      : String(rawMessage || registrationErrorText[language].required);
+  }
+
+  function clearRegistrationFieldError(fieldName) {
+    const field = registrationFieldAliases[fieldName] || fieldName;
+    const config = registrationFields[field];
+    if (!config) return;
+    const input = document.getElementById(config[0]);
+    const feedback = document.getElementById(config[1]);
+    input?.classList.remove('is-invalid');
+    input?.removeAttribute('aria-invalid');
+    if (feedback) {
+      feedback.textContent = '';
+      feedback.style.display = 'none';
+      delete feedback.dataset.registrationErrorField;
+      delete feedback.dataset.registrationErrorRaw;
+    }
+  }
+
+  function clearRegistrationErrors() {
+    Object.keys(registrationFields).forEach(clearRegistrationFieldError);
+    const alertBox = document.getElementById('register-alert');
+    alertBox.textContent = '';
+    alertBox.style.display = 'none';
+  }
+
+  function setRegistrationFieldError(fieldName, rawMessage) {
+    const field = registrationFieldAliases[fieldName] || fieldName;
+    const config = registrationFields[field];
+    if (!config) return false;
+    const input = document.getElementById(config[0]);
+    const feedback = document.getElementById(config[1]);
+    input?.classList.add('is-invalid');
+    input?.setAttribute('aria-invalid', 'true');
+    if (feedback) {
+      feedback.dataset.registrationErrorField = field;
+      feedback.dataset.registrationErrorRaw = String(rawMessage || 'This field is required.');
+      feedback.textContent = registrationErrorMessage(field, feedback.dataset.registrationErrorRaw);
+      feedback.style.display = 'block';
+    }
+    return true;
+  }
+
+  function firstErrorMessage(value) {
+    if (Array.isArray(value)) return firstErrorMessage(value[0]);
+    if (value && typeof value === 'object') {
+      const firstValue = Object.values(value)[0];
+      return firstErrorMessage(firstValue);
+    }
+    return String(value || 'This field is required.');
+  }
+
+  function applyRegistrationApiErrors(data, fallbackMessage) {
+    let firstInvalidInput = null;
+    let generalMessage = '';
+    if (data && typeof data === 'object') {
+      Object.entries(data).forEach(([fieldName, value]) => {
+        if (['retry_after', 'attempts_remaining'].includes(fieldName)) return;
+        const message = firstErrorMessage(value);
+        if (['error', 'detail', 'message', 'non_field_errors', 'role'].includes(fieldName)) {
+          generalMessage = generalMessage || message;
+          return;
+        }
+        if (setRegistrationFieldError(fieldName, message) && !firstInvalidInput) {
+          const field = registrationFieldAliases[fieldName] || fieldName;
+          firstInvalidInput = document.getElementById(registrationFields[field][0]);
+        } else if (!registrationFields[registrationFieldAliases[fieldName] || fieldName]) {
+          generalMessage = generalMessage || message;
+        }
+      });
+    }
+    if (generalMessage) showRegisterError(generalMessage);
+    if (!generalMessage && !firstInvalidInput && fallbackMessage) showRegisterError(fallbackMessage);
+    firstInvalidInput?.focus();
+    firstInvalidInput?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return Boolean(firstInvalidInput || generalMessage);
+  }
+
+  function normalizeRegistrationPhone(value) {
+    return String(value || '').replace(/[\s\-+()]/g, '').replace(/^977/, '');
+  }
+
   async function handleRegisterSubmit(event) {
     event.preventDefault();
     const alertBox = document.getElementById('register-alert');
@@ -254,12 +504,14 @@
     const btnText = document.getElementById('register-btn-text');
     const isNe = (typeof I18n !== 'undefined' && I18n.currentLang === 'ne');
 
-    alertBox.style.display = 'none';
+    clearRegistrationErrors();
 
-    const fullName = document.getElementById('reg-full-name').value.trim();
+    const firstName = document.getElementById('reg-first-name').value.trim();
+    const middleName = document.getElementById('reg-middle-name').value.trim();
+    const lastName = document.getElementById('reg-last-name').value.trim();
     const dob = document.getElementById('reg-dob').value;
     const gender = document.getElementById('reg-gender').value;
-    const nationality = document.getElementById('reg-nationality').value.trim() || 'Nepali';
+    const nationality = document.getElementById('reg-nationality').value.trim();
     const email = document.getElementById('reg-email').value.trim();
     const phone = document.getElementById('reg-phone').value.trim();
     const address = document.getElementById('reg-address').value.trim();
@@ -267,39 +519,64 @@
     const confirmPassword = document.getElementById('reg-confirm-password').value;
     const terms = document.getElementById('reg-terms').checked;
 
-    if (!terms) {
-      showRegisterError(isNe ? 'कृपया विवरणको सत्यता पुष्टि गर्नुहोस्।' : 'You must confirm the accuracy of your details.');
-      return;
-    }
+    const cleanPhone = normalizeRegistrationPhone(phone);
+    const validationErrors = [];
+    const addError = (field, message) => {
+      setRegistrationFieldError(field, message);
+      validationErrors.push(field);
+    };
 
-    if (password.length < 6) {
-      showRegisterError(isNe ? 'पासवर्ड कम्तिमा ६ अक्षरको हुनुपर्छ।' : 'Password must be at least 6 characters long.');
-      return;
+    const validNamePart = value => /^[\p{L}\p{M}]+(?:[ '\-][\p{L}\p{M}]+)*$/u.test(value);
+    if (!firstName) addError('first_name', 'This field is required.');
+    else if (!validNamePart(firstName)) addError('first_name', 'First name may contain letters, spaces, apostrophes, and hyphens only.');
+    if (middleName && !validNamePart(middleName)) addError('middle_name', 'Middle name may contain letters, spaces, apostrophes, and hyphens only.');
+    if (!lastName) addError('last_name', 'This field is required.');
+    else if (!validNamePart(lastName)) addError('last_name', 'Last name may contain letters, spaces, apostrophes, and hyphens only.');
+    if (!dob) {
+      addError('date_of_birth', 'This field is required.');
+    } else {
+      const selectedDob = new Date(`${dob}T00:00:00`);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (Number.isNaN(selectedDob.getTime())) addError('date_of_birth', 'Enter a valid date.');
+      else if (selectedDob > today) addError('date_of_birth', 'Date of birth cannot be in the future.');
     }
+    if (!gender) addError('gender', 'This field is required.');
+    if (!nationality) addError('nationality', 'This field is required.');
+    if (!email) addError('email', 'This field is required.');
+    else if (!document.getElementById('reg-email').validity.valid) addError('email', 'Enter a valid email address.');
+    if (!phone) addError('phone', 'This field is required.');
+    else if (!/^9[678]\d{8}$/.test(cleanPhone)) addError('phone', 'Enter a valid 10-digit Nepali mobile number.');
+    if (!address) addError('address', 'This field is required.');
+    if (!password) addError('password', 'This field is required.');
+    else if (password.length < 8) addError('password', 'Password must contain at least 8 characters.');
+    else if (/^\d+$/.test(password)) addError('password', 'This password is entirely numeric.');
+    if (!confirmPassword) addError('confirm_password', 'This field is required.');
+    else if (password !== confirmPassword) addError('confirm_password', 'Passwords do not match.');
+    if (!terms) addError('accepted_terms', 'You must confirm that the registration details are accurate.');
 
-    if (password !== confirmPassword) {
-      showRegisterError(isNe ? 'पासवर्ड मेल खाएन। कृपया पुनः प्रविष्ट गर्नुहोस्।' : 'Passwords do not match. Please re-enter your password.');
-      return;
-    }
-
-    // Validate Nepali mobile format: 10 digits starting with 98, 97, 96
-    const cleanPhone = phone.replace(/[\s\-+]/g, '').replace(/^977/, '');
-    const phoneRegex = /^9[678]\d{8}$/;
-    if (!phoneRegex.test(cleanPhone)) {
-      showRegisterError(isNe ? 'कृपया १० अंकको मान्य नेपाली मोबाइल नम्बर प्रविष्ट गर्नुहोस् (उदा: ९८XXXXXXXX)।' : 'Please enter a valid 10-digit Nepali mobile number (e.g., 98XXXXXXXX).');
+    if (validationErrors.length) {
+      const firstField = registrationFields[validationErrors[0]];
+      const firstInput = firstField ? document.getElementById(firstField[0]) : null;
+      firstInput?.focus();
+      firstInput?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
 
     const payload = {
       role: 'citizen',
-      full_name: fullName,
+      first_name: firstName,
+      middle_name: middleName,
+      last_name: lastName,
       date_of_birth: dob,
       gender: gender,
       nationality: nationality,
       email: email,
       phone: cleanPhone,
       address: address,
-      password: password
+      password: password,
+      confirm_password: confirmPassword,
+      accepted_terms: terms
     };
 
     submitBtn.disabled = true;
@@ -307,14 +584,16 @@
 
     try {
       await Auth.register(payload);
-      UI.showToast(isNe ? 'नागरिक खाता दर्ता सफल भयो! लग-इन पृष्ठमा जाँदै...' : 'Registration successful! Redirecting to login...', 'success');
+      UI.showToast(isNe ? 'नागरिक खाता सफलतापूर्वक बन्यो। अब लग-इन गर्न सक्नुहुन्छ।' : 'Registration successful! You can now log in.', 'success');
       setTimeout(() => {
         window.location.href = '/login/?msg=registered';
       }, 800);
     } catch (err) {
       console.error('Registration failed:', err);
-      const errMsg = err.message || (isNe ? 'दर्ता असफल भयो। इमेल वा मोबाइल नम्बर पहिले नै प्रयोगमा हुन सक्छ।' : 'Registration failed. Email or phone number might already be in use.');
-      showRegisterError(errMsg);
+      applyRegistrationApiErrors(
+        err.data,
+        err.message || (isNe ? 'दर्ता पूरा गर्न सकिएन। कृपया पुनः प्रयास गर्नुहोस्।' : 'Registration could not be completed. Please try again.')
+      );
       submitBtn.disabled = false;
       btnText.textContent = isNe ? 'नयाँ खाता खोल्नुहोस्' : 'Create Account';
     }

@@ -4,7 +4,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="/static/css/admin.css">
-<style>
+<style nonce="{{ csp_nonce }}">
   .admin-layout { display: flex; min-height: calc(100vh - var(--header-height) - var(--topbar-height) - 160px); }
   .admin-sidebar { width: var(--sidebar-width); background: var(--surface-container-low); border-right: 1px solid var(--outline-variant); padding: var(--spacing-lg) var(--spacing-md); display: flex; flex-direction: column; gap: var(--spacing-xs); flex-shrink: 0; }
   @media(max-width:900px){ .admin-sidebar{ display:none; } }
@@ -56,7 +56,7 @@
         <button type="button" onclick="openAddStaffModal()" class="btn btn-primary">
           <span class="material-symbols-outlined">person_add</span> <span data-i18n="admin_add_staff">Register New Officer</span>
         </button>
-        <button type="button" onclick="loadStaffData()" class="btn btn-outline" title="Refresh Staff">
+        <button type="button" onclick="loadStaffData()" class="btn btn-outline" title="Refresh Staff" data-i18n-title="title_refresh_staff">
           <span class="material-symbols-outlined">refresh</span>
         </button>
       </div>
@@ -155,43 +155,43 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-md">
           <div class="form-group">
             <label class="form-label" for="staff-name">Full Name <span class="required">*</span></label>
-            <input type="text" id="staff-name" class="form-control" placeholder="e.g. Rameshwor Adhikari" required>
+            <input type="text" id="staff-name" class="form-control" placeholder="e.g. Rameshwor Adhikari" data-i18n-placeholder="staff_name_placeholder" required>
           </div>
 
           <div class="form-group">
             <label class="form-label" for="staff-username">Username <span class="required">*</span></label>
-            <input type="text" id="staff-username" class="form-control" placeholder="e.g. ramesh.adhikari" required>
+            <input type="text" id="staff-username" class="form-control" placeholder="e.g. ramesh.adhikari" data-i18n-placeholder="staff_username_placeholder" required>
           </div>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-md">
           <div class="form-group">
             <label class="form-label" for="staff-email">Official Email <span class="required">*</span></label>
-            <input type="email" id="staff-email" class="form-control" placeholder="officer@passport.gov.np" required>
+            <input type="email" id="staff-email" class="form-control" placeholder="officer@passport.gov.np" data-i18n-placeholder="staff_email_placeholder" required>
           </div>
 
           <div class="form-group">
             <label class="form-label" for="staff-phone">Phone Number <span class="required">*</span></label>
-            <input type="tel" id="staff-phone" class="form-control" placeholder="98XXXXXXXX" required>
+            <input type="tel" id="staff-phone" class="form-control" placeholder="98XXXXXXXX" data-i18n-placeholder="staff_phone_placeholder" required>
           </div>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-md">
           <div class="form-group">
             <label class="form-label" for="staff-department">Department / Unit</label>
-            <input type="text" id="staff-department" class="form-control" placeholder="e.g. Verification Desk">
+            <input type="text" id="staff-department" class="form-control" placeholder="e.g. Verification Desk" data-i18n-placeholder="staff_department_placeholder">
           </div>
 
           <div class="form-group">
             <label class="form-label" for="staff-designation">Official Designation</label>
-            <input type="text" id="staff-designation" class="form-control" placeholder="e.g. Verification Officer">
+            <input type="text" id="staff-designation" class="form-control" placeholder="e.g. Verification Officer" data-i18n-placeholder="staff_designation_placeholder">
           </div>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-md">
           <div class="form-group">
             <label class="form-label" for="staff-password">Portal Access Password <span class="required">*</span></label>
-            <input type="password" id="staff-password" class="form-control" minlength="6" placeholder="Min 6 characters" required>
+            <input type="password" id="staff-password" class="form-control" minlength="8" placeholder="Minimum 8 characters" data-i18n-placeholder="staff_password_placeholder" required>
           </div>
 
           <div class="form-group">
@@ -355,11 +355,11 @@
         </p>
         <div class="form-group">
           <label class="form-label" for="new-staff-password">New Password <span class="required">*</span></label>
-          <input type="password" id="new-staff-password" class="form-control" minlength="6" placeholder="At least 6 characters" required>
+          <input type="password" id="new-staff-password" class="form-control" minlength="8" placeholder="At least 8 characters" data-i18n-placeholder="staff_new_password_placeholder" required>
         </div>
         <div class="form-group">
           <label class="form-label" for="confirm-staff-password">Confirm New Password <span class="required">*</span></label>
-          <input type="password" id="confirm-staff-password" class="form-control" minlength="6" placeholder="Repeat password" required>
+          <input type="password" id="confirm-staff-password" class="form-control" minlength="8" placeholder="Repeat password" data-i18n-placeholder="staff_repeat_password_placeholder" required>
         </div>
       </div>
       <div class="modal-footer">
@@ -374,7 +374,8 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
+  const esc = value => UI.escapeHtml(value);
   let allStaff = [];
   let allApplications = [];
   let editingStaffId = null;
@@ -393,7 +394,7 @@
   });
 
   async function loadStaffData() {
-    UI.showLoading('Loading staff records...');
+    UI.showLoading(t('loading_staff_records', 'Loading staff records...'));
     try {
       const [staffRes, appsRes] = await Promise.all([
         API.get('/staff/'),
@@ -407,9 +408,9 @@
       filterStaff();
     } catch (err) {
       console.error('Staff loading error:', err);
-      UI.showToast(err.message || 'Failed to fetch staff roster.', 'error');
+      UI.showToast(err.message ? I18n.translateError(err.message) : t('msg_load_staff_failed', 'Failed to fetch staff roster.'), 'error');
       document.getElementById('staff-table-body').innerHTML = `
-        <tr><td colspan="7" class="text-center text-error py-lg">Error loading staff: ${err.message}</td></tr>
+        <tr><td colspan="7" class="text-center text-error py-lg">${esc(I18n.format('error_loading_staff', 'Error loading staff: {error}', { error: I18n.translateError(err.message) }))}</td></tr>
       `;
     } finally {
       UI.hideLoading();
@@ -463,7 +464,10 @@
 
   function renderStaffTable(staffList) {
     const tbody = document.getElementById('staff-table-body');
-    document.getElementById('staff-count-text').textContent = `Showing ${staffList.length} of ${allStaff.length} officers`;
+    document.getElementById('staff-count-text').textContent = I18n.format(
+      'showing_officers', 'Showing {shown} of {total} officers',
+      { shown: staffList.length, total: allStaff.length }
+    );
 
     if (!staffList.length) {
       tbody.innerHTML = `
@@ -479,7 +483,7 @@
     }
 
     const activeLabel = (typeof I18n !== 'undefined') ? I18n.t('status_active', 'Active') : 'Active';
-    const inactiveLabel = (typeof I18n !== 'undefined') ? I18n.t('status_expired', 'Inactive') : 'Inactive';
+    const inactiveLabel = (typeof I18n !== 'undefined') ? I18n.t('status_inactive', 'Inactive') : 'Inactive';
 
     tbody.innerHTML = staffList.map(st => {
       const isActive = st.status === 'Active' && st.is_active !== false;
@@ -491,34 +495,34 @@
           <td>
             <div class="flex items-center gap-sm">
               <div class="user-avatar-circle" style="width:32px;height:32px;font-size:0.75rem;background:var(--primary);">
-                ${initials}
+                ${esc(initials)}
               </div>
               <div class="flex flex-col">
-                <span class="font-bold text-sm text-primary">${st.full_name}</span>
-                <span class="text-xs text-muted">${st.email}</span>
+                <span class="font-bold text-sm text-primary">${esc(st.full_name)}</span>
+                <span class="text-xs text-muted">${esc(st.email)}</span>
               </div>
             </div>
           </td>
           <td>
-            <span class="font-mono text-sm text-secondary">${st.username ? '@' + st.username : '<span class="text-muted">—</span>'}</span>
+            <span class="font-mono text-sm text-secondary">${st.username ? esc('@' + st.username) : '<span class="text-muted">—</span>'}</span>
           </td>
-          <td class="text-sm">${st.department || '<span class="text-muted">—</span>'}</td>
-          <td class="text-sm font-medium">${st.designation || '<span class="text-muted">—</span>'}</td>
+          <td class="text-sm">${st.department ? esc(st.department) : '<span class="text-muted">—</span>'}</td>
+          <td class="text-sm font-medium">${st.designation ? esc(st.designation) : '<span class="text-muted">—</span>'}</td>
           <td>
-            <button type="button" onclick="toggleStaffDuty(${st.staff_id}, '${isActive ? 'Active' : 'Inactive'}')" class="btn btn-sm ${isActive ? 'btn-outline text-success' : 'btn-outline text-muted'}" title="Click to toggle active status">
+            <button type="button" onclick="toggleStaffDuty(${st.staff_id}, '${isActive ? 'Active' : 'Inactive'}')" class="btn btn-sm ${isActive ? 'btn-outline text-success' : 'btn-outline text-muted'}" title="${t('title_toggle_staff_status', 'Click to toggle active status')}">
               <span class="material-symbols-outlined" style="font-size:1rem;">${isActive ? 'check_circle' : 'do_not_disturb_on'}</span>
               ${isActive ? activeLabel : inactiveLabel}
             </button>
           </td>
           <td>
             <div class="flex items-center gap-xs">
-              <button type="button" onclick="openViewStaffModal(${st.staff_id})" class="btn btn-sm btn-outline" title="View Officer Dossier">
+              <button type="button" onclick="openViewStaffModal(${st.staff_id})" class="btn btn-sm btn-outline" title="${t('title_view_officer', 'View Officer Dossier')}">
                 <span class="material-symbols-outlined" style="font-size:1rem;">visibility</span>
               </button>
-              <button type="button" onclick="openEditStaffModal(${st.staff_id})" class="btn btn-sm btn-outline" title="Edit Staff Details">
+              <button type="button" onclick="openEditStaffModal(${st.staff_id})" class="btn btn-sm btn-outline" title="${t('title_edit_staff', 'Edit Staff Details')}">
                 <span class="material-symbols-outlined" style="font-size:1rem;">edit</span>
               </button>
-              <button type="button" onclick="openResetPasswordModal(${st.staff_id})" class="btn btn-sm btn-outline text-warning" title="Reset Password">
+              <button type="button" onclick="openResetPasswordModal(${st.staff_id})" class="btn btn-sm btn-outline text-warning" title="${t('legacy_reset_staff_password', 'Reset Password')}">
                 <span class="material-symbols-outlined" style="font-size:1rem;">lock_reset</span>
               </button>
             </div>
@@ -539,17 +543,21 @@
   async function toggleStaffDuty(staffId, currentStatus) {
     const willBeActive = currentStatus !== 'Active';
     const newStatus = willBeActive ? 'Active' : 'Inactive';
-    UI.showLoading(`Setting officer status to ${newStatus}...`);
+    UI.showLoading(I18n.format('setting_officer_status', 'Setting officer status to {status}...', {
+      status: willBeActive ? I18n.translateStatus('Active') : t('status_inactive', 'Inactive')
+    }));
     try {
       await API.patch(`/staff/${staffId}/`, {
         status: newStatus,
         is_active: willBeActive
       });
-      UI.showToast(`Staff status updated to ${newStatus}.`, 'success');
+      UI.showToast(I18n.format('staff_status_updated', 'Staff status updated to {status}.', {
+        status: willBeActive ? I18n.translateStatus('Active') : t('status_inactive', 'Inactive')
+      }), 'success');
       await loadStaffData();
     } catch (err) {
       console.error('Status toggle error:', err);
-      UI.showToast(err.message || 'Could not update staff status.', 'error');
+      UI.showToast(err.message ? I18n.translateError(err.message) : t('msg_update_staff_failed', 'Could not update staff status.'), 'error');
     } finally {
       UI.hideLoading();
     }
@@ -593,12 +601,12 @@
         is_active: status === 'Active'
       });
 
-      UI.showToast(`Staff officer ${fullName} created successfully!`, 'success');
+      UI.showToast(I18n.format('staff_created_success', 'Staff officer {name} created successfully!', { name: fullName }), 'success');
       UI.closeModal('add-staff-modal');
       await loadStaffData();
     } catch (err) {
       console.error('Create staff error:', err);
-      alertBox.textContent = err.message || 'Could not create staff account.';
+      alertBox.textContent = err.message ? I18n.translateError(err.message) : t('msg_create_staff_failed', 'Could not create staff account.');
       alertBox.style.display = 'block';
     } finally {
       submitBtn.disabled = false;
@@ -611,17 +619,17 @@
 
     document.getElementById('view-avatar').textContent = (st.full_name || 'ST').substring(0, 2).toUpperCase();
     document.getElementById('view-fullname').textContent = st.full_name;
-    document.getElementById('view-username').textContent = st.username ? `@${st.username}` : 'No username set';
+    document.getElementById('view-username').textContent = st.username ? `@${st.username}` : t('label_no_username', 'No username set');
     document.getElementById('view-staff-id').textContent = `#ST-${String(st.staff_id).padStart(3, '0')}`;
     document.getElementById('view-email').textContent = st.email;
     document.getElementById('view-phone').textContent = st.phone || st.phone_number || '—';
     document.getElementById('view-department').textContent = st.department || '—';
     document.getElementById('view-designation').textContent = st.designation || '—';
-    document.getElementById('view-created-at').textContent = st.created_at ? UI.formatDateTime(st.created_at) : 'Existing Account';
+    document.getElementById('view-created-at').textContent = st.created_at ? UI.formatDateTime(st.created_at) : t('label_existing_account', 'Existing Account');
 
     const isActive = st.status === 'Active' && st.is_active !== false;
     document.getElementById('view-status-badge').innerHTML = `
-      <span class="badge ${isActive ? 'badge-approved' : 'badge-inactive'}">${isActive ? 'Active Duty' : 'Inactive'}</span>
+      <span class="badge ${isActive ? 'badge-approved' : 'badge-inactive'}">${isActive ? t('status_active_duty', 'Active Duty') : t('status_inactive', 'Inactive')}</span>
     `;
 
     UI.openModal('view-staff-modal');
@@ -672,12 +680,12 @@
         is_active: status === 'Active'
       });
 
-      UI.showToast('Officer profile updated successfully.', 'success');
+      UI.showToast(t('msg_officer_updated', 'Officer profile updated successfully.'), 'success');
       UI.closeModal('edit-staff-modal');
       await loadStaffData();
     } catch (err) {
       console.error('Update staff error:', err);
-      alertBox.textContent = err.message || 'Could not update officer details.';
+      alertBox.textContent = err.message ? I18n.translateError(err.message) : t('msg_update_officer_failed', 'Could not update officer details.');
       alertBox.style.display = 'block';
     } finally {
       submitBtn.disabled = false;
@@ -708,30 +716,30 @@
 
     alertBox.style.display = 'none';
 
-    if (p1.length < 6) {
-      alertBox.textContent = 'Password must be at least 6 characters long.';
+    if (p1.length < 8) {
+      alertBox.textContent = t('err_password_short', 'Password must be at least 8 characters long.');
       alertBox.style.display = 'block';
       return;
     }
 
     if (p1 !== p2) {
-      alertBox.textContent = 'Passwords do not match.';
+      alertBox.textContent = t('err_password_mismatch', 'Passwords do not match.');
       alertBox.style.display = 'block';
       return;
     }
 
     submitBtn.disabled = true;
-    UI.showLoading('Updating staff password...');
+    UI.showLoading(t('updating_staff_password', 'Updating staff password...'));
     try {
       await API.post(`/staff/${resetStaffId}/reset-password/`, {
         new_password: p1
       });
 
-      UI.showToast('Staff password reset successfully.', 'success');
+      UI.showToast(t('msg_staff_password_reset', 'Staff password reset successfully.'), 'success');
       UI.closeModal('reset-password-modal');
     } catch (err) {
       console.error('Reset password error:', err);
-      alertBox.textContent = err.message || 'Failed to reset password.';
+      alertBox.textContent = err.message ? I18n.translateError(err.message) : t('msg_reset_password_failed', 'Failed to reset password.');
       alertBox.style.display = 'block';
     } finally {
       UI.hideLoading();
@@ -742,18 +750,22 @@
   async function deleteStaffConfirm() {
     if (!editingStaffId) return;
     const st = allStaff.find(s => s.staff_id === editingStaffId);
-    const confirmed = confirm(`Are you sure you want to remove staff member ${st ? st.full_name : ''}? This action cannot be undone.`);
+    const confirmed = confirm(I18n.format(
+      'confirm_remove_staff',
+      'Are you sure you want to remove staff member {name}? This action cannot be undone.',
+      { name: st ? st.full_name : '' }
+    ));
     if (!confirmed) return;
 
-    UI.showLoading('Removing staff account...');
+    UI.showLoading(t('removing_staff_account', 'Removing staff account...'));
     try {
       await API.delete(`/staff/${editingStaffId}/`);
-      UI.showToast('Staff member removed.', 'info');
+      UI.showToast(t('msg_staff_removed', 'Staff member removed.'), 'info');
       UI.closeModal('edit-staff-modal');
       await loadStaffData();
     } catch (err) {
       console.error('Delete error:', err);
-      UI.showToast(err.message || 'Could not delete staff member.', 'error');
+      UI.showToast(err.message ? I18n.translateError(err.message) : t('msg_delete_staff_failed', 'Could not delete staff member.'), 'error');
     } finally {
       UI.hideLoading();
     }

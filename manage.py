@@ -10,7 +10,12 @@ if BACKEND_DIR not in sys.path:
 
 def main():
     """Run administrative tasks."""
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+    default_settings = (
+        'config.migration_settings'
+        if len(sys.argv) > 1 and sys.argv[1] == 'migrate'
+        else 'config.settings'
+    )
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', default_settings)
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:

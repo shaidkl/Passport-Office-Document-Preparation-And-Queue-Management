@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 from django.db import connection
 from django.db.utils import OperationalError
-from passport.models import Administrator, Staff, Applicant, Application, QueueToken, ActivityLog, Payment, DigitalSignature
+from passport.models import Administrator, Staff, Applicant, Application, QueueToken, ActivityLog, Payment
 
 class Command(BaseCommand):
     help = 'Check PostgreSQL database connectivity and seed default demo accounts if needed'
@@ -104,16 +104,7 @@ class Command(BaseCommand):
                 payment_status='Completed',
                 remarks='Standard 34-page e-Passport fee'
             )
-            # Create Government Digital Signature
-            DigitalSignature.objects.create(
-                application=app,
-                signature_hash='e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-                signing_authority='Department of Passports, Ministry of Foreign Affairs, Government of Nepal',
-                certificate_serial='NPL-DOP-PKI-2026-001',
-                algorithm='RSA-SHA256',
-                is_valid=True
-            )
-            self.stdout.write(self.style.SUCCESS("✅ Created Sample Application #1, Queue Token T-101, Payment (eSewa) & Official Government Digital Signature"))
+            self.stdout.write(self.style.SUCCESS("✅ Created Sample Application #1, Queue Token T-101 and Payment (eSewa)"))
         else:
             self.stdout.write(self.style.SUCCESS("ℹ️ Citizen account already exists: citizen@example.com"))
 
@@ -124,4 +115,3 @@ class Command(BaseCommand):
         )
 
         self.stdout.write(self.style.SUCCESS("\n🎉 System check and seed complete! All models (including Payment) are ready."))
-

@@ -3,8 +3,8 @@
 {% block title %}Queue Token — Nepal Passport Portal{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="/static/css/applicant.css">
-<style>
+<link rel="stylesheet" href="/static/css/applicant.css?v=20260913-4">
+<style nonce="{{ csp_nonce }}">
   .queue-big-display {
     background: linear-gradient(135deg, var(--primary) 0%, #1a3a6e 100%);
     color: #fff;
@@ -87,7 +87,7 @@
         <h1 style="font-size:1.75rem;color:var(--primary);margin:0;" data-i18n="queue_page_title">Queue Token Status</h1>
         <p class="text-sm text-muted m-0" data-i18n="queue_page_subtitle">Track your digital queue position and appointment slot.</p>
       </div>
-      <button type="button" onclick="loadQueueData()" class="btn btn-outline" title="Refresh queue status">
+      <button type="button" onclick="loadQueueData()" class="btn btn-outline" title="Refresh queue status" data-i18n-title="title_refresh_queue_status">
         <span class="material-symbols-outlined">refresh</span> <span data-i18n="btn_refresh">Refresh</span>
       </button>
     </div>
@@ -103,7 +103,7 @@
       <div class="empty-state">
         <span class="material-symbols-outlined empty-state-icon">confirmation_number</span>
         <h4 class="empty-state-title" data-i18n="queue_no_token_yet">No Queue Token Assigned</h4>
-        <p class="empty-state-desc" data-i18n="queue_no_token_desc">A queue token will be assigned to your application once staff initiates the review process. Please ensure your documents are uploaded.</p>
+        <p class="empty-state-desc" data-i18n="queue_no_token_desc">A processing token is assigned after payment, document verification, biometrics, and digital signing are complete.</p>
         <div class="flex gap-sm justify-center flex-wrap mt-sm">
           <a href="/applicant/documents/" class="btn btn-primary btn-sm">
             <span class="material-symbols-outlined">upload_file</span> <span data-i18n="btn_upload_document">Upload Documents</span>
@@ -222,7 +222,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
   async function initQueuePage() {
     if (!Auth.requireAuth(['citizen', 'applicant'])) return;
     const canAccess = await WorkflowManager.guardPage('queue');
@@ -303,9 +303,9 @@
     const pFee = app?.fee_amount ? `NPR ${Number(app.fee_amount).toLocaleString()}` : (pName.includes('66') ? 'NPR 10,000' : 'NPR 5,000');
 
     const pkgNameEl = document.getElementById('q-pkg-name');
-    if (pkgNameEl) pkgNameEl.textContent = pName;
+    if (pkgNameEl) pkgNameEl.textContent = I18n.translateText(pName);
     const pkgPagesEl = document.getElementById('q-pkg-pages');
-    if (pkgPagesEl) pkgPagesEl.textContent = `${pPages} • ${pFee}`;
+    if (pkgPagesEl) pkgPagesEl.textContent = `${I18n.translateText(pPages)} • ${pFee}`;
 
     document.getElementById('q-token-date').textContent = token.token_date ? UI.formatDate(token.token_date) : t('queue_today', 'Today');
     document.getElementById('q-time-slot').textContent = token.time_slot || t('queue_standard_queue', 'Standard Queue');
@@ -333,7 +333,7 @@
           <td><strong class="text-primary">T-${String(t.token_number).padStart(3,'0')}</strong></td>
           <td>#NP-${String(t.application).padStart(4,'0')}</td>
           <td>${t.token_date ? UI.formatDate(t.token_date) : '—'}</td>
-          <td>${t.time_slot || 'Standard'}</td>
+          <td>${t.time_slot || I18n.translateText('Standard')}</td>
           <td>${UI.renderStatusBadge(t.queue_status)}</td>
           <td class="text-xs text-muted">${t.called_time ? UI.formatDateTime(t.called_time) : '—'}</td>
         </tr>`;

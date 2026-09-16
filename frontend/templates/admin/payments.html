@@ -4,7 +4,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="/static/css/admin.css">
-<style>
+<style nonce="{{ csp_nonce }}">
   .admin-layout { display: flex; min-height: calc(100vh - var(--header-height) - var(--topbar-height) - 160px); }
   .admin-sidebar { width: var(--sidebar-width); background: var(--surface-container-low); border-right: 1px solid var(--outline-variant); padding: var(--spacing-lg) var(--spacing-md); display: flex; flex-direction: column; gap: var(--spacing-xs); flex-shrink: 0; }
   @media(max-width:900px){ .admin-sidebar{ display:none; } }
@@ -53,7 +53,7 @@
         <p class="text-sm text-muted m-0" data-i18n="admin_payments_subtitle">Live audit of payment requests, QR disbursements, gateway webhooks, and verified revenues across Nepal.</p>
       </div>
       <div class="flex items-center gap-sm">
-        <button type="button" onclick="loadPaymentsData()" class="btn btn-outline" title="Refresh Payment Ledger">
+        <button type="button" onclick="loadPaymentsData()" class="btn btn-outline" title="Refresh Payment Ledger" data-i18n-title="title_refresh_payments">
           <span class="material-symbols-outlined">refresh</span> <span data-i18n="btn_refresh">Refresh</span>
         </button>
       </div>
@@ -174,7 +174,8 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
+  const esc = value => UI.escapeHtml(value);
   let allPayments = [];
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -188,7 +189,7 @@
   });
 
   async function loadPaymentsData() {
-    UI.showLoading('Loading payment ledger...');
+    UI.showLoading(t('loading_payment_ledger', 'Loading payment ledger...'));
     try {
       const data = await API.get('/payments/');
       allPayments = Array.isArray(data) ? data : (data.results || []);
@@ -196,7 +197,7 @@
       renderPaymentsTable(allPayments);
     } catch (err) {
       console.error('Failed to load payments:', err);
-      UI.showToast('Could not load payment ledger.', 'error');
+      UI.showToast(t('msg_load_payment_ledger_error', 'Could not load payment ledger.'), 'error');
     } finally {
       UI.hideLoading();
     }
@@ -237,7 +238,9 @@
 
   function renderPaymentsTable(payments) {
     const tbody = document.getElementById('payments-tbody');
-    document.getElementById('table-count-label').textContent = `Showing ${payments.length} records`;
+    document.getElementById('table-count-label').textContent = I18n.format(
+      'showing_payment_records', 'Showing {count} records', { count: payments.length }
+    );
 
     if (payments.length === 0) {
       tbody.innerHTML = `<tr><td colspan="10" class="text-center text-muted py-lg" data-i18n="label_no_data">No payment records found.</td></tr>`;
@@ -254,23 +257,23 @@
       else if (p.status === 'QR_GENERATED') badgeClass = 'badge-warning';
 
       const ref = p.payment_reference || `ID-${p.payment_id}`;
-      const txn = p.transaction_id || '<span class="text-muted">--</span>';
+      const txn = p.transaction_id ? esc(p.transaction_id) : '<span class="text-muted">--</span>';
       const createdDate = UI.formatDateTime(p.created_at || p.payment_date);
       const rawStatus = p.status || p.payment_status;
 
       return `
         <tr>
-          <td><span class="font-mono font-bold text-primary text-xs">${ref}</span></td>
+          <td><span class="font-mono font-bold text-primary text-xs">${esc(ref)}</span></td>
           <td><span class="badge badge-outline">#NP-${String(p.application).padStart(4, '0')}</span></td>
-          <td><span class="font-medium text-xs">${p.applicant_name || 'Citizen'}</span></td>
-          <td><span class="text-xs">${(p.payment_type || 'APPLICATION_FEE').replace(/_/g, ' ')}</span></td>
+          <td><span class="font-medium text-xs">${esc(p.applicant_name || t('label_citizen', 'Citizen'))}</span></td>
+          <td><span class="text-xs">${esc(p.payment_type === 'APPLICATION_FEE' || !p.payment_type ? t('label_application_fee', 'Application Fee') : p.payment_type.replace(/_/g, ' '))}</span></td>
           <td><span class="font-bold text-xs text-primary">NPR ${Number(p.amount).toLocaleString()}</span></td>
-          <td><span class="badge badge-secondary" style="font-size: 0.7rem;">${p.gateway_name || p.payment_method || 'Gateway'}</span></td>
-          <td><span class="badge ${badgeClass}" data-raw-status="${rawStatus}" style="font-size: 0.7rem;">${UI.renderStatusBadge ? I18n.translateStatus(rawStatus) : rawStatus}</span></td>
+          <td><span class="badge badge-secondary" style="font-size: 0.7rem;">${esc(p.gateway_name || p.payment_method || t('label_gateway', 'Gateway'))}</span></td>
+          <td><span class="badge ${badgeClass}" data-raw-status="${esc(rawStatus)}" style="font-size: 0.7rem;">${esc(UI.renderStatusBadge ? I18n.translateStatus(rawStatus) : rawStatus)}</span></td>
           <td><span class="font-mono text-xs">${txn}</span></td>
           <td><span class="text-xs text-muted">${createdDate}</span></td>
           <td>
-            <button type="button" onclick="inspectPayment(${p.payment_id})" class="btn btn-outline btn-sm" title="Inspect Payment">
+            <button type="button" onclick="inspectPayment(${p.payment_id})" class="btn btn-outline btn-sm" title="${t('title_inspect_payment', 'Inspect Payment')}">
               <span class="material-symbols-outlined" style="font-size: 15px;">visibility</span> ${detailsLabel}
             </button>
           </td>
@@ -297,61 +300,61 @@
     modalBody.innerHTML = `
       <div class="p-md rounded mb-md border border-outline-variant flex items-center justify-between" style="background: var(--surface-container-low);">
         <div>
-          <span class="text-xs text-muted uppercase font-bold block">${p.payment_type || 'Application Fee'}</span>
+           <span class="text-xs text-muted uppercase font-bold block">${esc(p.payment_type === 'APPLICATION_FEE' || !p.payment_type ? t('label_application_fee', 'Application Fee') : p.payment_type.replace(/_/g, ' '))}</span>
           <span class="text-2xl font-black text-primary">NPR ${Number(p.amount).toLocaleString()}</span>
-          <span class="text-xs text-muted block">Application Ref: #NP-${String(p.application).padStart(4, '0')}</span>
+           <span class="text-xs text-muted block">${t('label_application_reference', 'Application Ref')}: #NP-${String(p.application).padStart(4, '0')}</span>
         </div>
         <div class="text-right">
           <span class="badge ${isVerified ? 'badge-approved' : (p.status === 'FAILED' ? 'badge-rejected' : 'badge-warning')} text-xs">
-            ${p.status || p.payment_status}
+             ${esc(I18n.translateStatus(p.status || p.payment_status))}
           </span>
-          <span class="text-xs text-muted block mt-xs font-mono">${p.gateway_name || p.payment_method}</span>
+          <span class="text-xs text-muted block mt-xs font-mono">${esc(p.gateway_name || p.payment_method)}</span>
         </div>
       </div>
 
       <div class="grid grid-cols-2 gap-sm mb-md">
         <div class="p-xs bg-surface border rounded">
-          <span class="text-xs text-muted block">Payment Reference</span>
-          <span class="font-mono font-bold text-xs text-primary">${p.payment_reference || '--'}</span>
+           <span class="text-xs text-muted block">${t('label_payment_reference', 'Payment Reference')}</span>
+          <span class="font-mono font-bold text-xs text-primary">${esc(p.payment_reference || '--')}</span>
         </div>
         <div class="p-xs bg-surface border rounded">
-          <span class="text-xs text-muted block">Gateway Transaction ID</span>
-          <span class="font-mono text-xs">${p.transaction_id || 'Awaiting Confirmation'}</span>
+           <span class="text-xs text-muted block">${t('label_gateway_transaction_id', 'Gateway Transaction ID')}</span>
+           <span class="font-mono text-xs">${esc(p.transaction_id || t('status_awaiting_confirmation', 'Awaiting Confirmation'))}</span>
         </div>
         <div class="p-xs bg-surface border rounded">
-          <span class="text-xs text-muted block">Citizen / Applicant</span>
-          <span class="font-medium text-xs">${p.applicant_name || 'Citizen'}</span>
+           <span class="text-xs text-muted block">${t('label_citizen_applicant', 'Citizen / Applicant')}</span>
+           <span class="font-medium text-xs">${esc(p.applicant_name || t('label_citizen', 'Citizen'))}</span>
         </div>
         <div class="p-xs bg-surface border rounded">
-          <span class="text-xs text-muted block">Created Date</span>
+           <span class="text-xs text-muted block">${t('label_created_date', 'Created Date')}</span>
           <span class="text-xs text-muted">${UI.formatDateTime(p.created_at || p.payment_date)}</span>
         </div>
         <div class="p-xs bg-surface border rounded">
-          <span class="text-xs text-muted block">Paid Timestamp</span>
+           <span class="text-xs text-muted block">${t('label_paid_timestamp', 'Paid Timestamp')}</span>
           <span class="text-xs">${p.paid_at ? UI.formatDateTime(p.paid_at) : '--'}</span>
         </div>
         <div class="p-xs bg-surface border rounded">
-          <span class="text-xs text-muted block">Verified Timestamp</span>
+           <span class="text-xs text-muted block">${t('label_verified_timestamp', 'Verified Timestamp')}</span>
           <span class="text-xs">${p.verified_at ? UI.formatDateTime(p.verified_at) : '--'}</span>
         </div>
       </div>
 
       ${p.failure_reason ? `
         <div class="p-sm rounded border border-danger mb-md" style="background: rgba(220, 38, 38, 0.05);">
-          <span class="text-xs font-bold text-error block">Failure Explanation</span>
-          <p class="text-xs text-muted m-0">${p.failure_reason}</p>
+           <span class="text-xs font-bold text-error block">${t('label_failure_explanation', 'Failure Explanation')}</span>
+          <p class="text-xs text-muted m-0">${esc(p.failure_reason)}</p>
         </div>
       ` : ''}
 
       ${p.qr_code ? `
         <div class="p-md rounded border text-center mb-md" style="background: #ffffff;">
-          <span class="text-xs text-muted block mb-xs font-medium">Issued Payment QR Code</span>
-          <img src="${p.qr_code}" alt="QR" style="max-width: 140px; height: auto; border: 1px solid #e2e8f0; border-radius: 4px; display: inline-block;">
+           <span class="text-xs text-muted block mb-xs font-medium">${t('label_issued_payment_qr', 'Issued Payment QR Code')}</span>
+           <img src="${esc(p.qr_code)}" alt="${t('label_payment_qr', 'Payment QR code')}" style="max-width: 140px; height: auto; border: 1px solid #e2e8f0; border-radius: 4px; display: inline-block;">
         </div>
       ` : ''}
 
       <div class="p-xs bg-surface-low rounded text-xs text-muted border">
-        ℹ️ Automatic verification is enforced. Administrators may inspect transactions but cannot bypass the Payment Gateway or PostgreSQL cryptographic audit trail.
+        ℹ️ ${t('payment_audit_notice', 'Automatic verification is enforced. Administrators may inspect transactions but cannot bypass the payment gateway or cryptographic audit trail.')}
       </div>
     `;
 

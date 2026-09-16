@@ -4,7 +4,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="/static/css/admin.css">
-<style>
+<style nonce="{{ csp_nonce }}">
   .admin-layout { display: flex; min-height: calc(100vh - var(--header-height) - var(--topbar-height) - 160px); }
   .admin-sidebar { width: var(--sidebar-width); background: var(--surface-container-low); border-right: 1px solid var(--outline-variant); padding: var(--spacing-lg) var(--spacing-md); display: flex; flex-direction: column; gap: var(--spacing-xs); flex-shrink: 0; }
   @media(max-width:900px){ .admin-sidebar{ display:none; } }
@@ -58,7 +58,7 @@
         <button type="button" onclick="openGenerateReportModal()" class="btn btn-primary">
           <span class="material-symbols-outlined">post_add</span> <span data-i18n="admin_nav_reports">Generate New Report</span>
         </button>
-        <button type="button" onclick="loadReportsData()" class="btn btn-outline" title="Refresh Reports">
+        <button type="button" onclick="loadReportsData()" class="btn btn-outline" title="Refresh Reports" data-i18n-title="title_refresh_reports">
           <span class="material-symbols-outlined">refresh</span>
         </button>
       </div>
@@ -235,7 +235,8 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
+  const esc = value => UI.escapeHtml(value);
   let allReports = [];
   let currentReport = null;
   let cachedApps = [];
@@ -256,7 +257,7 @@
   });
 
   async function loadReportsData() {
-    UI.showLoading('Loading operational reports...');
+    UI.showLoading(t('loading_operational_reports', 'Loading operational reports...'));
     try {
       const [repRes, appRes, tokRes, docRes, stRes] = await Promise.all([
         API.get('/reports/'),
@@ -276,9 +277,9 @@
       renderReportsTable();
     } catch (err) {
       console.error('Reports loading error:', err);
-      UI.showToast(err.message || 'Could not load reports.', 'error');
+      UI.showToast(err.message ? I18n.translateError(err.message) : t('msg_load_reports_failed', 'Could not load reports.'), 'error');
       document.getElementById('reports-table-body').innerHTML = `
-        <tr><td colspan="5" class="text-center text-error py-lg">Failed to load reports: ${err.message}</td></tr>
+        <tr><td colspan="5" class="text-center text-error py-lg">${esc(I18n.format('error_loading_reports', 'Failed to load reports: {error}', { error: I18n.translateError(err.message) }))}</td></tr>
       `;
     } finally {
       UI.hideLoading();
@@ -311,14 +312,14 @@
 
   function renderReportsTable() {
     const tbody = document.getElementById('reports-table-body');
-    document.getElementById('reports-count-text').textContent = `Showing ${allReports.length} reports`;
+    document.getElementById('reports-count-text').textContent = I18n.format('showing_reports', 'Showing {count} reports', { count: allReports.length });
 
     if (!allReports.length) {
       tbody.innerHTML = `
         <tr>
           <td colspan="5" class="text-center py-xl">
             <span class="material-symbols-outlined text-muted" style="font-size:3rem;">description</span>
-            <p class="text-muted mt-sm mb-0">No archived reports yet. Click "Generate New Report" to compile one.</p>
+            <p class="text-muted mt-sm mb-0">${t('empty_no_reports', 'No archived reports yet. Click "Generate New Report" to compile one.')}</p>
           </td>
         </tr>
       `;
@@ -327,7 +328,7 @@
 
     tbody.innerHTML = allReports.map(rep => {
       const repDate = rep.report_date ? UI.formatDateTime(rep.report_date) : '--';
-      let summaryText = 'System Analytics';
+      let summaryText = t('label_system_analytics', 'System Analytics');
       if (rep.report_data) {
         if (typeof rep.report_data === 'object') {
           const keys = Object.keys(rep.report_data);
@@ -343,16 +344,16 @@
           <td>
             <div class="flex items-center gap-xs">
               <span class="material-symbols-outlined text-primary" style="font-size:1.1rem;">analytics</span>
-              <span class="font-semibold text-sm">${rep.report_type}</span>
+              <span class="font-semibold text-sm">${esc(I18n.translateText(rep.report_type))}</span>
             </div>
           </td>
           <td class="text-xs text-muted">${repDate}</td>
           <td class="text-xs text-muted" style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-            ${summaryText}
+            ${esc(summaryText)}
           </td>
           <td>
             <button type="button" onclick="openViewReportModal(${rep.report_id})" class="btn btn-sm btn-outline">
-              <span class="material-symbols-outlined">visibility</span> Inspect
+              <span class="material-symbols-outlined">visibility</span> ${t('btn_inspect', 'Inspect')}
             </button>
           </td>
         </tr>
@@ -366,39 +367,16 @@
 
   async function createReportAction() {
     const reportType = document.getElementById('report-type-select').value;
-    const currentUser = Auth.getUser();
-    const adminId = currentUser ? (currentUser.user_id || currentUser.id) : 1;
 
-    // Compile current stats into report payload
-    const reportPayload = {
-      report_type: reportType,
-      administrator: adminId,
-      report_data: {
-        total_applications: cachedApps.length,
-        pending_applications: cachedApps.filter(a => a.status === 'Pending').length,
-        approved_applications: cachedApps.filter(a => a.status === 'Approved').length,
-        rejected_applications: cachedApps.filter(a => a.status === 'Rejected').length,
-        completed_applications: cachedApps.filter(a => a.status === 'Completed').length,
-        total_queue_tokens: cachedTokens.length,
-        waiting_tokens: cachedTokens.filter(t => t.queue_status === 'Waiting').length,
-        completed_tokens: cachedTokens.filter(t => t.queue_status === 'Completed').length,
-        total_documents: cachedDocs.length,
-        verified_documents: cachedDocs.filter(d => d.verification_status === 'Verified').length,
-        rejected_documents: cachedDocs.filter(d => d.verification_status === 'Rejected').length,
-        active_staff_count: cachedStaff.filter(s => s.status === 'Active').length,
-        generated_at: new Date().toISOString()
-      }
-    };
-
-    UI.showLoading('Compiling and saving report...');
+    UI.showLoading(t('compiling_report', 'Compiling and saving report...'));
     try {
-      await API.post('/reports/', reportPayload);
-      UI.showToast('Executive report compiled successfully.', 'success');
+      await API.post('/reports/', { report_type: reportType });
+      UI.showToast(t('msg_report_compiled', 'Executive report compiled successfully.'), 'success');
       UI.closeModal('generate-report-modal');
       await loadReportsData();
     } catch (err) {
       console.error('Report compilation error:', err);
-      UI.showToast(err.message || 'Failed to generate report.', 'error');
+      UI.showToast(err.message ? I18n.translateError(err.message) : t('msg_generate_report_failed', 'Failed to generate report.'), 'error');
     } finally {
       UI.hideLoading();
     }
@@ -408,7 +386,7 @@
     currentReport = allReports.find(r => r.report_id === reportId);
     if (!currentReport) return;
 
-    document.getElementById('view-report-title').textContent = currentReport.report_type;
+    document.getElementById('view-report-title').textContent = I18n.translateText(currentReport.report_type);
     document.getElementById('modal-report-id').textContent = `#REP-${String(currentReport.report_id).padStart(4, '0')}`;
     document.getElementById('modal-report-date').textContent = currentReport.report_date ? UI.formatDateTime(currentReport.report_date) : '--';
 
@@ -421,12 +399,12 @@
     if (typeof data === 'object' && Object.keys(data).length) {
       metricsContainer.innerHTML = Object.entries(data).map(([key, val]) => `
         <div class="p-xs bg-surface rounded border border-outline-variant">
-          <span class="text-xs text-muted block capitalize">${key.replace(/_/g, ' ')}</span>
-          <span class="font-bold text-sm text-primary">${val}</span>
+          <span class="text-xs text-muted block capitalize">${esc(t(`report_metric_${key}`, key.replace(/_/g, ' ')))}</span>
+          <span class="font-bold text-sm text-primary">${esc(val)}</span>
         </div>
       `).join('');
     } else {
-      metricsContainer.innerHTML = '<span class="text-xs text-muted">No key-value metrics recorded.</span>';
+      metricsContainer.innerHTML = `<span class="text-xs text-muted">${t('empty_no_report_metrics', 'No key-value metrics recorded.')}</span>`;
     }
 
     UI.openModal('view-report-modal');
@@ -434,18 +412,22 @@
 
   async function deleteReportConfirm() {
     if (!currentReport) return;
-    const confirmed = confirm(`Are you sure you want to permanently delete Report #REP-${currentReport.report_id}?`);
+    const confirmed = confirm(I18n.format(
+      'confirm_delete_report',
+      'Are you sure you want to permanently delete Report #REP-{id}?',
+      { id: currentReport.report_id }
+    ));
     if (!confirmed) return;
 
-    UI.showLoading('Deleting report...');
+    UI.showLoading(t('deleting_report', 'Deleting report...'));
     try {
       await API.delete(`/reports/${currentReport.report_id}/`);
-      UI.showToast(`Report #REP-${currentReport.report_id} deleted.`, 'info');
+      UI.showToast(I18n.format('report_deleted', 'Report #REP-{id} deleted.', { id: currentReport.report_id }), 'info');
       UI.closeModal('view-report-modal');
       await loadReportsData();
     } catch (err) {
       console.error('Delete report error:', err);
-      UI.showToast(err.message || 'Could not delete report.', 'error');
+      UI.showToast(err.message ? I18n.translateError(err.message) : t('msg_delete_report_failed', 'Could not delete report.'), 'error');
     } finally {
       UI.hideLoading();
     }

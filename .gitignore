@@ -1,0 +1,17 @@
+.env
+.secrets/
+backend/.secrets/
+__pycache__/
+*.py[cod]
+*.log
+.pytest_cache/
+.coverage
+htmlcov/
+backend/media/
+/local-recovery/
+backend/staticfiles/
+venv/
+.venv/
+frontend/css/*.exe
+frontend/css/Passport_Sample_*.pdf
+frontend/css/Virtual_Passport_*.pdf

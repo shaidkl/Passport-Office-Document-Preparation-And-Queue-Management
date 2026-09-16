@@ -3,8 +3,8 @@
 {% block title %}Document Upload — Nepal Passport Portal{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="/static/css/applicant.css">
-<style>
+<link rel="stylesheet" href="/static/css/applicant.css?v=20260913-4">
+<style nonce="{{ csp_nonce }}">
   .doc-upload-zone {
     border: 2px dashed var(--outline-variant);
     border-radius: var(--radius-lg);
@@ -224,6 +224,23 @@
         </div>
       </div>
 
+      <!-- Next step: payment appears only after the required uploads exist. -->
+      <div id="payment-next-step" class="card mb-xl" style="display:none; border:2px solid #16a34a; border-left:6px solid #16a34a;">
+        <div class="p-lg flex flex-col md:flex-row md:items-center justify-between gap-md" style="background:rgba(22,163,74,0.06);">
+          <div class="flex items-start gap-md">
+            <span class="material-symbols-outlined text-success" style="font-size:36px;">task_alt</span>
+            <div>
+              <h2 class="text-lg font-bold m-0" data-i18n="status_uploads_complete_pay_fee">Uploads Complete — Pay Fee</h2>
+              <p class="text-sm text-muted m-0 mt-xs" data-i18n="workflow_payment_after_upload_notice">Your required documents are uploaded. Complete the statutory fee payment so staff verification can begin.</p>
+            </div>
+          </div>
+          <button type="button" id="continue-to-payment-btn" onclick="continueToPayment()" class="btn btn-primary shrink-0">
+            <span class="material-symbols-outlined">payments</span>
+            <span data-i18n="btn_pay_fee">Pay Fee</span>
+          </button>
+        </div>
+      </div>
+
     </div>
 
     <!-- Required Documents Info -->
@@ -263,11 +280,6 @@
             <span class="text-xs text-muted" data-i18n="old_passport_desc">Required only for renewal or replacement of an existing passport</span>
           </div>
         </div>
-          <div>
-            <strong class="text-sm block">Previous Passport <span class="text-xs text-muted">(If Renewal)</span></strong>
-            <span class="text-xs text-muted">Data page of your existing/expired passport</span>
-          </div>
-        </div>
       </div>
     </div>
 
@@ -276,7 +288,8 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
+  const esc = value => UI.escapeHtml(value);
   let selectedFile = null;
   let selectedApplicationId = null;
   let myApplicationsList = [];
@@ -313,11 +326,11 @@
       const all = Array.isArray(data) ? data : (data.results || []);
       myApplicationsList = all.filter(a => String(a.applicant) === String(myId));
       if (myApplicationsList.length === 0) {
-        select.innerHTML = '<option value="">No applications found. Please create one first.</option>';
+        select.innerHTML = `<option value="">${t('docs_no_applications', 'No applications found. Please create one first.')}</option>`;
         return;
       }
-      select.innerHTML = '<option value="">— Select an Application —</option>' +
-        myApplicationsList.map(a => `<option value="${a.application_id}">#NP-${String(a.application_id).padStart(4,'0')} — ${a.status}</option>`).join('');
+      select.innerHTML = `<option value="">${t('label_select_application', '— Select an Application —')}</option>` +
+        myApplicationsList.map(a => `<option value="${a.application_id}">#NP-${String(a.application_id).padStart(4,'0')} — ${I18n.translateStatus(a.status)}</option>`).join('');
 
       // Auto-select from query parameter or latest application
       const urlParams = new URLSearchParams(window.location.search);
@@ -331,7 +344,7 @@
         onApplicationSelected();
       }
     } catch (err) {
-      select.innerHTML = '<option value="">Could not load applications.</option>';
+      select.innerHTML = `<option value="">${t('docs_load_applications_failed', 'Could not load applications.')}</option>`;
     }
   }
 
@@ -362,14 +375,30 @@
     loadDocuments();
   }
 
-  async function loadDocuments() {
+  function applyUploadedDocumentStatus(result) {
+    if (!result?.application_status || !selectedApplicationId) return;
+    const application = myApplicationsList.find(app =>
+      String(app.application_id) === String(selectedApplicationId)
+    );
+    if (!application) return;
+    application.status = result.application_status;
+    const option = document.querySelector(`#doc-app-select option[value="${selectedApplicationId}"]`);
+    if (option) {
+      option.textContent = `#NP-${String(application.application_id).padStart(4, '0')} — ${I18n.translateStatus(application.status)}`;
+    }
+    WorkflowManager.invalidate();
+  }
+
+  async function loadDocuments(announcePaymentReady = false) {
     if (!selectedApplicationId) return;
     const container = document.getElementById('documents-list');
-    container.innerHTML = '<p class="text-sm text-muted text-center py-md">Loading documents...</p>';
+    container.innerHTML = `<p class="text-sm text-muted text-center py-md">${t('loading_documents', 'Loading documents...')}</p>`;
     try {
       const data = await API.get('/documents/');
       const all = Array.isArray(data) ? data : (data.results || []);
       const docs = all.filter(d => String(d.application) === String(selectedApplicationId));
+
+      await updatePaymentNextStep(announcePaymentReady);
 
       // Handle passport photo display in photo card
       const photoDoc = docs.find(d => d.document_type === 'Passport Photo');
@@ -377,8 +406,9 @@
       const photoBadge = document.getElementById('photo-status-badge');
       const photoRejAlert = document.getElementById('photo-rejection-alert');
       if (photoDoc) {
-        if (photoDoc.file_path && photoFrame) {
-          photoFrame.innerHTML = `<img src="${photoDoc.file_path}" alt="Passport Photo" style="width:100%;height:100%;object-fit:cover;">`;
+        if (photoDoc.document_id && photoFrame) {
+          const photoUrl = await API.getBlobUrl(`/documents/${photoDoc.document_id}/view-file/`);
+          photoFrame.innerHTML = `<img src="${photoUrl}" alt="${t('doc_photo', 'Passport Photo')}" style="width:100%;height:100%;object-fit:cover;">`;
         }
         if (photoBadge) {
           photoBadge.textContent = I18n.translateStatus(photoDoc.verification_status);
@@ -414,9 +444,9 @@
               <span class="material-symbols-outlined text-primary" style="font-size:22px;">${isPhoto ? 'portrait' : 'description'}</span>
             </div>
             <div style="flex:1;">
-              <strong class="text-sm block">${I18n.translateDocType(doc.document_type)}</strong>
-              <span class="text-xs text-muted">${doc.file_name || 'File uploaded'} • ${UI.formatDate(doc.upload_date)}</span>
-              ${doc.rejection_reason ? `<span class="text-xs text-error block mt-xs">${t('label_reason', 'Reason')}: ${doc.rejection_reason}</span>` : ''}
+              <strong class="text-sm block">${esc(I18n.translateDocType(doc.document_type))}</strong>
+              <span class="text-xs text-muted">${esc(doc.file_name || t('label_file_uploaded', 'File uploaded'))} • ${UI.formatDate(doc.upload_date)}</span>
+              ${doc.rejection_reason ? `<span class="text-xs text-error block mt-xs">${t('label_reason', 'Reason')}: ${esc(doc.rejection_reason)}</span>` : ''}
             </div>
             ${UI.renderStatusBadge(doc.verification_status)}
           </div>`;
@@ -424,6 +454,43 @@
     } catch (err) {
       container.innerHTML = `<p class="text-sm text-error text-center py-md">${t('err_load_docs', 'Could not load documents. Please try again.')}</p>`;
     }
+  }
+
+  async function updatePaymentNextStep(announce = false) {
+    const card = document.getElementById('payment-next-step');
+    const button = document.getElementById('continue-to-payment-btn');
+    if (!card || !selectedApplicationId) return;
+
+    try {
+      const workflow = await WorkflowManager.load(true);
+      const isSelectedApplication = String(workflow?.application_id) === String(selectedApplicationId);
+      const paymentReady = isSelectedApplication &&
+        workflow?.current_step === 'fee' &&
+        workflow?.is_payment_verified !== true;
+
+      card.style.display = paymentReady ? 'block' : 'none';
+      if (button) button.disabled = !paymentReady;
+
+      if (paymentReady && announce) {
+        UI.showToast(
+          t('workflow_payment_after_upload_notice', 'Your required documents are uploaded. Complete the statutory fee payment so staff verification can begin.'),
+          'success'
+        );
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    } catch (error) {
+      card.style.display = 'none';
+      if (button) button.disabled = true;
+      console.warn('Could not refresh the payment next step:', error);
+    }
+  }
+
+  function continueToPayment() {
+    if (!selectedApplicationId) {
+      UI.showToast(t('msg_select_application', 'Please select an application first.'), 'warning');
+      return;
+    }
+    window.location.href = `/applicant/apply/?application_id=${encodeURIComponent(selectedApplicationId)}&open_payment=1`;
   }
 
   function onFileSelected(e) {
@@ -441,11 +508,11 @@
     const allowed = ['image/jpeg', 'image/png', 'image/jpg'];
     const nameEl = document.getElementById('selected-photo-name');
     if (!allowed.includes(file.type)) {
-      UI.showToast('Passport photo must be in JPG or PNG format only.', 'error');
+      UI.showToast(t('msg_photo_format', 'Passport photo must be in JPG or PNG format only.'), 'error');
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      UI.showToast('Passport photo must not exceed 5 MB.', 'error');
+      UI.showToast(t('msg_photo_size', 'Passport photo must not exceed 5 MB.'), 'error');
       return;
     }
     selectedPhotoFile = file;
@@ -456,7 +523,7 @@
     const reader = new FileReader();
     reader.onload = (ev) => {
       const frame = document.getElementById('photo-preview-frame');
-      if (frame) frame.innerHTML = `<img src="${ev.target.result}" alt="Preview" style="width:100%;height:100%;object-fit:cover;">`;
+        if (frame) frame.innerHTML = `<img src="${ev.target.result}" alt="${t('label_preview', 'Preview')}" style="width:100%;height:100%;object-fit:cover;">`;
     };
     reader.readAsDataURL(file);
   }
@@ -474,10 +541,10 @@
     const btnText = document.getElementById('photo-upload-btn-text');
     const progressEl = document.getElementById('photo-upload-progress');
     const progressBar = document.getElementById('photo-progress-bar');
-    if (!selectedPhotoFile) { UI.showToast('Please select a photo file.', 'warning'); return; }
-    if (!selectedApplicationId) { UI.showToast('Please select an application first.', 'warning'); return; }
+    if (!selectedPhotoFile) { UI.showToast(t('msg_select_photo', 'Please select a photo file.'), 'warning'); return; }
+    if (!selectedApplicationId) { UI.showToast(t('msg_select_application', 'Please select an application first.'), 'warning'); return; }
     btn.disabled = true;
-    btnText.textContent = 'Uploading...';
+    btnText.textContent = t('legacy_uploading', 'Uploading...');
     progressEl.style.display = 'block';
     let prog = 0;
     const interval = setInterval(() => { prog = Math.min(prog + 12, 90); progressBar.style.width = prog + '%'; }, 120);
@@ -487,27 +554,31 @@
       formData.append('document_type', 'Passport Photo');
       formData.append('file_name', selectedPhotoFile.name);
       formData.append('file_path', selectedPhotoFile);
-      await API.upload('/documents/', formData);
+      const result = await API.upload('/documents/', formData);
+      applyUploadedDocumentStatus(result);
       clearInterval(interval);
       progressBar.style.width = '100%';
-      UI.showToast('Passport photo uploaded successfully!', 'success');
+      const photoUploadMessage = result.is_replacement_upload
+        ? t('replacement_document_uploaded', 'Replacement uploaded. Staff document verification is pending.')
+        : t('msg_photo_uploaded', 'Passport photo uploaded successfully!');
+      UI.showToast(photoUploadMessage, 'success');
       setTimeout(() => { progressEl.style.display = 'none'; progressBar.style.width = '0'; }, 600);
       selectedPhotoFile = null;
       document.getElementById('photo-file-input').value = '';
       document.getElementById('selected-photo-name').style.display = 'none';
       btn.disabled = true;
-      btnText.textContent = 'Upload Passport Photo';
-      document.getElementById('photo-status-badge').textContent = 'Pending Review';
+      btnText.textContent = t('photo_upload_btn', 'Upload Passport Photo');
+      document.getElementById('photo-status-badge').textContent = I18n.translateStatus('Pending Review');
       document.getElementById('photo-status-badge').className = 'badge badge-pending';
       document.getElementById('photo-rejection-alert').style.display = 'none';
       WorkflowManager.invalidate();
-      loadDocuments();
+      await loadDocuments(true);
     } catch (err) {
       clearInterval(interval);
       progressEl.style.display = 'none';
-      UI.showToast(err.message || 'Photo upload failed.', 'error');
+      UI.showToast(err.message ? I18n.translateError(err.message) : t('msg_photo_upload_failed', 'Photo upload failed.'), 'error');
       btn.disabled = false;
-      btnText.textContent = 'Upload Passport Photo';
+      btnText.textContent = t('photo_upload_btn', 'Upload Passport Photo');
     }
   }
 
@@ -524,12 +595,12 @@
     const alertBox = document.getElementById('upload-alert');
     const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
     if (!allowed.includes(file.type)) {
-      alertBox.textContent = 'Invalid file type. Only PDF, JPG, and PNG are accepted.';
+      alertBox.textContent = t('msg_invalid_document_type', 'Invalid file type. Only PDF, JPG, and PNG are accepted.');
       alertBox.style.display = 'flex';
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      alertBox.textContent = 'File size exceeds 5 MB. Please upload a smaller file.';
+      alertBox.textContent = t('msg_document_too_large', 'File size exceeds 5 MB. Please upload a smaller file.');
       alertBox.style.display = 'flex';
       return;
     }
@@ -548,12 +619,12 @@
     const btnText = document.getElementById('upload-btn-text');
 
     alertBox.style.display = 'none';
-    if (!docType) { alertBox.textContent = 'Please select a document type.'; alertBox.style.display = 'flex'; return; }
-    if (!selectedFile) { alertBox.textContent = 'Please select a file to upload.'; alertBox.style.display = 'flex'; return; }
-    if (!selectedApplicationId) { alertBox.textContent = 'Please select an application.'; alertBox.style.display = 'flex'; return; }
+    if (!docType) { alertBox.textContent = t('msg_select_document_type', 'Please select a document type.'); alertBox.style.display = 'flex'; return; }
+    if (!selectedFile) { alertBox.textContent = t('msg_select_document_file', 'Please select a file to upload.'); alertBox.style.display = 'flex'; return; }
+    if (!selectedApplicationId) { alertBox.textContent = t('msg_select_application', 'Please select an application.'); alertBox.style.display = 'flex'; return; }
 
     btn.disabled = true;
-    btnText.textContent = 'Uploading...';
+    btnText.textContent = t('legacy_uploading', 'Uploading...');
 
     const progressWrap = document.getElementById('upload-progress-wrap');
     const progressBar = document.getElementById('upload-progress-bar');
@@ -573,11 +644,15 @@
       formData.append('file_name', selectedFile.name);
       formData.append('file_path', selectedFile);
 
-      await API.upload('/documents/', formData);
+      const result = await API.upload('/documents/', formData);
+      applyUploadedDocumentStatus(result);
       clearInterval(progInterval);
       progressBar.style.width = '100%';
 
-      UI.showToast('Document uploaded successfully!', 'success');
+      const documentUploadMessage = result.is_replacement_upload
+        ? t('replacement_document_uploaded', 'Replacement uploaded. Staff document verification is pending.')
+        : t('msg_document_uploaded', 'Document uploaded successfully!');
+      UI.showToast(documentUploadMessage, 'success');
       setTimeout(() => { progressWrap.style.display = 'none'; progressBar.style.width = '0%'; }, 600);
 
       // Reset
@@ -586,12 +661,12 @@
       document.getElementById('selected-file-name').style.display = 'none';
       document.getElementById('doc-type').value = '';
       btn.disabled = true;
-      btnText.textContent = 'Upload Document';
-      loadDocuments();
+      btnText.textContent = t('btn_upload_document', 'Upload Document');
+      await loadDocuments(true);
     } catch (err) {
       clearInterval(progInterval);
       progressWrap.style.display = 'none';
-      alertBox.textContent = err.message || 'Upload failed. Please try again.';
+      alertBox.textContent = err.message ? I18n.translateError(err.message) : t('msg_upload_failed', 'Upload failed. Please try again.');
       alertBox.style.display = 'flex';
       btn.disabled = false;
       btnText.textContent = t('btn_upload_document', 'Upload Document');

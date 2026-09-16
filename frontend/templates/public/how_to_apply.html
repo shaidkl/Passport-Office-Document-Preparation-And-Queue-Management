@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}How to Apply — Nepal Passport Portal{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/public.css?v=20260914-3">
+{% endblock %}
+
+{% block content %}
+<section class="public-guide-hero">
+  <div class="container public-guide-hero-inner">
+    <a href="/" class="guide-back-link">
+      <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
+      <span data-i18n="back_to_home">Back to home</span>
+    </a>
+    <span class="section-eyebrow" data-i18n="guide_eyebrow">Application guide</span>
+    <h1 data-i18n="how_page_title">How to apply for a passport</h1>
+    <p data-i18n="how_page_subtitle">Follow these steps in order. Your dashboard will always show the next action required.</p>
+  </div>
+</section>
+
+<section class="public-guide-section">
+  <div class="container guide-layout">
+    <div class="guide-timeline">
+      <article class="guide-step">
+        <span class="guide-step-number">1</span>
+        <div>
+          <h2 data-i18n="how_step_1_title">Create and verify your account</h2>
+          <p data-i18n="how_step_1_desc">Register with correct personal details, then verify your account using the secure link sent to your email.</p>
+        </div>
+      </article>
+
+      <article class="guide-step">
+        <span class="guide-step-number">2</span>
+        <div>
+          <h2 data-i18n="how_step_2_title">Complete the application</h2>
+          <p data-i18n="how_step_2_desc">Choose the passport category and service type, then submit accurate application information.</p>
+        </div>
+      </article>
+
+      <article class="guide-step">
+        <span class="guide-step-number">3</span>
+        <div>
+          <h2 data-i18n="how_step_3_title">Upload documents and photo</h2>
+          <p data-i18n="how_step_3_desc">Upload clear supporting documents and a valid passport photo. Each file is reviewed individually.</p>
+        </div>
+      </article>
+
+      <article class="guide-step">
+        <span class="guide-step-number">4</span>
+        <div>
+          <h2 data-i18n="how_step_4_title">Complete the fee payment</h2>
+          <p data-i18n="how_step_4_desc">After the required files are uploaded, complete the secure eSewa payment so staff review can begin.</p>
+        </div>
+      </article>
+
+      <article class="guide-step">
+        <span class="guide-step-number">5</span>
+        <div>
+          <h2 data-i18n="how_step_5_title">Wait for document review</h2>
+          <p data-i18n="how_step_5_desc">Staff approve or reject each document. If one is rejected, upload a new replacement while the old record remains in history.</p>
+        </div>
+      </article>
+
+      <article class="guide-step">
+        <span class="guide-step-number">6</span>
+        <div>
+          <h2 data-i18n="how_step_6_title">Complete biometrics verification</h2>
+          <p data-i18n="how_step_6_desc">Authorized staff verify the applicant's biometrics after every current document is approved.</p>
+        </div>
+      </article>
+
+      <article class="guide-step">
+        <span class="guide-step-number">7</span>
+        <div>
+          <h2 data-i18n="how_step_7_title">Authorize the digital signature</h2>
+          <p data-i18n="how_step_7_desc">An authorized officer applies the government digital signature after biometrics are verified.</p>
+        </div>
+      </article>
+
+      <article class="guide-step">
+        <span class="guide-step-number">8</span>
+        <div>
+          <h2 data-i18n="how_step_8_title">Complete queue processing</h2>
+          <p data-i18n="how_step_8_desc">The signed application receives a processing token and is handled through the staff queue.</p>
+        </div>
+      </article>
+
+      <article class="guide-step">
+        <span class="guide-step-number">9</span>
+        <div>
+          <h2 data-i18n="how_step_9_title">Generate the passport</h2>
+          <p data-i18n="how_step_9_desc">After queue processing is completed, the passport is approved and becomes available to generate or download.</p>
+        </div>
+      </article>
+    </div>
+
+    <aside class="guide-side-card">
+      <span class="material-symbols-outlined" aria-hidden="true">notifications_active</span>
+      <h2 data-i18n="guide_track_title">Stay informed</h2>
+      <p data-i18n="guide_track_desc">Use your citizen dashboard or application reference to follow the latest status.</p>
+      <a href="/track/" class="btn btn-outline-primary btn-block">
+        <span class="material-symbols-outlined" aria-hidden="true">search</span>
+        <span data-i18n="btn_track_status">Track Application</span>
+      </a>
+      <a href="/applicant/apply/" class="btn btn-primary btn-block">
+        <span class="material-symbols-outlined" aria-hidden="true">description</span>
+        <span data-i18n="simple_apply_button">Apply for Passport</span>
+      </a>
+    </aside>
+  </div>
+</section>
+{% endblock %}

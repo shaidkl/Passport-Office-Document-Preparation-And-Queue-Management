@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: passport_test
+          POSTGRES_USER: passport_test
+          POSTGRES_PASSWORD: passport_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U passport_test -d passport_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DJANGO_DEBUG: "true"
+      DJANGO_SECRET_KEY: "ci-only-secret"
+      DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1,testserver"
+      DB_ENGINE: "django.db.backends.postgresql"
+      DB_NAME: "passport_test"
+      DB_USER: "passport_test"
+      DB_PASSWORD: "passport_test_password"
+      DB_HOST: "127.0.0.1"
+      DB_PORT: "5432"
+      MALWARE_SCAN_ENABLED: "false"
+      PERSONNEL_MFA_REQUIRED: "false"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - run: pip install -r backend/requirements.txt
+      - run: python manage.py check --settings=config.integration_test_settings
+      - run: python manage.py check --deploy --settings=config.deploy_check_settings
+      - run: python manage.py makemigrations --check --dry-run
+      - run: python manage.py migrate --noinput
+      - run: python manage.py test passport --settings=config.integration_test_settings --verbosity 2
+      - run: node --check frontend/js/api.js
+      - run: node --check frontend/js/auth.js
+      - run: node --check frontend/js/i18n.js
+      - run: node --check frontend/js/workflow.js

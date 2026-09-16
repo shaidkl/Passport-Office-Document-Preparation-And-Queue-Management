@@ -3,7 +3,7 @@
 {% block title %}Citizen Portal Dashboard — Nepal Passport Office{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="/static/css/applicant.css">
+<link rel="stylesheet" href="/static/css/applicant.css?v=20260913-4">
 {% endblock %}
 
 {% block content %}
@@ -160,26 +160,25 @@
     <!-- ===== NEXT STEP CARD ===== -->
     <div id="next-step-card-container"></div>
 
-    <!-- Payment Required Notice (When Approved but Unpaid) -->
+    <!-- Payment Required Notice (after required uploads, before staff review) -->
     <div id="approved-payment-notice" class="card mb-xl p-lg" style="display: none; background: linear-gradient(135deg, rgba(234, 88, 12, 0.08), rgba(245, 158, 11, 0.05)); border: 1px solid #f97316; border-left: 6px solid #ea580c; border-radius: var(--radius-xl);">
       <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-md">
         <div class="flex items-start gap-md">
-          <span class="material-symbols-outlined" style="font-size: 36px; color: #ea580c;">verified</span>
+          <span class="material-symbols-outlined" style="font-size: 36px; color: #ea580c;">payments</span>
           <div>
-            <h3 style="font-size: 1.15rem; color: #c2410c; margin: 0 0 4px 0; font-weight: 700;" data-i18n="status_payment_pending">
-              APPLICATION APPROVED ✓ — PAYMENT REQUIRED
+            <h3 style="font-size: 1.15rem; color: #c2410c; margin: 0 0 4px 0; font-weight: 700;" data-i18n="status_payment_required">
+              DOCUMENTS UPLOADED — PAYMENT REQUIRED
             </h3>
-            <p class="text-sm text-muted m-0">
-              Your application and documents have been verified and approved by the Department of Passports.
-              To authorize your digital signature and generate your official Virtual e-Passport, please complete the statutory passport fee payment.
+            <p class="text-sm text-muted m-0" data-i18n="workflow_payment_after_upload_notice">
+              Your required documents are uploaded. Complete the statutory fee payment so staff verification can begin.
             </p>
           </div>
         </div>
         <div class="shrink-0 flex items-center gap-sm">
-          <a href="/applicant/documents/" class="btn btn-primary" style="background-color: #ea580c; border-color: #ea580c;">
+          <button type="button" onclick="initiatePayment()" class="btn btn-primary" style="background-color: #ea580c; border-color: #ea580c;">
             <span class="material-symbols-outlined">payments</span>
             <span data-i18n="btn_pay_now">Proceed to Payment</span>
-          </a>
+          </button>
         </div>
       </div>
     </div>
@@ -468,7 +467,8 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
+  const esc = value => UI.escapeHtml(value);
   let currentApplicant = null;
   let applicationsList = [];
   let queueTokensList = [];
@@ -479,7 +479,7 @@
     if (!Auth.requireAuth(['citizen', 'applicant'])) return;
     const params = new URLSearchParams(window.location.search);
     if (params.get('step_blocked')) {
-      UI.showToast('That step is not yet available. Complete your current step first.', 'warning');
+      UI.showToast(t('msg_step_unavailable', 'That step is not yet available. Complete your current step first.'), 'warning');
     }
     loadApplicantData();
     setupDocUploadDnD();
@@ -505,16 +505,19 @@
       }
     }
 
-    UI.showLoading('Loading citizen dashboard...');
+    UI.showLoading(t('loading_citizen_dashboard', 'Loading citizen dashboard...'));
     try {
       WorkflowManager.invalidate();
       const [appProfile, apps, tokens, docs, workflow] = await Promise.all([
         userId ? API.get(`/applicants/${userId}/`).catch(() => null) : Promise.resolve(null),
-        API.get('/applications/').catch(() => []),
-        API.get('/queue-tokens/').catch(() => []),
-        API.get('/documents/').catch(() => []),
+        API.get('/applications/'),
+        API.get('/queue-tokens/'),
+        API.get('/documents/'),
         WorkflowManager.load(true),
       ]);
+      if (!workflow) {
+        throw new Error(t('msg_workflow_unavailable', 'Workflow information is temporarily unavailable.'));
+      }
       currentApplicant = appProfile;
       if (currentApplicant) {
         document.querySelectorAll('.auth-user-name').forEach(el => el.textContent = currentApplicant.full_name || (user && user.name) || '');
@@ -525,7 +528,7 @@
         const elNat = document.getElementById('vp-nationality');
         if (elNat && currentApplicant.nationality) elNat.textContent = currentApplicant.nationality.toUpperCase();
       }
-      _wfState = workflow || { has_application: false, current_step: 'application' };
+      _wfState = workflow;
       applicationsList = Array.isArray(apps) ? apps : (apps && apps.results ? apps.results : []);
       queueTokensList = Array.isArray(tokens) ? tokens : (tokens && tokens.results ? tokens.results : []);
       documentsList = Array.isArray(docs) ? docs : (docs && docs.results ? docs.results : []);
@@ -538,7 +541,7 @@
       if (typeof I18n !== 'undefined') I18n.applyTranslations();
     } catch (err) {
       console.error('Dashboard load error:', err);
-      UI.showToast('Could not load dashboard information. Please try again.', 'error');
+      UI.showToast(t('msg_load_dashboard_error', 'Could not load dashboard information. Please try again.'), 'error');
     } finally {
       UI.hideLoading();
     }
@@ -563,9 +566,9 @@
     const colorClass = `nsc-${card.color || 'primary'}`;
     let buttonHtml = '';
     if (card.buttonAction) {
-      buttonHtml = `<button type="button" class="btn btn-primary" onclick="${card.buttonAction}">${card.buttonLabel}</button>`;
+      buttonHtml = `<button type="button" class="btn btn-primary" onclick="${esc(card.buttonAction)}">${esc(card.buttonLabel)}</button>`;
     } else if (card.buttonUrl) {
-      buttonHtml = `<a href="${card.buttonUrl}" class="btn btn-primary">${card.buttonLabel}</a>`;
+      buttonHtml = `<a href="${esc(card.buttonUrl)}" class="btn btn-primary">${esc(card.buttonLabel)}</a>`;
     }
 
     let extraHtml = '';
@@ -576,8 +579,8 @@
           <div class="p-sm rounded-lg flex items-center gap-sm" style="background:rgba(185,28,28,0.06);border:1px solid rgba(185,28,28,0.2);">
             <span class="material-symbols-outlined text-error" style="font-size:18px;">warning</span>
             <div>
-              <strong class="text-sm">${d.document_type}</strong>
-              <p class="text-xs text-muted m-0">${d.rejection_reason}</p>
+              <strong class="text-sm">${esc(I18n.translateDocType(d.document_type))}</strong>
+              <p class="text-xs text-muted m-0">${esc(d.rejection_reason)}</p>
             </div>
           </div>
         `).join('')}
@@ -585,23 +588,23 @@
     }
 
     if ((card.type === 'initiate_payment' || card.type === 'complete_payment') && wf?.payment_reference) {
-      extraHtml += renderQRPanel(wf);
+      extraHtml += renderPaymentPanel(wf);
     }
 
     let extraActions = '';
     if (card.isWaiting) {
       extraActions = `<button type="button" class="btn btn-outline" onclick="loadApplicantData()">
-        <span class="material-symbols-outlined" style="font-size:16px;">refresh</span> Refresh
+        <span class="material-symbols-outlined" style="font-size:16px;">refresh</span> ${t('btn_refresh', 'Refresh')}
       </button>`;
     }
     if (card.type === 'initiate_payment' && !wf?.payment_reference) {
       extraActions += `<button type="button" class="btn btn-outline" onclick="initiatePayment()">
-        <span class="material-symbols-outlined" style="font-size:16px;">qr_code</span> Generate Payment QR
+        <span class="material-symbols-outlined" style="font-size:16px;">account_balance_wallet</span> ${t('btn_pay_esewa', 'Pay with eSewa')}
       </button>`;
     }
     if (card.type === 'upload_documents') {
       extraActions = `<button type="button" class="btn btn-outline" onclick="openDocumentUploadModal()">
-        <span class="material-symbols-outlined" style="font-size:16px;">add</span> Upload Another
+        <span class="material-symbols-outlined" style="font-size:16px;">add</span> ${t('btn_upload_another', 'Upload Another')}
       </button>`;
     }
 
@@ -611,9 +614,9 @@
           <span class="material-symbols-outlined">${card.icon}</span>
         </div>
         <div class="nsc-body">
-          <span class="nsc-tag">Next Step</span>
-          <h2 class="nsc-title">${card.title}</h2>
-          <p class="nsc-desc">${card.description}</p>
+          <span class="nsc-tag">${t('label_next_step', 'Next Step')}</span>
+          <h2 class="nsc-title">${esc(card.title)}</h2>
+          <p class="nsc-desc">${esc(card.description)}</p>
           ${extraHtml}
           <div class="nsc-actions">
             ${buttonHtml}
@@ -624,27 +627,27 @@
     `;
   }
 
-  function renderQRPanel(wf) {
+  function renderPaymentPanel(wf) {
     const payRef = wf.payment_reference;
     const feeAmt = wf.fee_amount || 5000;
     return `
       <div class="nsc-qr-panel mb-md">
         <div class="flex flex-col gap-xs">
-          <p class="text-xs text-muted m-0">Reference: <strong>${payRef}</strong></p>
-          <p class="text-xs text-muted m-0">Amount: <strong>NPR ${parseFloat(feeAmt).toLocaleString()}</strong></p>
-          <p class="text-xs text-muted m-0">Status: <strong>${wf.payment_status || 'PENDING'}</strong></p>
+          <p class="text-xs text-muted m-0">${t('label_reference', 'Reference')}: <strong>${esc(payRef)}</strong></p>
+          <p class="text-xs text-muted m-0">${t('label_amount', 'Amount')}: <strong>NPR ${parseFloat(feeAmt).toLocaleString()}</strong></p>
+          <p class="text-xs text-muted m-0">${t('label_status', 'Status')}: <strong>${I18n.translateStatus(wf.payment_status || 'PENDING')}</strong></p>
           <div class="flex gap-xs mt-xs flex-wrap">
-            <button type="button" class="btn btn-primary btn-sm" onclick="simulateSandboxPayment('${payRef}')">
-              <span class="material-symbols-outlined" style="font-size:15px;">paid</span>
-              Complete Sandbox Payment
+            <button type="button" class="btn btn-primary btn-sm" onclick="initiatePayment()" style="background:#60bb46;border-color:#55a83f;">
+              <span class="material-symbols-outlined" style="font-size:15px;">account_balance_wallet</span>
+              ${t('btn_continue_esewa', 'Continue with eSewa')}
             </button>
-            <button type="button" class="btn btn-outline btn-sm" onclick="pollPaymentStatus('${payRef}', true)">
+            <button type="button" class="btn btn-outline btn-sm" data-payment-reference="${esc(payRef)}" onclick="pollPaymentStatus(this.dataset.paymentReference, true)">
               <span class="material-symbols-outlined" style="font-size:15px;">refresh</span>
-              Check Status
+              ${t('btn_check_status', 'Check Status')}
             </button>
           </div>
-          <p class="text-xs" style="color:var(--secondary);margin-top:4px;">
-            ⚠️ SANDBOX MODE — Click "Complete Sandbox Payment" to simulate a verified gateway callback.
+          <p class="text-xs text-muted" style="margin-top:4px;">
+            ${t('payment_verification_notice', 'Payment is completed on eSewa and verified by the passport system before the next step unlocks.')}
           </p>
         </div>
       </div>
@@ -655,47 +658,48 @@
 
   async function openPaymentPanel() {
     if (!_wfState || !_wfState.application_id) return;
-    if (!_wfState.payment_reference) {
-      await initiatePayment();
-    } else {
-      loadApplicantData();
-    }
+    await initiatePayment();
   }
 
   async function initiatePayment() {
     const wf = _wfState;
-    if (!wf || !wf.application_id) { UI.showToast('No active application found.', 'error'); return; }
-    UI.showLoading('Generating payment QR...');
+    if (!wf || !wf.application_id) { UI.showToast(t('msg_no_active_application_found', 'No active application found.'), 'error'); return; }
+    UI.showLoading(t('legacy_preparing_esewa', 'Preparing secure eSewa payment...'));
     try {
       const result = await API.post('/payments/create-request/', {
         application_id: wf.application_id,
         payment_type: 'APPLICATION_FEE',
         gateway_name: 'eSewa'
       });
-      UI.showToast(`Payment QR generated! Reference: ${result.payment_reference}`, 'success');
-      WorkflowManager.invalidate();
-      await loadApplicantData();
-    } catch (err) {
-      UI.showToast(err.message || 'Could not generate payment request.', 'error');
-    } finally {
-      UI.hideLoading();
-    }
-  }
-
-  async function simulateSandboxPayment(payRef) {
-    if (!payRef) return;
-    UI.showLoading('Processing sandbox payment...');
-    try {
-      const result = await API.post('/payments/simulate-sandbox-callback/', { payment_reference: payRef });
-      if (result.status === 'VERIFIED') {
-        UI.showToast('✅ Payment verified! Your application is moving to the next step.', 'success');
-      } else {
-        UI.showToast(result.message || 'Payment processed.', 'info');
+      if (result.already_paid || result.status === 'VERIFIED') {
+        UI.showToast(t('msg_payment_already_verified', 'Payment is already verified.'), 'success');
+        WorkflowManager.invalidate();
+        await loadApplicantData();
+        return;
       }
-      WorkflowManager.invalidate();
-      await loadApplicantData();
+      if (!result.payment_url || !result.form_fields || !result.form_fields.signature) {
+        throw new Error(t('err_invalid_esewa_request', 'The backend did not return a valid signed eSewa payment request.'));
+      }
+
+      await API.post('/payments/initiate/', {
+        payment_reference: result.payment_reference
+      });
+
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = result.payment_url;
+      form.style.display = 'none';
+      Object.entries(result.form_fields).forEach(([name, value]) => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = name;
+        input.value = String(value);
+        form.appendChild(input);
+      });
+      document.body.appendChild(form);
+      form.submit();
     } catch (err) {
-      UI.showToast(err.message || 'Payment simulation failed.', 'error');
+      UI.showToast(err.message ? I18n.translateError(err.message) : t('msg_generate_payment_failed', 'Could not generate payment request.'), 'error');
     } finally {
       UI.hideLoading();
     }
@@ -704,35 +708,14 @@
   async function pollPaymentStatus(payRef, showToast = false) {
     if (!payRef) return;
     try {
-      const result = await API.get(`/payments/status/${payRef}/`);
-      if (showToast) UI.showToast(`Payment status: ${result.status}`, 'info');
+      const result = await API.get(`/payments/status/${payRef}/`, { refresh: '1' });
+      if (showToast) UI.showToast(I18n.format('payment_status_message', 'Payment status: {status}', { status: I18n.translateStatus(result.status) }), 'info');
       if (result.status === 'VERIFIED') {
         WorkflowManager.invalidate();
         await loadApplicantData();
       }
     } catch (err) {
-      if (showToast) UI.showToast(err.message, 'error');
-    }
-  }
-
-  // ==================== DIGITAL SIGNATURE ====================
-
-  async function handleSignApplication() {
-    const wf = _wfState;
-    if (!wf || !wf.application_id) return;
-    UI.showLoading('Authorizing digital signature...');
-    try {
-      await API.post('/digital-signatures/', {
-        application: wf.application_id
-      });
-      UI.showToast('✅ Digital signature authorized and verified!', 'success');
-      WorkflowManager.invalidate();
-      await loadApplicantData();
-    } catch (err) {
-      console.error('Signature error:', err);
-      UI.showToast(err.message || 'Signature authorization in progress.', 'info');
-    } finally {
-      UI.hideLoading();
+      if (showToast) UI.showToast(I18n.translateError(err.message), 'error');
     }
   }
 
@@ -752,7 +735,7 @@
     fileInput.addEventListener('change', () => {
       if (fileInput.files[0]) {
         const fn = document.getElementById('doc-file-name');
-        fn.textContent = `Selected: ${fileInput.files[0].name}`;
+        fn.textContent = `${t('label_selected', 'Selected')}: ${fileInput.files[0].name}`;
         fn.style.display = 'block';
       }
     });
@@ -764,7 +747,7 @@
       if (e.dataTransfer.files[0]) {
         fileInput.files = e.dataTransfer.files;
         const fn = document.getElementById('doc-file-name');
-        fn.textContent = `Selected: ${e.dataTransfer.files[0].name}`;
+        fn.textContent = `${t('label_selected', 'Selected')}: ${e.dataTransfer.files[0].name}`;
         fn.style.display = 'block';
       }
     });
@@ -773,15 +756,15 @@
   async function handleDocumentUpload(event) {
     event.preventDefault();
     const wf = _wfState;
-    if (!wf || !wf.application_id) { UI.showToast('No active application.', 'error'); return; }
+    if (!wf || !wf.application_id) { UI.showToast(t('msg_no_active_application', 'No active application.'), 'error'); return; }
     const alertBox = document.getElementById('doc-upload-alert');
     const submitBtn = document.getElementById('doc-upload-btn');
     const docType = document.getElementById('doc-type-select').value;
     const fileInput = document.getElementById('doc-file-input');
-    if (!fileInput.files[0]) { alertBox.textContent = 'Please select a file.'; alertBox.style.display = 'flex'; return; }
+    if (!fileInput.files[0]) { alertBox.textContent = t('msg_select_document_file', 'Please select a file.'); alertBox.style.display = 'flex'; return; }
     alertBox.style.display = 'none';
     submitBtn.disabled = true;
-    submitBtn.textContent = 'Uploading...';
+    submitBtn.textContent = t('legacy_uploading', 'Uploading...');
     try {
       const formData = new FormData();
       formData.append('application', wf.application_id);
@@ -789,16 +772,18 @@
       formData.append('file_name', fileInput.files[0].name);
       formData.append('file_path', fileInput.files[0]);
       await API.upload('/documents/', formData);
-      UI.showToast(`${docType} uploaded successfully! Awaiting staff verification.`, 'success');
+      UI.showToast(I18n.format('document_uploaded_awaiting_verification', '{type} uploaded successfully. Awaiting staff verification.', {
+        type: I18n.translateDocType(docType)
+      }), 'success');
       UI.closeModal('doc-upload-modal');
       WorkflowManager.invalidate();
       await loadApplicantData();
     } catch (err) {
-      alertBox.textContent = err.message || 'Upload failed. Please try again.';
+      alertBox.textContent = err.message ? I18n.translateError(err.message) : t('msg_upload_failed', 'Upload failed. Please try again.');
       alertBox.style.display = 'flex';
     } finally {
       submitBtn.disabled = false;
-      submitBtn.innerHTML = '<span class="material-symbols-outlined">upload</span> Upload Document';
+      submitBtn.innerHTML = `<span class="material-symbols-outlined">upload</span> ${t('btn_upload_document', 'Upload Document')}`;
     }
   }
 
@@ -810,7 +795,7 @@
     if (!container) return;
     const steps = (workflowData && workflowData.steps) ? workflowData.steps : [];
     if (steps.length === 0) {
-      container.innerHTML = `<div class="p-md text-center text-muted" style="grid-column:1/-1;"><p class="text-xs m-0">No active application pipeline. Click "New Application" to begin.</p></div>`;
+      container.innerHTML = `<div class="p-md text-center text-muted" style="grid-column:1/-1;"><p class="text-xs m-0">${t('empty_no_active_pipeline', 'No active application pipeline. Select “New Application” to begin.')}</p></div>`;
       return;
     }
     if (overallBadge) {
@@ -827,23 +812,23 @@
         <div class="card p-md flex flex-col justify-between" style="border:1px solid ${cardBorder};background:var(--surface);border-radius:var(--radius-md);">
           <div>
             <div class="flex items-center justify-between gap-xs mb-xs">
-              <span class="text-xs font-bold text-muted uppercase">Step ${s.step}</span>
-              <span class="badge ${badgeClass}" style="font-size:0.7rem;">${s.status}</span>
+              <span class="text-xs font-bold text-muted uppercase">${t('label_step', 'Step')} ${s.step}</span>
+              <span class="badge ${badgeClass}" style="font-size:0.7rem;">${I18n.translateStatus(s.status)}</span>
             </div>
             <div class="flex items-center gap-xs mb-xs">
               <span class="material-symbols-outlined" style="font-size:20px;color:${iconColor};">${icon}</span>
-              <h4 class="text-sm font-bold text-primary m-0">${s.title}</h4>
+              <h4 class="text-sm font-bold text-primary m-0">${I18n.translateText(s.title)}</h4>
             </div>
-            <p class="text-xs text-muted m-0 mb-sm" style="line-height:1.4;">${s.details || ''}</p>
+            <p class="text-xs text-muted m-0 mb-sm" style="line-height:1.4;">${I18n.translateText(s.details || '')}</p>
           </div>
           <div class="pt-xs" style="border-top:1px dashed var(--outline-variant);">
             ${s.step === 9 && s.can_download && workflowData.application_id ? `
-              <a href="/api/applications/${workflowData.application_id}/download-pdf/" class="btn btn-primary btn-sm btn-block" style="font-size:0.75rem;">
-                <span class="material-symbols-outlined" style="font-size:15px;">download</span> Download Official PDF
+              <a href="#" onclick="API.downloadFile('/applications/${workflowData.application_id}/download-pdf/', 'Virtual_Passport_${workflowData.passport_number}.pdf'); return false;" class="btn btn-primary btn-sm btn-block" style="font-size:0.75rem;">
+                <span class="material-symbols-outlined" style="font-size:15px;">download</span> ${t('btn_download_official_pdf', 'Download Official PDF')}
               </a>
             ` : `
               <a href="${s.action_url || '#'}" class="text-xs font-medium text-primary flex items-center justify-between" style="text-decoration:none;">
-                <span>${s.action_label || 'View Details'}</span>
+                <span>${I18n.translateText(s.action_label || t('btn_view_details', 'View Details'))}</span>
                 <span class="material-symbols-outlined" style="font-size:14px;">arrow_forward</span>
               </a>
             `}
@@ -858,14 +843,14 @@
     const passportSection = document.getElementById('virtual-passport-section');
     if (latestApp) {
       document.getElementById('stat-active-status').textContent = I18n.translateStatus(latestApp.status);
-      document.getElementById('stat-app-id').textContent = `Application #NP-${String(latestApp.application_id).padStart(4, '0')}`;
+      document.getElementById('stat-app-id').textContent = `${t('label_application', 'Application')} #NP-${String(latestApp.application_id).padStart(4, '0')}`;
       document.getElementById('banner-status-badge').innerHTML = UI.renderStatusBadge(latestApp.status);
       const pkgName = latestApp.passport_category || 'Ordinary (34 Pages)';
       const pkgPages = latestApp.passport_pages || (pkgName.includes('66') ? '66 Pages' : '34 Pages');
       const pkgFee = latestApp.fee_amount ? `NPR ${Number(latestApp.fee_amount).toLocaleString()}` : (pkgName.includes('66') ? 'NPR 10,000' : 'NPR 5,000');
       const pkgDelivery = latestApp.delivery_type || (pkgName.toLowerCase().includes('urgent') ? 'Fast-Track Delivery' : 'Standard Delivery');
 
-      const appDocs = documentsList.filter(d => d.application === latestApp.application_id);
+      const appDocs = documentsList.filter(d => String(d.application) === String(latestApp.application_id));
       const verifiedDocs = appDocs.filter(d => d.verification_status === 'Verified').length;
       document.getElementById('stat-doc-count').textContent = `${verifiedDocs} / ${appDocs.length}`;
       document.getElementById('stat-doc-status').textContent = appDocs.length > 0
@@ -876,9 +861,9 @@
         <div class="flex flex-col gap-md">
           <div class="grid grid-cols-1 sm:grid-cols-4 gap-md p-md rounded-lg" style="background-color:var(--surface-container-low);border:1px solid var(--outline-variant);">
             <div><span class="text-xs text-muted block" data-i18n="label_application_id">${t('label_application_id', 'Application ID')}</span><strong class="text-primary font-bold">#NP-${String(latestApp.application_id).padStart(4, '0')}</strong></div>
-            <div><span class="text-xs text-muted block" data-i18n="label_passport_category">${t('label_passport_category', 'Passport Package')}</span><span class="text-sm font-bold text-primary">${pkgName}</span></div>
-            <div><span class="text-xs text-muted block">${t('label_pages_fee', 'Pages & Fee')}</span><span class="text-sm font-medium">${pkgPages} • ${pkgFee}</span></div>
-            <div><span class="text-xs text-muted block">${t('label_delivery', 'Delivery')}</span><span class="text-sm font-medium">${pkgDelivery}</span></div>
+             <div><span class="text-xs text-muted block" data-i18n="label_passport_category">${t('label_passport_category', 'Passport Package')}</span><span class="text-sm font-bold text-primary">${I18n.translateText(pkgName)}</span></div>
+             <div><span class="text-xs text-muted block">${t('label_pages_fee', 'Pages & Fee')}</span><span class="text-sm font-medium">${I18n.translateText(pkgPages)} • ${pkgFee}</span></div>
+             <div><span class="text-xs text-muted block">${t('label_delivery', 'Delivery')}</span><span class="text-sm font-medium">${I18n.translateText(pkgDelivery)}</span></div>
           </div>
 
           <!-- Document Verification Checklist Section -->
@@ -896,10 +881,10 @@
                     <div class="flex items-center justify-between text-xs py-xs" style="border-bottom:1px dashed var(--outline-variant);">
                       <div class="flex items-center gap-xs">
                         <span class="material-symbols-outlined text-primary" style="font-size:16px;">${d.document_type === 'Passport Photo' ? 'portrait' : 'description'}</span>
-                        <strong class="text-on-surface">${I18n.translateDocType(d.document_type)}</strong>
+                        <strong class="text-on-surface">${esc(I18n.translateDocType(d.document_type))}</strong>
                       </div>
                       <div class="flex items-center gap-xs">
-                        ${d.rejection_reason ? `<span class="text-error" title="${d.rejection_reason}">(${t('label_reason', 'Reason')}: ${d.rejection_reason.substring(0,25)}...)</span>` : ''}
+                        ${d.rejection_reason ? `<span class="text-error" title="${esc(d.rejection_reason)}">(${t('label_reason', 'Reason')}: ${esc(d.rejection_reason.substring(0,25))}...)</span>` : ''}
                         ${UI.renderStatusBadge(d.verification_status)}
                       </div>
                     </div>
@@ -916,14 +901,14 @@
             </a>
           </div>
         </div>`;
-      const activeToken = queueTokensList.find(t => t.application === latestApp.application_id) || queueTokensList[0] || null;
+      const activeToken = queueTokensList.find(t => String(t.application) === String(latestApp.application_id)) || null;
       if (activeToken) {
         const elTicketNum = document.getElementById('ticket-token-num');
         if (elTicketNum) elTicketNum.textContent = `T-${String(activeToken.token_number).padStart(3, '0')}`;
         const elTicketStatus = document.getElementById('ticket-status');
         if (elTicketStatus) elTicketStatus.textContent = I18n.translateStatus(activeToken.queue_status);
         const elTicketSlot = document.getElementById('ticket-slot');
-        if (elTicketSlot) elTicketSlot.textContent = `Token #${activeToken.token_id}`;
+        if (elTicketSlot) elTicketSlot.textContent = `${t('label_token', 'Token')} #${activeToken.token_id}`;
         const elStatToken = document.getElementById('stat-queue-token');
         if (elStatToken) elStatToken.textContent = `T-${String(activeToken.token_number).padStart(3, '0')}`;
         const elStatStatus = document.getElementById('stat-queue-status');
@@ -941,14 +926,23 @@
       if (canDownload) {
         passportSection.style.display = 'block';
         if (paymentNotice) paymentNotice.style.display = 'none';
-        document.getElementById('stat-passport-status').textContent = 'Active';
+        document.getElementById('stat-passport-status').textContent = I18n.translateStatus('Active');
         document.getElementById('stat-passport-status').className = 'stat-value text-success';
-        document.getElementById('stat-passport-desc').textContent = 'Verified & Issued';
+        document.getElementById('stat-passport-desc').textContent = t('status_verified_issued', 'Verified & Issued');
         const typePagesEl = document.getElementById('vp-type-pages');
-        if (typePagesEl) typePagesEl.textContent = `${latestApp.passport_type || 'Ordinary e-Passport'} • ${pkgPages}`;
+        if (typePagesEl) typePagesEl.textContent = `${I18n.translateText(latestApp.passport_type || 'Ordinary e-Passport')} • ${I18n.translateText(pkgPages)}`;
         const pdfBtn = document.getElementById('vp-download-pdf-btn');
-        if (pdfBtn) pdfBtn.href = `/api/applications/${latestApp.application_id}/download-pdf/`;
-        const passNum = `NP-${new Date(latestApp.submission_date || Date.now()).getFullYear()}-${String(latestApp.application_id).padStart(4, '0')}`;
+        if (pdfBtn) {
+          pdfBtn.href = '#';
+          pdfBtn.onclick = (event) => {
+            event.preventDefault();
+            API.downloadFile(
+              `/applications/${latestApp.application_id}/download-pdf/`,
+              `Virtual_Passport_${latestApp.passport_number}.pdf`
+            );
+          };
+        }
+        const passNum = latestApp.passport_number;
         document.getElementById('vp-passport-no').textContent = passNum;
         // Use real issue_date and expiry_date from the API if available
         const issueDate = latestApp.issue_date ? String(latestApp.issue_date) : (latestApp.submission_date ? latestApp.submission_date.substring(0, 10) : new Date().toISOString().substring(0, 10));
@@ -971,25 +965,33 @@
         const photoFrame = document.getElementById('vp-photo-frame');
         if (photoFrame) {
           if (photoDoc && photoDoc.document_id) {
-            const token = Auth.getToken();
-            const photoSrc = `/api/documents/${photoDoc.document_id}/view-file/?token=${encodeURIComponent(token)}`;
-            photoFrame.innerHTML = `<img src="${photoSrc}" alt="Passport Photo" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.parentElement.innerHTML='<span class=\'material-symbols-outlined text-primary\' style=\'font-size: 54px;\'>person</span>'">`;
+            API.getBlobUrl(`/documents/${photoDoc.document_id}/view-file/?application=${encodeURIComponent(latestApp.application_id)}`)
+              .then((photoSrc) => {
+                photoFrame.innerHTML = `<img src="${photoSrc}" alt="${t('doc_photo', 'Passport Photo')}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.parentElement.innerHTML='<span class=\'material-symbols-outlined text-primary\' style=\'font-size: 54px;\'>person</span>'">`;
+              })
+              .catch(() => {
+                photoFrame.innerHTML = `<span class="material-symbols-outlined text-primary" style="font-size: 54px;">person</span>`;
+              });
           } else {
             photoFrame.innerHTML = `<span class="material-symbols-outlined text-primary" style="font-size: 54px;">person</span>`;
           }
         }
-      } else if (latestApp.status === 'Approved') {
+      } else if (_wfState?.current_step === 'fee' && !_wfState?.is_payment_verified) {
         passportSection.style.display = 'none';
         if (paymentNotice) paymentNotice.style.display = 'block';
-        document.getElementById('stat-passport-status').textContent = 'Fee Pending';
+        document.getElementById('stat-passport-status').textContent = t('status_fee_pending', 'Fee Pending');
         document.getElementById('stat-passport-status').className = 'stat-value text-warning';
-        document.getElementById('stat-passport-desc').textContent = 'Approved — Pay Fee';
+        document.getElementById('stat-passport-desc').textContent = t('status_uploads_complete_pay_fee', 'Uploads Complete — Pay Fee');
       } else {
         passportSection.style.display = 'none';
         if (paymentNotice) paymentNotice.style.display = 'none';
-        document.getElementById('stat-passport-status').textContent = 'Inactive';
-        document.getElementById('stat-passport-status').className = 'stat-value text-muted';
-        document.getElementById('stat-passport-desc').textContent = 'Not yet issued';
+        const workflowStep = _wfState?.current_step;
+        const awaitingFinalApproval = latestApp.status === 'Pending' && _wfState?.is_payment_verified;
+        document.getElementById('stat-passport-status').textContent = awaitingFinalApproval ? I18n.translateStatus('Pending') : t('status_inactive', 'Inactive');
+        document.getElementById('stat-passport-status').className = awaitingFinalApproval ? 'stat-value text-warning' : 'stat-value text-muted';
+        document.getElementById('stat-passport-desc').textContent = awaitingFinalApproval
+          ? (workflowStep === 'signature' ? t('status_awaiting_signature', 'Awaiting digital signature') : t('status_awaiting_biometrics', 'Awaiting biometric verification'))
+          : t('status_not_issued', 'Not yet issued');
       }
 
       // Show/hide expired passport banner
@@ -998,34 +1000,40 @@
       if (expiredBanner) {
         const passportStatus = latestApp.passport_status;
         const isExpired = latestApp.is_expired;
-        if (isExpired && latestApp.status === 'Completed') {
+        if (isExpired && (latestApp.status === 'Completed' || latestApp.can_download_pdf)) {
           expiredBanner.style.display = 'block';
-          if (expiredDetail) expiredDetail.textContent = `Passport #NP-${String(latestApp.application_id).padStart(4,'0')} expired on ${latestApp.expiry_date || 'N/A'}. You may apply for a renewal.`;
+          if (expiredDetail) expiredDetail.textContent = I18n.format(
+            'passport_expired_renewal_message',
+            'Passport #NP-{id} expired on {date}. You may apply for a renewal.',
+            { id: String(latestApp.application_id).padStart(4,'0'), date: latestApp.expiry_date || t('label_not_available', 'N/A') }
+          );
           // Update stat card
-          document.getElementById('stat-passport-status').textContent = 'EXPIRED';
+          document.getElementById('stat-passport-status').textContent = I18n.translateStatus('Expired');
           document.getElementById('stat-passport-status').className = 'stat-value text-error';
-          document.getElementById('stat-passport-desc').textContent = 'Renewal Required';
+          document.getElementById('stat-passport-desc').textContent = t('status_renewal_required', 'Renewal Required');
           // Update new application button to show renewal option
           const btnNewApp = document.getElementById('btn-new-application');
           if (btnNewApp) {
-            btnNewApp.innerHTML = '<span class="material-symbols-outlined">autorenew</span> Renew Passport';
+            btnNewApp.innerHTML = `<span class="material-symbols-outlined">autorenew</span> ${t('btn_renew', 'Renew Passport')}`;
             btnNewApp.onclick = openRenewalModal;
           }
         } else {
           expiredBanner.style.display = 'none';
           // If active passport, hide/disable new application button
-          if (passportStatus === 'ACTIVE' && latestApp.status === 'Completed') {
-            document.getElementById('stat-passport-status').textContent = 'ACTIVE';
+          if (passportStatus === 'ACTIVE' && (latestApp.status === 'Completed' || latestApp.can_download_pdf)) {
+            document.getElementById('stat-passport-status').textContent = I18n.translateStatus('Active');
             document.getElementById('stat-passport-status').className = 'stat-value text-success';
-            document.getElementById('stat-passport-desc').textContent = `Valid until ${latestApp.expiry_date || 'N/A'}`;
+            document.getElementById('stat-passport-desc').textContent = I18n.format('valid_until_date', 'Valid until {date}', {
+              date: latestApp.expiry_date || t('label_not_available', 'N/A')
+            });
             const btnNewApp = document.getElementById('btn-new-application');
             if (btnNewApp) { btnNewApp.style.display = 'none'; }
           }
         }
       }
     } else {
-      document.getElementById('stat-active-status').textContent = 'None';
-      document.getElementById('stat-app-id').textContent = 'No applications';
+      document.getElementById('stat-active-status').textContent = t('label_none', 'None');
+      document.getElementById('stat-app-id').textContent = t('empty_no_applications_short', 'No applications');
       document.getElementById('stat-doc-count').textContent = '0 / 0';
       document.getElementById('stat-queue-token').textContent = '--';
       passportSection.style.display = 'none';
@@ -1039,10 +1047,21 @@
   function scrollToVirtualPassport() {
     const el = document.getElementById('virtual-passport-section');
     if (!el || el.style.display === 'none') {
-      UI.showToast('Your Virtual e-Passport will appear here once payment is verified and signature is authorized.', 'info');
+      UI.showToast(t('msg_passport_pending', 'Your Virtual e-Passport will appear here once payment is verified and signature is authorized.'), 'info');
     } else {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
+  }
+
+  function downloadVirtualPassport() {
+    if (!_wfState?.application_id || _wfState.can_download_pdf !== true) {
+      UI.showToast(t('msg_passport_not_ready', 'Your Virtual e-Passport is not ready for download yet.'), 'warning');
+      return;
+    }
+    API.downloadFile(
+      `/applications/${_wfState.application_id}/download-pdf/`,
+      `Virtual_Passport_${_wfState.passport_number}.pdf`
+    );
   }
 
   function renderApplicationsTable() {
@@ -1063,16 +1082,16 @@
               <span class="material-symbols-outlined" style="font-size:16px;">search</span> ${t('btn_track_status', 'Track')}
             </a>
             ${app.can_download_pdf ? `
-              <a href="/api/applications/${app.application_id}/download-pdf/" class="btn btn-primary btn-sm">
+              <a href="#" onclick="API.downloadFile('/applications/${app.application_id}/download-pdf/', 'Virtual_Passport_${app.passport_number}.pdf'); return false;" class="btn btn-primary btn-sm">
                 <span class="material-symbols-outlined" style="font-size:16px;">download</span> ${t('btn_download', 'PDF')}
               </a>
               <button type="button" onclick="scrollToVirtualPassport()" class="btn btn-success btn-sm">
                 <span class="material-symbols-outlined" style="font-size:16px;">badge</span> ${t('btn_view', 'View')}
               </button>
-            ` : (app.status === 'Approved' ? `
-              <a href="/applicant/documents/" class="btn btn-warning btn-sm" style="background-color: #ea580c; color: #fff; border-color: #ea580c;">
+            ` : (String(app.application_id) === String(_wfState?.application_id) && _wfState?.current_step === 'fee' && !_wfState?.is_payment_verified ? `
+              <button type="button" onclick="initiatePayment()" class="btn btn-warning btn-sm" style="background-color: #ea580c; color: #fff; border-color: #ea580c;">
                 <span class="material-symbols-outlined" style="font-size:16px;">payments</span> ${t('btn_pay_fee', 'Pay Fee')}
-              </a>
+              </button>
             ` : '')}
           </div>
         </td>
@@ -1083,18 +1102,25 @@
   function openNewApplicationModal() {
     // Check for existing active applications first
     if (applicationsList && applicationsList.length > 0) {
-      const activeApp = applicationsList.find(a => ['Pending', 'Under Review', 'Approved'].includes(a.status));
+      const activeApp = applicationsList.find(a =>
+        ['Pending', 'Under Review', 'Approved'].includes(a.status) &&
+        !(a.can_download_pdf && (a.passport_status === 'EXPIRED' || a.is_expired))
+      );
       if (activeApp) {
-        UI.showToast(`You already have an active passport application (#NP-${String(activeApp.application_id).padStart(4,'0')}). You cannot submit another.`, 'warning');
+        UI.showToast(I18n.format('active_application_exists', 'You already have an active passport application (#NP-{id}). You cannot submit another.', {
+          id: String(activeApp.application_id).padStart(4,'0')
+        }), 'warning');
         document.getElementById('next-step-card-container')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         return;
       }
       // Check for completed (issued) passport
-      const completedApp = applicationsList.find(a => a.status === 'Completed');
+      const completedApp = applicationsList.find(a => a.status === 'Completed' || a.can_download_pdf);
       if (completedApp) {
         const pStatus = completedApp.passport_status;
         if (pStatus === 'ACTIVE') {
-          UI.showToast(`You already have a valid active passport (valid until ${completedApp.expiry_date || 'N/A'}). Renewal is only permitted after expiry.`, 'warning');
+          UI.showToast(I18n.format('active_passport_renewal_blocked', 'You already have a valid active passport (valid until {date}). Renewal is only permitted after expiry.', {
+            date: completedApp.expiry_date || t('label_not_available', 'N/A')
+          }), 'warning');
           return;
         } else if (pStatus === 'EXPIRED' || completedApp.is_expired) {
           // Route to renewal modal
@@ -1102,7 +1128,7 @@
           return;
         } else if (!completedApp.expiry_date) {
           // Completed but no expiry date yet — passport still in final processing
-          UI.showToast('Your passport application is completed. Please check back later for renewal options.', 'info');
+          UI.showToast(t('msg_passport_completed', 'Your passport application is completed. Please check back later for renewal options.'), 'info');
           return;
         }
       }
@@ -1118,10 +1144,14 @@
   function openRenewalModal() {
     // Check if there's already an active renewal
     const activeRenewal = applicationsList.find(a =>
-      a.application_type === 'RENEWAL' && ['Pending', 'Under Review', 'Approved'].includes(a.status)
+      a.application_type === 'RENEWAL' &&
+      ['Pending', 'Under Review', 'Approved'].includes(a.status) &&
+      !(a.can_download_pdf && (a.passport_status === 'EXPIRED' || a.is_expired))
     );
     if (activeRenewal) {
-      UI.showToast(`You already have an active renewal application (#NP-${String(activeRenewal.application_id).padStart(4,'0')}). You cannot submit another.`, 'warning');
+      UI.showToast(I18n.format('active_renewal_exists', 'You already have an active renewal application (#NP-{id}). You cannot submit another.', {
+        id: String(activeRenewal.application_id).padStart(4,'0')
+      }), 'warning');
       document.getElementById('next-step-card-container')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
@@ -1132,7 +1162,7 @@
     // Update the modal title to indicate renewal
     const modalTitle = document.querySelector('#new-app-modal .modal-title');
     if (modalTitle) {
-      modalTitle.innerHTML = '<span class="material-symbols-outlined text-primary">autorenew</span> Passport Renewal Application';
+      modalTitle.innerHTML = `<span class="material-symbols-outlined text-primary">autorenew</span> ${t('renewal_application_title', 'Passport Renewal Application')}`;
     }
     UI.openModal('new-app-modal');
   }
@@ -1155,12 +1185,14 @@
         application_type: isRenewal ? 'RENEWAL' : 'NEW',
         status: 'Pending'
       });
-      UI.showToast(`Application #NP-${String(newApp.application_id).padStart(4, '0')} submitted!`, 'success');
+      UI.showToast(I18n.format('application_submitted', 'Application #NP-{id} submitted.', {
+        id: String(newApp.application_id).padStart(4, '0')
+      }), 'success');
       UI.closeModal('new-app-modal');
       // Restore modal title in case it was changed for renewal
       const modalTitle = document.querySelector('#new-app-modal .modal-title');
       if (modalTitle) {
-        modalTitle.innerHTML = '<span class="material-symbols-outlined text-primary">add_circle</span> New Passport Application';
+        modalTitle.innerHTML = `<span class="material-symbols-outlined text-primary">add_circle</span> ${t('new_application_title', 'New Passport Application')}`;
       }
       WorkflowManager.invalidate();
       await loadApplicantData();
@@ -1168,7 +1200,7 @@
         document.getElementById('next-step-card-container')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }, 400);
     } catch (err) {
-      alertBox.textContent = err.message || 'Could not create application. Please try again.';
+      alertBox.textContent = err.message ? I18n.translateError(err.message) : t('msg_create_application_failed', 'Could not create application. Please try again.');
       alertBox.style.display = 'flex';
     } finally {
       submitBtn.disabled = false;

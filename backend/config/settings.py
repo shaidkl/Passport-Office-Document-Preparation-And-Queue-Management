@@ -10,22 +10,62 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
+import os
+import importlib.util
 from pathlib import Path
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def _load_local_environment(path):
+    """Load an ignored local .env file without adding another dependency."""
+    if not path.exists():
+        return
+    for raw_line in path.read_text(encoding='utf-8').splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith('#') or '=' not in line:
+            continue
+        key, value = line.split('=', 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+def _env_bool(name, default=False):
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
+def _env_list(name, default=''):
+    return [item.strip() for item in os.environ.get(name, default).split(',') if item.strip()]
+
+
+_load_local_environment(BASE_DIR.parent / '.env')
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-j(8#vr-c8it-w(#o!qo$kj3#yh@**qgv*29x$mvngt(9rx^+xh'
+DEBUG = _env_bool('DJANGO_DEBUG', True)
+
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', '').strip()
+if not SECRET_KEY:
+    if not DEBUG:
+        raise ImproperlyConfigured('DJANGO_SECRET_KEY is required when DJANGO_DEBUG is false.')
+    SECRET_KEY = 'development-only-key-set-DJANGO_SECRET_KEY-before-deployment'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+ALLOWED_HOSTS = _env_list(
+    'DJANGO_ALLOWED_HOSTS',
+    '127.0.0.1,localhost,0.0.0.0,testserver' if DEBUG else '',
+)
+if not ALLOWED_HOSTS:
+    raise ImproperlyConfigured('DJANGO_ALLOWED_HOSTS is required in production.')
 
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '0.0.0.0', 'testserver']
+CSRF_TRUSTED_ORIGINS = _env_list('DJANGO_CSRF_TRUSTED_ORIGINS')
 
 
 # Application definition
@@ -43,6 +83,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'passport.security_middleware.ContentSecurityPolicyMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -50,6 +91,10 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+WHITENOISE_AVAILABLE = importlib.util.find_spec('whitenoise') is not None
+if WHITENOISE_AVAILABLE:
+    MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
 
 ROOT_URLCONF = 'config.urls'
 
@@ -66,6 +111,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'passport.security_middleware.csp_nonce',
             ],
         },
     },
@@ -77,6 +123,9 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'passport.authentication.CustomTokenAuthentication',
     ],
+    'DEFAULT_THROTTLE_RATES': {
+        'public_tracking': os.environ.get('PUBLIC_TRACKING_RATE', '20/hour'),
+    },
 }
 
 
@@ -85,14 +134,22 @@ REST_FRAMEWORK = {
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'passport_db',
-        'USER': 'postgres',
-        'PASSWORD': 'postgres123',
-        'HOST': 'localhost',
-        'PORT': '5433',
+        'ENGINE': os.environ.get('DB_ENGINE', 'django.db.backends.postgresql'),
+        'NAME': os.environ.get('DB_NAME', 'passport_db'),
+        'USER': os.environ.get('DB_USER', 'passport_app'),
+        'PASSWORD': os.environ.get('DB_PASSWORD', ''),
+        'HOST': os.environ.get('DB_HOST', 'localhost'),
+        'PORT': os.environ.get('DB_PORT', '5433'),
+        'CONN_MAX_AGE': int(os.environ.get('DB_CONN_MAX_AGE', '60')),
     }
 }
+
+if (
+    not DEBUG
+    and 'postgresql' in DATABASES['default']['ENGINE']
+    and not DATABASES['default']['PASSWORD']
+):
+    raise ImproperlyConfigured('DB_PASSWORD is required for PostgreSQL in production.')
 
 
 # Password validation
@@ -119,7 +176,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Kathmandu'
 
 USE_I18N = True
 
@@ -135,6 +192,16 @@ STATICFILES_DIRS = [
 ]
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
+if WHITENOISE_AVAILABLE:
+    STORAGES = {
+        'default': {
+            'BACKEND': 'django.core.files.storage.FileSystemStorage',
+        },
+        'staticfiles': {
+            'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+        },
+    }
+
 
 # Media files (Uploaded documents, photos, signatures)
 MEDIA_URL = '/media/'
@@ -144,13 +211,135 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
 
+_MAILER_BACKEND = os.environ.get(
+    'EMAIL_BACKEND',
+    'django.core.mail.backends.console.EmailBackend' if DEBUG
+    else 'django.core.mail.backends.smtp.EmailBackend',
+)
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'no-reply@passport.gov.np')
+
+_MAILER_OPTIONS = {}
+if _MAILER_BACKEND.endswith('smtp.EmailBackend'):
+    _MAILER_OPTIONS = {
+        'host': os.environ.get('EMAIL_HOST', ''),
+        'port': int(os.environ.get('EMAIL_PORT', '587')),
+        'username': os.environ.get('EMAIL_HOST_USER', ''),
+        'password': os.environ.get('EMAIL_HOST_PASSWORD', ''),
+        'use_tls': _env_bool('EMAIL_USE_TLS', True),
+        'timeout': int(os.environ.get('EMAIL_TIMEOUT', '20')),
+    }
 MAILERS = {
     'default': {
-        'BACKEND': 'django.core.mail.backends.console.EmailBackend',
+        'BACKEND': _MAILER_BACKEND,
+        'OPTIONS': _MAILER_OPTIONS,
     },
 }
 
 # Passport Configuration
 PASSPORT_VALIDITY_YEARS = 10
+
+# Security controls
+AUTH_TOKEN_TTL_MINUTES = int(os.environ.get('AUTH_TOKEN_TTL_MINUTES', '720'))
+AUTH_TOKEN_COOKIE_NAME = os.environ.get('AUTH_TOKEN_COOKIE_NAME', 'passport_session')
+AUTH_TOKEN_COOKIE_SECURE = _env_bool('AUTH_TOKEN_COOKIE_SECURE', not DEBUG)
+AUTH_TOKEN_COOKIE_SAMESITE = os.environ.get('AUTH_TOKEN_COOKIE_SAMESITE', 'Lax')
+LOGIN_MAX_ATTEMPTS = int(os.environ.get('LOGIN_MAX_ATTEMPTS', '5'))
+LOGIN_ATTEMPT_WINDOW_MINUTES = int(os.environ.get('LOGIN_ATTEMPT_WINDOW_MINUTES', '15'))
+LOGIN_LOCKOUT_MINUTES = int(os.environ.get('LOGIN_LOCKOUT_MINUTES', '15'))
+PERSONNEL_MFA_REQUIRED = _env_bool('PERSONNEL_MFA_REQUIRED', not DEBUG)
+PERSONNEL_MFA_TTL_SECONDS = int(os.environ.get('PERSONNEL_MFA_TTL_SECONDS', '300'))
+PERSONNEL_MFA_MAX_ATTEMPTS = int(os.environ.get('PERSONNEL_MFA_MAX_ATTEMPTS', '5'))
+
+if not DEBUG and PERSONNEL_MFA_REQUIRED:
+    if _MAILER_BACKEND != 'django.core.mail.backends.smtp.EmailBackend':
+        raise ImproperlyConfigured('Personnel MFA requires a real SMTP email backend in production.')
+    if not all(_MAILER_OPTIONS.get(name) for name in ('host', 'username', 'password')):
+        raise ImproperlyConfigured(
+            'EMAIL_HOST, EMAIL_HOST_USER, and EMAIL_HOST_PASSWORD are required when personnel MFA is enabled.'
+        )
+    if not DEFAULT_FROM_EMAIL:
+        raise ImproperlyConfigured('DEFAULT_FROM_EMAIL is required when personnel MFA is enabled.')
+
+MALWARE_SCAN_ENABLED = _env_bool('MALWARE_SCAN_ENABLED', not DEBUG)
+CLAMAV_HOST = os.environ.get('CLAMAV_HOST', '127.0.0.1')
+CLAMAV_PORT = int(os.environ.get('CLAMAV_PORT', '3310'))
+CLAMAV_TIMEOUT_SECONDS = int(os.environ.get('CLAMAV_TIMEOUT_SECONDS', '20'))
+
+PASSPORT_SIGNING_PRIVATE_KEY_FILE = os.environ.get('PASSPORT_SIGNING_PRIVATE_KEY_FILE', '')
+PASSPORT_SIGNING_PUBLIC_KEY_FILE = os.environ.get('PASSPORT_SIGNING_PUBLIC_KEY_FILE', '')
+PASSPORT_SIGNING_PRIVATE_KEY = os.environ.get('PASSPORT_SIGNING_PRIVATE_KEY', '')
+PASSPORT_SIGNING_PUBLIC_KEY = os.environ.get('PASSPORT_SIGNING_PUBLIC_KEY', '')
+PASSPORT_SIGNING_KEY_ID = os.environ.get('PASSPORT_SIGNING_KEY_ID', 'passport-dev-2026')
+
+if not DEBUG and not (PASSPORT_SIGNING_PRIVATE_KEY or PASSPORT_SIGNING_PRIVATE_KEY_FILE):
+    raise ImproperlyConfigured('A passport signing private key is required in production.')
+
+SECURE_SSL_REDIRECT = _env_bool('SECURE_SSL_REDIRECT', not DEBUG)
+SESSION_COOKIE_SECURE = _env_bool('SESSION_COOKIE_SECURE', not DEBUG)
+CSRF_COOKIE_SECURE = _env_bool('CSRF_COOKIE_SECURE', not DEBUG)
+SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '31536000' if not DEBUG else '0'))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = _env_bool('SECURE_HSTS_INCLUDE_SUBDOMAINS', not DEBUG)
+SECURE_HSTS_PRELOAD = _env_bool('SECURE_HSTS_PRELOAD', not DEBUG)
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
+REFERRER_POLICY = 'same-origin'
+
+if _env_bool('TRUST_PROXY_SSL_HEADER', False):
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+
+# eSewa ePay v2
+# UAT values are safe defaults for local development. Production deployments
+# must provide the merchant product code and secret key issued by eSewa.
+ESEWA_ENVIRONMENT = os.environ.get(
+    'ESEWA_ENVIRONMENT',
+    os.environ.get('PAYMENT_ENVIRONMENT', 'sandbox'),
+).strip().lower()
+
+ESEWA_PRODUCT_CODE = os.environ.get(
+    'ESEWA_PRODUCT_CODE',
+    os.environ.get('PAYMENT_GATEWAY_MERCHANT_ID', 'EPAYTEST'),
+).strip()
+
+ESEWA_SECRET_KEY = os.environ.get(
+    'ESEWA_SECRET_KEY',
+    os.environ.get('PAYMENT_GATEWAY_SECRET', '8gBm/:&EnhH.1/q'),
+).strip()
+
+_ESEWA_IS_PRODUCTION = ESEWA_ENVIRONMENT == 'production'
+ESEWA_PAYMENT_URL = os.environ.get(
+    'ESEWA_PAYMENT_URL',
+    (
+        'https://epay.esewa.com.np/api/epay/main/v2/form'
+        if _ESEWA_IS_PRODUCTION
+        else 'https://rc-epay.esewa.com.np/api/epay/main/v2/form'
+    ),
+).strip()
+
+ESEWA_STATUS_URL = os.environ.get(
+    'ESEWA_STATUS_URL',
+    (
+        'https://esewa.com.np/api/epay/transaction/status/'
+        if _ESEWA_IS_PRODUCTION
+        else 'https://rc.esewa.com.np/api/epay/transaction/status/'
+    ),
+).strip()
+
+ESEWA_HTTP_TIMEOUT = int(os.environ.get('ESEWA_HTTP_TIMEOUT', '10'))
+
+if ESEWA_ENVIRONMENT not in {'sandbox', 'uat', 'production'}:
+    raise ImproperlyConfigured('ESEWA_ENVIRONMENT must be sandbox, uat, or production.')
+if _ESEWA_IS_PRODUCTION:
+    insecure_esewa_values = {
+        '',
+        'EPAYTEST',
+        '8gBm/:&EnhH.1/q',
+        'replace-with-esewa-product-code',
+        'replace-with-esewa-secret-key',
+    }
+    if ESEWA_PRODUCT_CODE in insecure_esewa_values or ESEWA_SECRET_KEY in insecure_esewa_values:
+        raise ImproperlyConfigured('Real eSewa merchant credentials are required in production.')
+    if not ESEWA_PAYMENT_URL.startswith('https://') or not ESEWA_STATUS_URL.startswith('https://'):
+        raise ImproperlyConfigured('Production eSewa endpoints must use HTTPS.')
 
 

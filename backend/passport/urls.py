@@ -14,8 +14,11 @@ from .views import (
     NotificationViewSet,
     PaymentViewSet,
     login_view,
+    verify_login_mfa,
+    logout_view,
     register_view,
-    track_application_view
+    track_application_view,
+    verify_signature_view,
 )
 
 
@@ -110,6 +113,9 @@ router.register(
 urlpatterns = [
     path('', include(router.urls)),
     path('login/', login_view, name='login'),
+    path('login/mfa/verify/', verify_login_mfa, name='login-mfa-verify'),
+    path('logout/', logout_view, name='logout'),
     path('register/', register_view, name='register'),
     path('track/', track_application_view, name='track'),
-]
+    path('signatures/verify/<uuid:verification_code>/', verify_signature_view, name='verify-signature'),
+]

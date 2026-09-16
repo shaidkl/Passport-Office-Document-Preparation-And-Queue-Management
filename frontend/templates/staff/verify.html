@@ -4,7 +4,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="/static/css/staff.css">
-<style>
+<style nonce="{{ csp_nonce }}">
   .staff-workspace-layout { display: flex; min-height: calc(100vh - var(--header-height) - var(--topbar-height) - 160px); }
   .staff-sidebar { width: var(--sidebar-width); background: var(--surface); border-right: 1px solid var(--outline-variant); padding: var(--spacing-lg) var(--spacing-md); display: flex; flex-direction: column; gap: var(--spacing-xs); flex-shrink: 0; }
   @media(max-width:900px){ .staff-sidebar{ display:none; } }
@@ -118,7 +118,7 @@
         <div class="card-body">
           <div class="grid grid-cols-1 md:grid-cols-3 gap-md items-end">
             <div class="md:col-span-2">
-              <label class="form-label" for="app-select-dropdown">Select Application to Inspect &amp; Verify:</label>
+              <label class="form-label" for="app-select-dropdown" data-i18n="legacy_select_application_inspect">Select Application to Inspect &amp; Verify:</label>
               <select id="app-select-dropdown" class="form-control" onchange="onApplicationSelected()">
                 <option value="">— Loading Applications —</option>
               </select>
@@ -159,14 +159,11 @@
 
               <!-- Application Decision Buttons -->
               <div class="flex items-center gap-sm flex-wrap">
-                <button type="button" id="btn-approve-app" onclick="handleApproveApplication()" class="btn btn-success" disabled title="All required documents (including photo) must be verified before approving.">
-                  <span class="material-symbols-outlined">check_circle</span> Approve Application
+                <button type="button" id="btn-approve-app" class="btn btn-success" disabled>
+                  <span class="material-symbols-outlined">fact_check</span> <span data-i18n="status_staff_review">Staff Review</span>
                 </button>
-                <button type="button" onclick="handleMarkUnderReview()" class="btn btn-outline">
-                  <span class="material-symbols-outlined">pending</span> Mark Under Review
-                </button>
-                <button type="button" onclick="handleRejectApplication()" class="btn btn-outline text-error">
-                  <span class="material-symbols-outlined">cancel</span> Reject App
+                <button type="button" id="btn-mark-under-review" onclick="handleMarkUnderReview()" class="btn btn-outline">
+                  <span class="material-symbols-outlined">pending</span> <span data-i18n="btn_mark_under_review">Mark Under Review</span>
                 </button>
               </div>
             </div>
@@ -223,7 +220,7 @@
               <label class="form-label" for="search-input">Search Documents</label>
               <div class="input-icon-wrapper">
                 <span class="material-symbols-outlined input-icon">search</span>
-                <input type="text" id="search-input" class="form-control with-icon" placeholder="Search by App #, file name, doc type..." oninput="applyTableFilters()">
+                <input type="text" id="search-input" class="form-control with-icon" placeholder="Search by App #, file name, doc type..." data-i18n-placeholder="staff_document_search_placeholder" oninput="applyTableFilters()">
               </div>
             </div>
             <div>
@@ -312,17 +309,17 @@
           <span class="text-xs text-muted" style="color:#cbd5e1;" id="viewer-file-info">File: Loading...</span>
         </div>
         <div class="flex items-center gap-xs" id="image-zoom-controls" style="display:none;">
-          <button type="button" onclick="adjustZoom(-0.2)" class="btn btn-xs" style="background:#334155;color:#fff;" title="Zoom Out">
+          <button type="button" onclick="adjustZoom(-0.2)" class="btn btn-xs" style="background:#334155;color:#fff;" title="Zoom Out" data-i18n-title="title_zoom_out">
             <span class="material-symbols-outlined" style="font-size:14px;">zoom_out</span>
           </button>
           <span id="zoom-level-text" class="text-xs px-xs" style="min-width:40px;text-align:center;">100%</span>
-          <button type="button" onclick="adjustZoom(0.2)" class="btn btn-xs" style="background:#334155;color:#fff;" title="Zoom In">
+          <button type="button" onclick="adjustZoom(0.2)" class="btn btn-xs" style="background:#334155;color:#fff;" title="Zoom In" data-i18n-title="title_zoom_in">
             <span class="material-symbols-outlined" style="font-size:14px;">zoom_in</span>
           </button>
-          <button type="button" onclick="resetZoom()" class="btn btn-xs" style="background:#334155;color:#fff;" title="Reset Zoom">
+          <button type="button" onclick="resetZoom()" class="btn btn-xs" style="background:#334155;color:#fff;" title="Reset Zoom" data-i18n-title="title_reset_zoom">
             <span class="material-symbols-outlined" style="font-size:14px;">restart_alt</span>
           </button>
-          <button type="button" onclick="rotateImage()" class="btn btn-xs" style="background:#334155;color:#fff;" title="Rotate">
+          <button type="button" onclick="rotateImage()" class="btn btn-xs" style="background:#334155;color:#fff;" title="Rotate" data-i18n-title="title_rotate">
             <span class="material-symbols-outlined" style="font-size:14px;">rotate_right</span>
           </button>
         </div>
@@ -348,18 +345,18 @@
       <!-- In-Modal Rejection Reason Field -->
       <div class="mt-md" id="viewer-rejection-box">
         <label class="form-label" for="viewer-rejection-input" style="font-size:0.8rem;">Rejection Reason (Required only if rejecting this document):</label>
-        <textarea id="viewer-rejection-input" class="form-control" rows="2" placeholder="e.g. Photograph has shadowy/non-white background; Citizenship photocopy is partially cropped..."></textarea>
+        <textarea id="viewer-rejection-input" class="form-control" rows="2" placeholder="e.g. Photograph has shadowy/non-white background; Citizenship photocopy is partially cropped..." data-i18n-placeholder="staff_reject_reason_placeholder"></textarea>
       </div>
     </div>
 
     <div class="modal-footer flex items-center justify-between" style="border-top:1px solid var(--outline-variant);padding:12px 20px;">
-      <button type="button" onclick="UI.closeModal('viewer-modal')" class="btn btn-outline">Close Viewer</button>
+      <button type="button" onclick="UI.closeModal('viewer-modal')" class="btn btn-outline" data-i18n="btn_close_viewer">Close Viewer</button>
       <div class="flex items-center gap-sm">
-        <button type="button" onclick="rejectFromViewer()" class="btn btn-outline text-error">
-          <span class="material-symbols-outlined">cancel</span> Reject Document
+        <button type="button" id="viewer-reject-button" onclick="rejectFromViewer()" class="btn btn-outline text-error">
+          <span class="material-symbols-outlined">cancel</span> <span data-i18n="btn_reject_document">Reject Document</span>
         </button>
-        <button type="button" onclick="verifyFromViewer()" class="btn btn-success">
-          <span class="material-symbols-outlined">check_circle</span> Approve &amp; Verify Document
+        <button type="button" id="viewer-verify-button" onclick="verifyFromViewer()" class="btn btn-success">
+          <span class="material-symbols-outlined">check_circle</span> <span data-i18n="btn_verify_document">Approve &amp; Verify Document</span>
         </button>
       </div>
     </div>
@@ -373,7 +370,7 @@
     <div class="modal-header">
       <h3 class="modal-title flex items-center gap-sm text-error">
         <span class="material-symbols-outlined">cancel</span>
-        <span>Reject Document</span>
+        <span data-i18n="btn_reject_document">Reject Document</span>
       </h3>
       <button type="button" onclick="UI.closeModal('quick-reject-modal')" class="modal-close-btn">&times;</button>
     </div>
@@ -381,13 +378,13 @@
       <p class="text-sm text-muted mb-md" id="quick-reject-target-desc">Rejecting document. Please specify why the document is being rejected so the applicant can re-upload a compliant copy.</p>
       <div class="form-group mb-md">
         <label class="form-label" for="quick-reject-reason-input">Rejection Reason <span class="text-error">*</span></label>
-        <textarea id="quick-reject-reason-input" class="form-control" rows="3" placeholder="State clear feedback for the citizen (e.g. Unclear signature, blurry copy, incorrect document type)..."></textarea>
+        <textarea id="quick-reject-reason-input" class="form-control" rows="3" placeholder="State clear feedback for the citizen (e.g. Unclear signature, blurry copy, incorrect document type)..." data-i18n-placeholder="staff_quick_reject_placeholder"></textarea>
       </div>
     </div>
     <div class="modal-footer">
-      <button type="button" onclick="UI.closeModal('quick-reject-modal')" class="btn btn-outline">Cancel</button>
-      <button type="button" onclick="confirmQuickReject()" class="btn btn-outline text-error">
-        <span class="material-symbols-outlined">cancel</span> Confirm Rejection
+      <button type="button" onclick="UI.closeModal('quick-reject-modal')" class="btn btn-outline" data-i18n="btn_cancel">Cancel</button>
+      <button type="button" id="quick-reject-confirm-button" onclick="confirmQuickReject()" class="btn btn-outline text-error">
+        <span class="material-symbols-outlined">cancel</span> <span data-i18n="btn_confirm_rejection">Confirm Rejection</span>
       </button>
     </div>
   </div>
@@ -395,7 +392,8 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
+  const esc = value => UI.escapeHtml(value);
   let allDocuments = [];
   let allApplications = [];
   let currentSelectedAppId = null;
@@ -404,6 +402,126 @@
   let currentZoom = 1.0;
   let currentRotation = 0;
   let currentViewMode = 'app'; // 'app' or 'table'
+  const documentActionInFlight = new Set();
+
+  function documentById(docId) {
+    return allDocuments.find(doc => String(doc.document_id) === String(docId)) || null;
+  }
+
+  function currentDocumentsForApplication(applicationId) {
+    const seenTypes = new Set();
+    return allDocuments
+      .filter(doc => String(doc.application) === String(applicationId))
+      .sort((left, right) => Number(right.document_id) - Number(left.document_id))
+      .filter(doc => {
+        const rawType = String(doc.document_type || '').trim().toLowerCase();
+        const typeKey = (
+          rawType.includes('citizenship') ||
+          rawType.startsWith('national id') ||
+          rawType === 'nid'
+        ) ? 'identity-document' : rawType;
+        if (seenTypes.has(typeKey)) return false;
+        seenTypes.add(typeKey);
+        return true;
+      });
+  }
+
+  function paymentVerifiedForApplication(applicationId) {
+    const application = allApplications.find(app =>
+      String(app.application_id) === String(applicationId)
+    );
+    const paymentStep = Array.isArray(application?.workflow_steps)
+      ? application.workflow_steps.find(step => step.key === 'fee')
+      : null;
+    return Boolean(paymentStep && (paymentStep.is_verified === true || paymentStep.status === 'Completed'));
+  }
+
+  function applyDocumentDecision(docId, result) {
+    const doc = documentById(docId);
+    if (!doc || !result) return;
+    if (result.verification_status) doc.verification_status = result.verification_status;
+    if (Object.prototype.hasOwnProperty.call(result, 'rejection_reason')) {
+      doc.rejection_reason = result.rejection_reason || '';
+    }
+    if (Object.prototype.hasOwnProperty.call(result, 'is_inspected')) {
+      doc.is_inspected = Boolean(result.is_inspected);
+    }
+    if (result.application_status) {
+      const application = allApplications.find(app =>
+        String(app.application_id) === String(doc.application)
+      );
+      if (application) application.status = result.application_status;
+    }
+  }
+
+  function renderDocumentDecisionState() {
+    updateStats();
+    renderSelectedApplication();
+    applyTableFilters();
+    updateViewerDecisionControls();
+  }
+
+  function updateViewerDecisionControls() {
+    if (!activeViewerDoc) return;
+    const isPending = activeViewerDoc.verification_status === 'Pending';
+    const isPaymentVerified = paymentVerifiedForApplication(activeViewerDoc.application);
+    const isBusy = documentActionInFlight.has(String(activeViewerDoc.document_id));
+    const verifyButton = document.getElementById('viewer-verify-button');
+    const rejectButton = document.getElementById('viewer-reject-button');
+    const rejectionInput = document.getElementById('viewer-rejection-input');
+    if (verifyButton) {
+      verifyButton.disabled = !isPending || !isPaymentVerified || !activeViewerDoc.is_inspected || isBusy;
+      verifyButton.title = !isPaymentVerified
+        ? t('msg_payment_first', 'Payment must be verified first.')
+        : (!isPending
+        ? I18n.format('decision_is_final', 'Decision is final: {status}', { status: I18n.translateStatus(activeViewerDoc.verification_status) })
+        : (!activeViewerDoc.is_inspected ? t('msg_inspect_before_verify', 'Inspect the real file before verifying it.') : t('btn_verify_document', 'Verify document')));
+    }
+    if (rejectButton) {
+      rejectButton.disabled = !isPending || !isPaymentVerified || isBusy;
+      rejectButton.title = !isPaymentVerified
+        ? t('msg_payment_first', 'Payment must be verified first.')
+        : (isPending
+        ? t('btn_reject_document', 'Reject document')
+        : I18n.format('decision_is_final', 'Decision is final: {status}', { status: I18n.translateStatus(activeViewerDoc.verification_status) }));
+    }
+    if (rejectionInput) rejectionInput.disabled = !isPending || !isPaymentVerified || isBusy;
+  }
+
+  function beginDocumentDecision(doc, requiresInspection = false) {
+    if (!doc) return null;
+    if (!paymentVerifiedForApplication(doc.application)) {
+      UI.showToast(t('msg_payment_first', 'Payment must be verified first.'), 'warning');
+      return null;
+    }
+    if (doc.verification_status !== 'Pending') {
+      UI.showToast(I18n.format('document_already_final', 'This document already has a final {status} decision.', {
+        status: I18n.translateStatus(doc.verification_status)
+      }), 'warning');
+      return null;
+    }
+    if (requiresInspection && !doc.is_inspected) {
+      UI.showToast(t('msg_open_before_verify', 'You must open and visually inspect the document file before verification.'), 'warning');
+      return null;
+    }
+    const actionKey = String(doc.document_id);
+    if (documentActionInFlight.has(actionKey)) return null;
+    documentActionInFlight.add(actionKey);
+    renderDocumentDecisionState();
+    return actionKey;
+  }
+
+  function finishDocumentDecision(actionKey) {
+    if (!actionKey) return;
+    documentActionInFlight.delete(actionKey);
+    renderDocumentDecisionState();
+  }
+
+  function applyDecisionConflict(docId, error) {
+    if (!error?.data?.current_status) return;
+    applyDocumentDecision(docId, { verification_status: error.data.current_status });
+    renderDocumentDecisionState();
+  }
 
   document.addEventListener('DOMContentLoaded', () => {
     if (!Auth.requireAuth(['staff', 'administrator'])) return;
@@ -423,7 +541,7 @@
     if (unameEl) unameEl.textContent = user.username ? `@${user.username}` : (user.email || '');
     if (roleEl) {
       const parts = [user.department, user.designation].filter(Boolean);
-      roleEl.textContent = parts.length ? parts.join(' • ') : 'Active Duty';
+      roleEl.textContent = parts.length ? parts.join(' • ') : t('status_active_duty', 'Active Duty');
     }
     if (avatarEl && user.full_name) {
       avatarEl.textContent = user.full_name.substring(0, 2).toUpperCase();
@@ -453,7 +571,7 @@
   }
 
   async function loadDocumentsData() {
-    UI.showLoading('Loading submitted documents and applications...');
+    UI.showLoading(t('loading_verification_records', 'Loading submitted documents and applications...'));
     try {
       const [docsRes, appsRes] = await Promise.all([
         API.get('/documents/'),
@@ -478,7 +596,7 @@
       applyTableFilters();
     } catch (err) {
       console.error('Error fetching verification data:', err);
-      UI.showToast(err.message || 'Failed to load records.', 'error');
+      UI.showToast(err.message ? I18n.translateError(err.message) : t('msg_load_records_error', 'Failed to load records.'), 'error');
     } finally {
       UI.hideLoading();
     }
@@ -508,21 +626,23 @@
     }
 
     if (apps.length === 0) {
-      dropdown.innerHTML = '<option value="">No applications found in this filter.</option>';
+      dropdown.innerHTML = `<option value="">${t('empty_no_filtered_applications', 'No applications found in this filter.')}</option>`;
       return;
     }
 
-    dropdown.innerHTML = '<option value="">— Choose Application to Inspect —</option>' +
+    dropdown.innerHTML = `<option value="">${t('choose_application_inspect', '— Choose Application to Inspect —')}</option>` +
       apps.map(a => {
-        const appDocs = allDocuments.filter(d => d.application === a.application_id);
+        const appDocs = currentDocumentsForApplication(a.application_id);
         const pendingCount = appDocs.filter(d => d.verification_status === 'Pending').length;
-        const pendingNotice = pendingCount > 0 ? ` [${pendingCount} Pending]` : ' [Reviewed]';
-        const name = a.applicant_name || `Applicant #${a.applicant || 'N/A'}`;
-        return `<option value="${a.application_id}">#NP-${String(a.application_id).padStart(4,'0')} — ${name} (${a.status})${pendingNotice}</option>`;
+        const pendingNotice = pendingCount > 0
+          ? ` [${I18n.format('pending_count', '{count} Pending', { count: pendingCount })}]`
+          : ` [${t('status_reviewed', 'Reviewed')}]`;
+        const name = a.applicant_name || `${t('label_applicant', 'Applicant')} #${a.applicant || t('label_not_available', 'N/A')}`;
+        return `<option value="${Number(a.application_id)}">#NP-${String(a.application_id).padStart(4,'0')} — ${esc(name)} (${esc(I18n.translateStatus(a.status))})${esc(pendingNotice)}</option>`;
       }).join('');
 
     // If current selected app still in list, keep it; otherwise pick first
-    if (currentSelectedAppId && apps.some(a => a.application_id === currentSelectedAppId)) {
+    if (currentSelectedAppId && apps.some(a => String(a.application_id) === String(currentSelectedAppId))) {
       dropdown.value = currentSelectedAppId;
     } else if (apps.length > 0 && !currentSelectedAppId) {
       currentSelectedAppId = apps[0].application_id;
@@ -548,7 +668,7 @@
       return;
     }
 
-    const app = allApplications.find(a => a.application_id === currentSelectedAppId);
+    const app = allApplications.find(a => String(a.application_id) === String(currentSelectedAppId));
     if (!app) {
       container.style.display = 'none';
       return;
@@ -557,31 +677,47 @@
     container.style.display = 'block';
 
     // Header info
-    const applicantName = app.applicant_name || `Applicant #${app.applicant || 'N/A'}`;
+    const applicantName = app.applicant_name || `${t('label_applicant', 'Applicant')} #${app.applicant || t('label_not_available', 'N/A')}`;
     document.getElementById('app-applicant-name').textContent = applicantName;
     document.getElementById('app-applicant-avatar').textContent = applicantName.substring(0, 2).toUpperCase();
     document.getElementById('app-id-text').textContent = `#NP-${String(app.application_id).padStart(4, '0')}`;
-    document.getElementById('app-pkg-text').textContent = app.passport_category || 'Ordinary (34 Pages)';
+    document.getElementById('app-pkg-text').textContent = I18n.translateText(app.passport_category || 'Ordinary (34 Pages)');
     document.getElementById('app-date-text').textContent = app.submission_date ? UI.formatDateTime(app.submission_date) : '--';
     document.getElementById('app-status-badge').innerHTML = UI.renderStatusBadge(app.status);
 
     // Get documents for this application
-    const appDocs = allDocuments.filter(d => d.application === app.application_id);
-    document.getElementById('app-docs-count').textContent = `${appDocs.length} Document${appDocs.length === 1 ? '' : 's'}`;
+    const appDocs = allDocuments.filter(d => String(d.application) === String(app.application_id));
+    const currentAppDocs = currentDocumentsForApplication(app.application_id);
+    document.getElementById('app-docs-count').textContent = I18n.format(
+      appDocs.length === 1 ? 'document_count_one' : 'document_count_many',
+      appDocs.length === 1 ? '{count} Document' : '{count} Documents',
+      { count: appDocs.length }
+    );
 
     // Checklist evaluation
-    const photoDoc = appDocs.find(d => d.document_type === 'Passport Photo');
+    const photoDoc = currentAppDocs.find(d => d.document_type === 'Passport Photo');
     const hasVerifiedPhoto = Boolean(photoDoc && photoDoc.verification_status === 'Verified');
     
-    const idDoc = appDocs.find(d => 
-      (d.document_type || '').includes('Citizenship') || 
-      (d.document_type || '').includes('National ID') || 
+    const idDoc = currentAppDocs.find(d =>
+      (d.document_type || '').includes('Citizenship') ||
+      (d.document_type || '').includes('National ID') ||
       (d.document_type || '').includes('NID')
     );
     const hasVerifiedId = Boolean(idDoc && idDoc.verification_status === 'Verified');
 
-    const allDocsVerified = appDocs.length > 0 && appDocs.every(d => d.verification_status === 'Verified');
-    const hasUnresolved = appDocs.some(d => d.verification_status === 'Pending' || d.verification_status === 'Rejected');
+    const allDocsVerified = currentAppDocs.length > 0 && currentAppDocs.every(d => d.verification_status === 'Verified');
+    const hasUnresolved = currentAppDocs.some(d => d.verification_status === 'Pending' || d.verification_status === 'Rejected');
+    const paymentStep = Array.isArray(app.workflow_steps)
+      ? app.workflow_steps.find(step => step.key === 'fee')
+      : null;
+    const signatureStep = Array.isArray(app.workflow_steps)
+      ? app.workflow_steps.find(step => step.key === 'signature')
+      : null;
+    const isPaymentVerified = Boolean(paymentStep && (paymentStep.is_verified === true || paymentStep.status === 'Completed'));
+    const isFinalApproved = Boolean(
+      (app.status === 'Approved' || app.status === 'Completed') &&
+      signatureStep && signatureStep.status === 'Completed'
+    );
 
     // Update checklist UI
     const chkPhotoIcon = document.getElementById('chk-icon-photo');
@@ -589,19 +725,19 @@
     if (hasVerifiedPhoto) {
       chkPhotoIcon.textContent = 'check_circle';
       chkPhotoIcon.style.color = 'var(--success)';
-      chkPhotoText.textContent = 'Verified & Validated';
+      chkPhotoText.textContent = t('status_verified_validated', 'Verified & Validated');
     } else if (photoDoc && photoDoc.verification_status === 'Rejected') {
       chkPhotoIcon.textContent = 'cancel';
       chkPhotoIcon.style.color = 'var(--error)';
-      chkPhotoText.textContent = 'Photo Rejected (Re-upload needed)';
+      chkPhotoText.textContent = t('status_photo_rejected_reupload', 'Photo Rejected (Re-upload needed)');
     } else if (photoDoc) {
       chkPhotoIcon.textContent = 'pending';
       chkPhotoIcon.style.color = 'var(--secondary)';
-      chkPhotoText.textContent = 'Pending Staff Inspection';
+      chkPhotoText.textContent = t('status_pending_staff_inspection', 'Pending Staff Inspection');
     } else {
       chkPhotoIcon.textContent = 'error';
       chkPhotoIcon.style.color = 'var(--error)';
-      chkPhotoText.textContent = 'Missing Photo';
+      chkPhotoText.textContent = t('status_missing_photo', 'Missing Photo');
     }
 
     const chkIdIcon = document.getElementById('chk-icon-id');
@@ -609,19 +745,19 @@
     if (hasVerifiedId) {
       chkIdIcon.textContent = 'check_circle';
       chkIdIcon.style.color = 'var(--success)';
-      chkIdText.textContent = 'Verified Identity Record';
+      chkIdText.textContent = t('status_verified_identity', 'Verified Identity Record');
     } else if (idDoc && idDoc.verification_status === 'Rejected') {
       chkIdIcon.textContent = 'cancel';
       chkIdIcon.style.color = 'var(--error)';
-      chkIdText.textContent = 'Identity Doc Rejected';
+      chkIdText.textContent = t('status_identity_rejected', 'Identity Document Rejected');
     } else if (idDoc) {
       chkIdIcon.textContent = 'pending';
       chkIdIcon.style.color = 'var(--secondary)';
-      chkIdText.textContent = 'Pending Staff Review';
+      chkIdText.textContent = t('status_pending_staff_review', 'Pending Staff Review');
     } else {
       chkIdIcon.textContent = 'error';
       chkIdIcon.style.color = 'var(--error)';
-      chkIdText.textContent = 'Missing Citizenship / NID';
+      chkIdText.textContent = t('status_missing_identity', 'Missing Citizenship / NID');
     }
 
     const chkAllIcon = document.getElementById('chk-icon-all');
@@ -629,26 +765,32 @@
     if (allDocsVerified && hasVerifiedPhoto && hasVerifiedId) {
       chkAllIcon.textContent = 'check_circle';
       chkAllIcon.style.color = 'var(--success)';
-      chkAllText.textContent = 'Ready for Official Approval';
+      chkAllText.textContent = t('status_documents_final_review', 'Documents Verified — Biometrics Next');
     } else if (hasUnresolved) {
       chkAllIcon.textContent = 'pending';
       chkAllIcon.style.color = 'var(--secondary)';
-      chkAllText.textContent = 'Unresolved Documents Present';
+      chkAllText.textContent = t('status_unresolved_documents', 'Unresolved Documents Present');
     } else {
       chkAllIcon.textContent = 'error';
       chkAllIcon.style.color = 'var(--error)';
-      chkAllText.textContent = 'Incomplete Uploads';
+      chkAllText.textContent = t('status_incomplete_uploads', 'Incomplete Uploads');
     }
 
-    // Approve Button State
+    // Review state indicator
     const approveBtn = document.getElementById('btn-approve-app');
-    const canApprove = (hasVerifiedPhoto && hasVerifiedId && allDocsVerified && app.status !== 'Approved' && app.status !== 'Completed');
-    approveBtn.disabled = !canApprove;
-    if (app.status === 'Approved' || app.status === 'Completed') {
-      approveBtn.textContent = 'Already Approved';
+    approveBtn.disabled = true;
+    if (isFinalApproved) {
+      approveBtn.textContent = t('status_finally_approved', 'Finally Approved');
+    } else if (!isPaymentVerified) {
+      approveBtn.innerHTML = `<span class="material-symbols-outlined">payments</span> ${t('status_awaiting_citizen_payment', 'Awaiting Citizen Payment')}`;
+    } else if (allDocsVerified && hasVerifiedPhoto && hasVerifiedId) {
+      approveBtn.innerHTML = `<span class="material-symbols-outlined">fingerprint</span> ${t('status_documents_final_review', 'Documents Verified — Biometrics Next')}`;
+      chkAllText.textContent = t('status_documents_final_review', 'Documents Verified — Biometrics Next');
     } else {
-      approveBtn.innerHTML = '<span class="material-symbols-outlined">check_circle</span> Approve Application';
+      approveBtn.innerHTML = `<span class="material-symbols-outlined">fact_check</span> ${t('status_staff_review', 'Staff Review')}`;
     }
+    const underReviewBtn = document.getElementById('btn-mark-under-review');
+    if (underReviewBtn) underReviewBtn.disabled = !isPaymentVerified || isFinalApproved;
 
     // Render Document Cards
     const grid = document.getElementById('app-documents-grid');
@@ -656,7 +798,7 @@
       grid.innerHTML = `
         <div class="card p-xl text-center text-muted" style="grid-column: 1 / -1;">
           <span class="material-symbols-outlined" style="font-size:3rem;color:var(--outline);">description</span>
-          <p class="text-sm mt-sm mb-0">No documents uploaded for this application yet.</p>
+          <p class="text-sm mt-sm mb-0">${t('empty_no_application_documents', 'No documents uploaded for this application yet.')}</p>
         </div>
       `;
       return;
@@ -665,22 +807,24 @@
     grid.innerHTML = appDocs.map(doc => {
       let borderClass = 'pending';
       let statusIcon = 'pending';
-      let statusBadge = `<span class="doc-status-badge doc-status-pending"><span class="material-symbols-outlined" style="font-size:14px;">pending</span> Pending Review</span>`;
+      let statusBadge = `<span class="doc-status-badge doc-status-pending"><span class="material-symbols-outlined" style="font-size:14px;">pending</span> ${I18n.translateStatus('Pending Review')}</span>`;
       
       if (doc.verification_status === 'Verified') {
         borderClass = 'verified';
         statusIcon = 'check_circle';
-        statusBadge = `<span class="doc-status-badge doc-status-verified"><span class="material-symbols-outlined" style="font-size:14px;">check_circle</span> Verified</span>`;
+        statusBadge = `<span class="doc-status-badge doc-status-verified"><span class="material-symbols-outlined" style="font-size:14px;">check_circle</span> ${I18n.translateStatus('Verified')}</span>`;
       } else if (doc.verification_status === 'Rejected') {
         borderClass = 'rejected';
         statusIcon = 'cancel';
-        statusBadge = `<span class="doc-status-badge doc-status-rejected"><span class="material-symbols-outlined" style="font-size:14px;">cancel</span> Rejected</span>`;
+        statusBadge = `<span class="doc-status-badge doc-status-rejected"><span class="material-symbols-outlined" style="font-size:14px;">cancel</span> ${I18n.translateStatus('Rejected')}</span>`;
       }
 
       const isInspected = Boolean(doc.is_inspected);
+      const isPending = doc.verification_status === 'Pending';
+      const isBusy = documentActionInFlight.has(String(doc.document_id));
       const inspectBadge = isInspected
-        ? `<span class="inspected-badge-yes"><span class="material-symbols-outlined" style="font-size:13px;">visibility</span> Visually Inspected</span>`
-        : `<span class="inspected-badge-no"><span class="material-symbols-outlined" style="font-size:13px;">visibility_off</span> Not Inspected Yet</span>`;
+        ? `<span class="inspected-badge-yes"><span class="material-symbols-outlined" style="font-size:13px;">visibility</span> ${t('legacy_visually_inspected', 'Visually Inspected')}</span>`
+        : `<span class="inspected-badge-no"><span class="material-symbols-outlined" style="font-size:13px;">visibility_off</span> ${t('status_not_inspected', 'Not Inspected Yet')}</span>`;
 
       const isPhoto = (doc.document_type === 'Passport Photo');
       const iconName = isPhoto ? 'portrait' : 'description';
@@ -691,18 +835,18 @@
             <div class="flex items-center justify-between gap-sm mb-sm">
               <div class="flex items-center gap-xs">
                 <span class="material-symbols-outlined text-primary" style="font-size:22px;">${iconName}</span>
-                <strong class="text-sm text-primary">${doc.document_type}</strong>
+                <strong class="text-sm text-primary">${esc(I18n.translateDocType(doc.document_type))}</strong>
               </div>
               ${statusBadge}
             </div>
 
             <div class="text-xs text-muted mb-xs flex items-center justify-between">
-              <span>File: <strong class="text-on-surface" title="${doc.file_name}">${doc.file_name || 'Document'}</strong></span>
+              <span>${t('legacy_file_name', 'File')}: <strong class="text-on-surface" title="${esc(doc.file_name || '')}">${esc(doc.file_name || t('label_document', 'Document'))}</strong></span>
               <span>#DOC-${String(doc.document_id).padStart(4, '0')}</span>
             </div>
 
             <div class="text-xs text-muted mb-sm">
-              Uploaded: ${doc.upload_date ? UI.formatDateTime(doc.upload_date) : '--'}
+              ${t('legacy_uploaded_date', 'Uploaded')}: ${doc.upload_date ? UI.formatDateTime(doc.upload_date) : '--'}
             </div>
 
             <div class="mb-sm">
@@ -711,26 +855,26 @@
 
             ${doc.rejection_reason ? `
               <div class="p-xs rounded text-xs text-error mb-sm" style="background:rgba(185,28,28,0.06);border:1px solid rgba(185,28,28,0.2);">
-                <strong>Rejection Reason:</strong> ${doc.rejection_reason}
+                <strong>${t('label_rejection_reason', 'Rejection Reason')}:</strong> ${esc(doc.rejection_reason)}
               </div>
             ` : ''}
           </div>
 
           <div class="pt-sm flex items-center gap-xs flex-wrap" style="border-top:1px solid var(--outline-variant);margin-top:12px;">
             <button type="button" onclick="openRealDocumentViewer(${doc.document_id})" class="btn btn-sm btn-primary flex-1" style="min-width:110px;">
-              <span class="material-symbols-outlined" style="font-size:16px;">visibility</span> View Document
+              <span class="material-symbols-outlined" style="font-size:16px;">visibility</span> ${t('btn_view_document', 'View Document')}
             </button>
 
-            ${doc.verification_status !== 'Verified' ? `
-              <button type="button" onclick="verifyDocumentDirect(${doc.document_id})" class="btn btn-sm btn-outline text-success" ${!isInspected ? 'disabled title="You must click View Document to inspect the real file first"' : ''}>
-                <span class="material-symbols-outlined" style="font-size:16px;">check</span> Verify
+            ${isPending ? `
+              <button type="button" onclick="verifyDocumentDirect(${doc.document_id})" class="btn btn-sm btn-outline text-success" ${(!isPaymentVerified || !isInspected || isBusy) ? 'disabled' : ''} title="${!isPaymentVerified ? t('msg_payment_first', 'Payment must be verified first.') : (!isInspected ? t('msg_open_before_verify', 'You must click View Document to inspect the real file first') : t('btn_verify_document', 'Verify document'))}">
+                <span class="material-symbols-outlined" style="font-size:16px;">check</span> ${isBusy ? t('status_saving', 'Saving…') : t('btn_verify_document', 'Verify Document')}
               </button>
-              <button type="button" onclick="openQuickRejectModal(${doc.document_id})" class="btn btn-sm btn-outline text-error">
-                <span class="material-symbols-outlined" style="font-size:16px;">cancel</span> Reject
+              <button type="button" onclick="openQuickRejectModal(${doc.document_id})" class="btn btn-sm btn-outline text-error" ${(!isPaymentVerified || isBusy) ? 'disabled' : ''} title="${!isPaymentVerified ? t('msg_payment_first', 'Payment must be verified first.') : t('btn_reject_document', 'Reject')}">
+                <span class="material-symbols-outlined" style="font-size:16px;">cancel</span> ${t('btn_reject_document', 'Reject')}
               </button>
             ` : `
-              <span class="text-xs text-success font-semibold flex items-center gap-xs">
-                <span class="material-symbols-outlined" style="font-size:15px;">verified</span> Verified
+              <span class="text-xs text-muted font-semibold flex items-center gap-xs" title="${t('title_final_decision', 'Final document decisions cannot be changed.')}">
+                <span class="material-symbols-outlined" style="font-size:15px;">lock</span> ${t('status_decision_final', 'Decision final')}
               </span>
             `}
           </div>
@@ -742,9 +886,25 @@
   // ==================== REAL DOCUMENT VIEWER ====================
 
   async function openRealDocumentViewer(docId) {
-    const doc = allDocuments.find(d => d.document_id === docId);
+    const doc = allDocuments.find(d => String(d.document_id) === String(docId));
     if (!doc) return;
+
+    if (currentViewMode === 'app' && String(doc.application) !== String(currentSelectedAppId)) {
+      UI.showToast(t('msg_doc_wrong_applicant', 'This document does not belong to the selected applicant.'), 'error');
+      return;
+    }
+
+    const documentApplication = allApplications.find(app =>
+      String(app.application_id) === String(doc.application)
+    );
+    if (!documentApplication) {
+      UI.showToast(t('msg_doc_app_missing', 'The application for this document could not be found.'), 'error');
+      return;
+    }
+
+    currentSelectedAppId = documentApplication.application_id;
     activeViewerDoc = doc;
+    updateViewerDecisionControls();
 
     // Reset zoom and rotation
     currentZoom = 1.0;
@@ -752,9 +912,9 @@
     updateZoomDisplay();
 
     // Populate modal titles
-    document.getElementById('viewer-modal-title').textContent = `Inspect: ${doc.document_type}`;
-    document.getElementById('viewer-modal-subtitle').textContent = `#DOC-${String(doc.document_id).padStart(4, '0')} • Application #NP-${String(doc.application).padStart(4, '0')}`;
-    document.getElementById('viewer-file-info').textContent = `File: ${doc.file_name || 'Uploaded File'}`;
+    document.getElementById('viewer-modal-title').textContent = `${t('btn_inspect', 'Inspect')}: ${I18n.translateDocType(doc.document_type)}`;
+    document.getElementById('viewer-modal-subtitle').textContent = `#DOC-${String(doc.document_id).padStart(4, '0')} • ${t('label_application', 'Application')} #NP-${String(doc.application).padStart(4, '0')}`;
+    document.getElementById('viewer-file-info').textContent = `${t('legacy_file_name', 'File')}: ${doc.file_name || t('label_file_uploaded', 'Uploaded File')}`;
     document.getElementById('viewer-rejection-input').value = doc.rejection_reason || '';
 
     // Show loading state
@@ -772,10 +932,9 @@
     UI.openModal('viewer-modal');
 
     // Secure view-file endpoint
-    const fileUrl = `/api/documents/${doc.document_id}/view-file/`;
+    const fileUrl = `/api/documents/${doc.document_id}/view-file/?application=${encodeURIComponent(doc.application)}`;
     const token = Auth.getToken();
-    const directUrl = token ? `${fileUrl}?token=${encodeURIComponent(token)}` : fileUrl;
-    extLink.href = directUrl;
+    extLink.href = '#';
 
     try {
       // Fetch the actual file blob via authenticated request
@@ -786,7 +945,7 @@
       });
 
       if (!response.ok) {
-        throw new Error(`Could not load document file (HTTP ${response.status})`);
+        throw new Error(I18n.format('error_document_http', 'Could not load document file (HTTP {status})', { status: response.status }));
       }
 
       const contentType = response.headers.get('content-type') || '';
@@ -794,7 +953,7 @@
       const isPdf = contentType.includes('pdf') || (doc.file_name && doc.file_name.toLowerCase().endsWith('.pdf'));
       const blob = isPdf ? new Blob([rawBlob], { type: 'application/pdf' }) : rawBlob;
       const blobUrl = URL.createObjectURL(blob);
-      extLink.href = directUrl;
+      extLink.href = blobUrl;
 
       // Mark inspected locally and in backend
       doc.is_inspected = true;
@@ -816,13 +975,13 @@
       }
 
       // Re-render the application card to show the "Inspected" badge and enable Verify button
-      renderSelectedApplication();
+      renderDocumentDecisionState();
 
     } catch (err) {
       console.error('Document view error:', err);
       loadingState.innerHTML = `
         <span class="material-symbols-outlined text-error" style="font-size:36px;">error</span>
-        <p class="text-sm text-error m-0 mt-xs">Failed to load real document: ${err.message}</p>
+        <p class="text-sm text-error m-0 mt-xs">${esc(I18n.format('error_loading_real_document', 'Failed to load real document: {error}', { error: I18n.translateError(err.message) }))}</p>
       `;
     }
   }
@@ -859,19 +1018,31 @@
 
   async function verifyFromViewer() {
     if (!activeViewerDoc) return;
-    UI.showLoading('Verifying document...');
+    const docId = activeViewerDoc.document_id;
+    const actionKey = beginDocumentDecision(activeViewerDoc, true);
+    if (!actionKey) return;
+    UI.showLoading(t('loading_verifying_document', 'Verifying document...'));
     try {
-      await API.post(`/documents/${activeViewerDoc.document_id}/verify-document/`, {
+      const result = await API.post(`/documents/${docId}/verify-document/`, {
         application_id: activeViewerDoc.application,
         remarks: ''
       });
-      UI.showToast(`${activeViewerDoc.document_type} verified successfully!`, 'success');
+      applyDocumentDecision(docId, result);
+      renderDocumentDecisionState();
+      const successMessage = result.application_verified
+        ? t('document_review_complete_next_biometrics', 'All current required documents are verified. Biometrics and digital signature are next.')
+        : I18n.format('document_type_verified', '{type} verified successfully!', {
+            type: I18n.translateDocType(activeViewerDoc.document_type)
+          });
+      UI.showToast(successMessage, 'success');
       UI.closeModal('viewer-modal');
       await loadDocumentsData();
     } catch (err) {
       console.error('Verify error:', err);
-      UI.showToast(err.message || 'Failed to verify document.', 'error');
+      applyDecisionConflict(docId, err);
+      UI.showToast(err.message ? I18n.translateError(err.message) : t('msg_verify_document_error', 'Failed to verify document.'), 'error');
     } finally {
+      finishDocumentDecision(actionKey);
       UI.hideLoading();
     }
   }
@@ -880,63 +1051,92 @@
     if (!activeViewerDoc) return;
     const reason = document.getElementById('viewer-rejection-input').value.trim();
     if (!reason) {
-      UI.showToast('Please enter a rejection reason so the applicant can correct the issue.', 'error');
+      UI.showToast(t('msg_rejection_explain', 'Please enter a rejection reason so the applicant can correct the issue.'), 'error');
       document.getElementById('viewer-rejection-input').focus();
       return;
     }
 
-    UI.showLoading('Rejecting document...');
+    const docId = activeViewerDoc.document_id;
+    const actionKey = beginDocumentDecision(activeViewerDoc);
+    if (!actionKey) return;
+    UI.showLoading(t('loading_rejecting_document', 'Rejecting document...'));
     try {
-      await API.post(`/documents/${activeViewerDoc.document_id}/reject-document/`, {
+      const result = await API.post(`/documents/${docId}/reject-document/`, {
         application_id: activeViewerDoc.application,
         reason: reason
       });
-      UI.showToast(`${activeViewerDoc.document_type} rejected.`, 'info');
+      applyDocumentDecision(docId, result);
+      renderDocumentDecisionState();
+      UI.showToast(I18n.format('document_type_rejected', '{type} rejected.', {
+        type: I18n.translateDocType(activeViewerDoc.document_type)
+      }), 'info');
       UI.closeModal('viewer-modal');
       await loadDocumentsData();
     } catch (err) {
       console.error('Reject error:', err);
-      UI.showToast(err.message || 'Could not update document status.', 'error');
+      applyDecisionConflict(docId, err);
+      UI.showToast(err.message ? I18n.translateError(err.message) : t('msg_update_document_error', 'Could not update document status.'), 'error');
     } finally {
+      finishDocumentDecision(actionKey);
       UI.hideLoading();
     }
   }
 
   async function verifyDocumentDirect(docId) {
-    const doc = allDocuments.find(d => d.document_id === docId);
+    const doc = documentById(docId);
     if (!doc) return;
 
     if (!doc.is_inspected) {
-      UI.showToast('You must open and visually inspect the document file before verification.', 'warning');
+      UI.showToast(t('msg_open_before_verify', 'You must open and visually inspect the document file before verification.'), 'warning');
       openRealDocumentViewer(docId);
       return;
     }
 
-    UI.showLoading('Verifying document...');
+    const actionKey = beginDocumentDecision(doc, true);
+    if (!actionKey) return;
+    UI.showLoading(t('loading_verifying_document', 'Verifying document...'));
     try {
-      await API.post(`/documents/${docId}/verify-document/`, {
+      const result = await API.post(`/documents/${docId}/verify-document/`, {
         application_id: doc.application,
         remarks: ''
       });
-      UI.showToast(`Document #DOC-${docId} verified successfully.`, 'success');
+      applyDocumentDecision(docId, result);
+      renderDocumentDecisionState();
+      const successMessage = result.application_verified
+        ? t('document_review_complete_next_biometrics', 'All current required documents are verified. Biometrics and digital signature are next.')
+        : I18n.format('document_id_verified', 'Document #DOC-{id} verified successfully.', { id: docId });
+      UI.showToast(successMessage, 'success');
       await loadDocumentsData();
     } catch (err) {
       console.error('Verify error:', err);
-      UI.showToast(err.message || 'Failed to verify document.', 'error');
+      applyDecisionConflict(docId, err);
+      UI.showToast(err.message ? I18n.translateError(err.message) : t('msg_verify_document_error', 'Failed to verify document.'), 'error');
     } finally {
+      finishDocumentDecision(actionKey);
       UI.hideLoading();
     }
   }
 
   function openQuickRejectModal(docId) {
-    targetRejectDocId = docId;
-    const doc = allDocuments.find(d => d.document_id === docId);
+    const doc = documentById(docId);
+    if (!doc || doc.verification_status !== 'Pending') {
+      if (doc) UI.showToast(I18n.format('document_already_final', 'This document already has a final {status} decision.', {
+        status: I18n.translateStatus(doc.verification_status)
+      }), 'warning');
+      return;
+    }
+    if (documentActionInFlight.has(String(doc.document_id))) return;
+    targetRejectDocId = doc.document_id;
     const descEl = document.getElementById('quick-reject-target-desc');
     const inputEl = document.getElementById('quick-reject-reason-input');
     inputEl.value = '';
 
     if (doc && descEl) {
-      descEl.textContent = `Rejecting ${doc.document_type} (#DOC-${doc.document_id}) for Application #NP-${doc.application}. Please enter an official reason for rejection.`;
+      descEl.textContent = I18n.format(
+        'rejecting_document_description',
+        'Rejecting {type} (#DOC-{docId}) for Application #NP-{appId}. Please enter an official reason for rejection.',
+        { type: I18n.translateDocType(doc.document_type), docId: doc.document_id, appId: doc.application }
+      );
     }
     UI.openModal('quick-reject-modal');
   }
@@ -945,83 +1145,54 @@
     if (!targetRejectDocId) return;
     const reason = document.getElementById('quick-reject-reason-input').value.trim();
     if (!reason) {
-      UI.showToast('Rejection reason is required.', 'error');
+      UI.showToast(t('msg_rejection_required', 'Rejection reason is required.'), 'error');
       document.getElementById('quick-reject-reason-input').focus();
       return;
     }
 
-    const doc = allDocuments.find(d => d.document_id === targetRejectDocId);
-    UI.showLoading('Rejecting document...');
+    const doc = documentById(targetRejectDocId);
+    const actionKey = beginDocumentDecision(doc);
+    if (!actionKey) {
+      UI.closeModal('quick-reject-modal');
+      return;
+    }
+    const confirmButton = document.getElementById('quick-reject-confirm-button');
+    if (confirmButton) confirmButton.disabled = true;
+    UI.showLoading(t('loading_rejecting_document', 'Rejecting document...'));
     try {
-      await API.post(`/documents/${targetRejectDocId}/reject-document/`, {
+      const result = await API.post(`/documents/${targetRejectDocId}/reject-document/`, {
         application_id: doc ? doc.application : undefined,
         reason: reason
       });
-      UI.showToast(`Document #DOC-${targetRejectDocId} rejected.`, 'info');
+      applyDocumentDecision(targetRejectDocId, result);
+      renderDocumentDecisionState();
+      UI.showToast(I18n.format('document_id_rejected', 'Document #DOC-{id} rejected.', { id: targetRejectDocId }), 'info');
       UI.closeModal('quick-reject-modal');
       await loadDocumentsData();
     } catch (err) {
       console.error('Reject error:', err);
-      UI.showToast(err.message || 'Failed to update document status.', 'error');
+      applyDecisionConflict(targetRejectDocId, err);
+      UI.showToast(err.message ? I18n.translateError(err.message) : t('msg_update_document_failed', 'Failed to update document status.'), 'error');
     } finally {
+      finishDocumentDecision(actionKey);
+      if (confirmButton) confirmButton.disabled = false;
       UI.hideLoading();
     }
   }
 
   // ==================== APPLICATION DECISION HANDLERS ====================
 
-  async function handleApproveApplication() {
-    if (!currentSelectedAppId) return;
-    const app = allApplications.find(a => a.application_id === currentSelectedAppId);
-    if (!app) return;
-
-    UI.showLoading(`Approving Application #NP-${app.application_id}...`);
-    try {
-      await API.patch(`/applications/${app.application_id}/`, {
-        status: 'Approved',
-        processing_notes: 'All mandatory credentials (Passport Photo & Identity) visually inspected and verified.'
-      });
-      UI.showToast(`Application #NP-${app.application_id} approved successfully! Payment fee unlocked for applicant.`, 'success');
-      await loadDocumentsData();
-    } catch (err) {
-      console.error('Approve application error:', err);
-      UI.showToast(err.message || 'Failed to approve application. Ensure all documents are verified.', 'error');
-    } finally {
-      UI.hideLoading();
-    }
-  }
-
   async function handleMarkUnderReview() {
     if (!currentSelectedAppId) return;
-    UI.showLoading(`Updating application status...`);
+    UI.showLoading(t('updating_application_status_short', 'Updating application status...'));
     try {
       await API.patch(`/applications/${currentSelectedAppId}/`, {
         status: 'Under Review'
       });
-      UI.showToast(`Application marked Under Review.`, 'info');
+      UI.showToast(t('application_marked_under_review', 'Application marked Under Review.'), 'info');
       await loadDocumentsData();
     } catch (err) {
-      UI.showToast(err.message || 'Failed to update application.', 'error');
-    } finally {
-      UI.hideLoading();
-    }
-  }
-
-  async function handleRejectApplication() {
-    if (!currentSelectedAppId) return;
-    const reason = prompt('Please enter the official reason for rejecting this passport application:');
-    if (!reason || !reason.trim()) return;
-
-    UI.showLoading(`Rejecting Application #NP-${currentSelectedAppId}...`);
-    try {
-      await API.patch(`/applications/${currentSelectedAppId}/`, {
-        status: 'Rejected',
-        processing_notes: reason.trim()
-      });
-      UI.showToast(`Application marked as Rejected.`, 'info');
-      await loadDocumentsData();
-    } catch (err) {
-      UI.showToast(err.message || 'Failed to reject application.', 'error');
+      UI.showToast(err.message ? I18n.translateError(err.message) : t('msg_update_application_failed', 'Failed to update application.'), 'error');
     } finally {
       UI.hideLoading();
     }
@@ -1053,14 +1224,17 @@
 
   function renderTable(docs) {
     const tbody = document.getElementById('documents-table-body');
-    document.getElementById('docs-count-text').textContent = `Showing ${docs.length} of ${allDocuments.length} documents`;
+    document.getElementById('docs-count-text').textContent = I18n.format(
+      'showing_documents', 'Showing {shown} of {total} documents',
+      { shown: docs.length, total: allDocuments.length }
+    );
 
     if (!docs.length) {
       tbody.innerHTML = `
         <tr>
           <td colspan="8" class="text-center py-xl text-muted">
             <span class="material-symbols-outlined" style="font-size:3rem;">search_off</span>
-            <p class="mt-sm mb-0">No documents found matching the filters.</p>
+            <p class="mt-sm mb-0">${t('empty_no_matching_documents', 'No documents found matching the filters.')}</p>
           </td>
         </tr>
       `;
@@ -1080,45 +1254,48 @@
 
       const uploadDate = doc.upload_date ? UI.formatDateTime(doc.upload_date) : '--';
       const isInspected = Boolean(doc.is_inspected);
+      const isPending = doc.verification_status === 'Pending';
+      const isBusy = documentActionInFlight.has(String(doc.document_id));
+      const isPaymentVerified = paymentVerifiedForApplication(doc.application);
       const inspectBadge = isInspected
-        ? `<span class="inspected-badge-yes"><span class="material-symbols-outlined" style="font-size:12px;">visibility</span> Inspected</span>`
-        : `<span class="inspected-badge-no"><span class="material-symbols-outlined" style="font-size:12px;">visibility_off</span> Not Inspected</span>`;
+        ? `<span class="inspected-badge-yes"><span class="material-symbols-outlined" style="font-size:12px;">visibility</span> ${t('legacy_inspection', 'Inspected')}</span>`
+        : `<span class="inspected-badge-no"><span class="material-symbols-outlined" style="font-size:12px;">visibility_off</span> ${t('status_not_inspected', 'Not Inspected')}</span>`;
 
       return `
         <tr>
           <td class="font-bold">#DOC-${String(doc.document_id).padStart(4, '0')}</td>
           <td>
-            <a href="javascript:void(0)" onclick="selectAppFromTable(${doc.application})" class="text-primary font-medium" title="Inspect this Application">
+            <a href="javascript:void(0)" onclick="selectAppFromTable(${doc.application})" class="text-primary font-medium" title="${t('title_inspect_application', 'Inspect this Application')}">
               #NP-${String(doc.application).padStart(4, '0')}
             </a>
           </td>
           <td>
-            <span class="badge badge-secondary" style="font-size:0.75rem;">${doc.document_type}</span>
+            <span class="badge badge-secondary" style="font-size:0.75rem;">${esc(I18n.translateDocType(doc.document_type))}</span>
           </td>
-          <td class="text-sm font-medium" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${doc.file_name}">
-            ${doc.file_name || 'Document File'}
+          <td class="text-sm font-medium" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(doc.file_name || '')}">
+            ${esc(doc.file_name || t('label_document_file', 'Document File'))}
           </td>
           <td class="text-xs text-muted">${uploadDate}</td>
           <td>${inspectBadge}</td>
           <td>
             <span class="doc-status-badge ${statusClass}">
               <span class="material-symbols-outlined" style="font-size:0.875rem;">${statusIcon}</span>
-              ${doc.verification_status}
+              ${I18n.translateStatus(doc.verification_status)}
             </span>
           </td>
           <td>
             <div class="flex items-center gap-xs">
-              <button type="button" onclick="openRealDocumentViewer(${doc.document_id})" class="btn btn-sm btn-primary" title="View & Inspect Real File">
-                <span class="material-symbols-outlined" style="font-size:15px;">visibility</span> Inspect
+              <button type="button" onclick="openRealDocumentViewer(${doc.document_id})" class="btn btn-sm btn-primary" title="${t('title_view_inspect_file', 'View & Inspect Real File')}">
+                <span class="material-symbols-outlined" style="font-size:15px;">visibility</span> ${t('btn_inspect', 'Inspect')}
               </button>
-              ${doc.verification_status !== 'Verified' ? `
-                <button type="button" onclick="verifyDocumentDirect(${doc.document_id})" class="btn btn-sm btn-outline text-success" ${!isInspected ? 'disabled title="Must inspect first"' : 'title="Verify"'}>
+              ${isPending ? `
+                <button type="button" onclick="verifyDocumentDirect(${doc.document_id})" class="btn btn-sm btn-outline text-success" ${(!isPaymentVerified || !isInspected || isBusy) ? 'disabled' : ''} title="${!isPaymentVerified ? t('msg_payment_first', 'Payment must be verified first.') : (!isInspected ? t('msg_inspect_before_verify', 'Must inspect first') : t('btn_verify_document', 'Verify'))}">
                   <span class="material-symbols-outlined" style="font-size:15px;">check</span>
                 </button>
-                <button type="button" onclick="openQuickRejectModal(${doc.document_id})" class="btn btn-sm btn-outline text-error" title="Reject">
+                <button type="button" onclick="openQuickRejectModal(${doc.document_id})" class="btn btn-sm btn-outline text-error" title="${!isPaymentVerified ? t('msg_payment_first', 'Payment must be verified first.') : t('btn_reject_document', 'Reject')}" ${(!isPaymentVerified || isBusy) ? 'disabled' : ''}>
                   <span class="material-symbols-outlined" style="font-size:15px;">cancel</span>
                 </button>
-              ` : ''}
+              ` : `<span class="text-xs text-muted font-semibold" title="${t('title_final_decision', 'Final document decisions cannot be changed.')}">${t('status_decision_final', 'Decision final')}</span>`}
             </div>
           </td>
         </tr>
@@ -1131,5 +1308,13 @@
     document.getElementById('app-select-dropdown').value = appId;
     switchViewMode('app');
   }
+
+  window.addEventListener('languageChanged', () => {
+    populateStaffProfile();
+    populateApplicationDropdown();
+    renderSelectedApplication();
+    applyTableFilters();
+    updateViewerDecisionControls();
+  });
 </script>
 {% endblock %}

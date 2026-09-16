@@ -4,7 +4,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="/static/css/staff.css">
-<style>
+<style nonce="{{ csp_nonce }}">
   .staff-workspace-layout { display: flex; min-height: calc(100vh - var(--header-height) - var(--topbar-height) - 160px); }
   .staff-sidebar { width: var(--sidebar-width); background: var(--surface); border-right: 1px solid var(--outline-variant); padding: var(--spacing-lg) var(--spacing-md); display: flex; flex-direction: column; gap: var(--spacing-xs); flex-shrink: 0; }
   @media(max-width:900px){ .staff-sidebar{ display:none; } }
@@ -189,7 +189,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
   let allTokens = [];
   let currentActiveToken = null;
 
@@ -199,13 +199,13 @@
   });
 
   async function loadQueueManagement() {
-    UI.showLoading('Loading queue...');
+    UI.showLoading(t('loading_queue', 'Loading queue...'));
     try {
       const data = await API.get('/queue-tokens/');
       allTokens = Array.isArray(data) ? data : (data.results || []);
       renderAll();
     } catch (err) {
-      UI.showToast('Could not load queue data.', 'error');
+      UI.showToast(t('msg_load_queue_error', 'Could not load queue data.'), 'error');
     } finally {
       UI.hideLoading();
     }
@@ -230,7 +230,7 @@
 
     // Waiting list
     const waitingList = document.getElementById('list-waiting');
-    waitingList.innerHTML = waiting.length === 0 ? '<p class="text-muted text-xs text-center py-md">No waiting tokens</p>' :
+    waitingList.innerHTML = waiting.length === 0 ? `<p class="text-muted text-xs text-center py-md">${t('empty_no_waiting_tokens', 'No waiting tokens')}</p>` :
       waiting.map(t => `<div class="queue-lane waiting flex items-center justify-between">
         <strong>T-${String(t.token_number).padStart(3,'0')}</strong>
         <span class="text-xs text-muted">#NP-${String(t.application).padStart(4,'0')}</span>
@@ -238,7 +238,7 @@
 
     // Called/Serving list
     const servingList = document.getElementById('list-serving');
-    servingList.innerHTML = called.length === 0 ? '<p class="text-muted text-xs text-center py-md">No active tokens</p>' :
+    servingList.innerHTML = called.length === 0 ? `<p class="text-muted text-xs text-center py-md">${t('empty_no_active_tokens', 'No active tokens')}</p>` :
       called.map(t => `<div class="queue-lane ${t.queue_status.toLowerCase()} flex items-center justify-between">
         <strong>T-${String(t.token_number).padStart(3,'0')}</strong>
         ${UI.renderStatusBadge(t.queue_status)}
@@ -261,7 +261,7 @@
         <td><strong class="text-primary">T-${String(t.token_number).padStart(3,'0')}</strong></td>
         <td>#NP-${String(t.application).padStart(4,'0')}</td>
         <td>${t.token_date ? UI.formatDate(t.token_date) : '—'}</td>
-        <td>${t.time_slot || 'Standard'}</td>
+        <td>${t.time_slot || I18n.translateText('Standard')}</td>
         <td>${UI.renderStatusBadge(t.queue_status)}</td>
         <td class="text-xs text-muted">${t.called_time ? UI.formatDateTime(t.called_time) : '—'}</td>
         <td>
@@ -296,7 +296,7 @@
 
   async function callNextToken() {
     const next = allTokens.find(t => t.queue_status === 'Waiting');
-    if (!next) { UI.showToast('No citizens waiting in queue.', 'info'); return; }
+    if (!next) { UI.showToast(t('msg_no_queue_citizens', 'No citizens waiting in queue.'), 'info'); return; }
     await updateToken(next.token_id, 'Called');
   }
 
@@ -308,13 +308,12 @@
   async function updateToken(tokenId, status) {
     try {
       await API.patch(`/queue-tokens/${tokenId}/`, {
-        queue_status: status,
-        ...(status === 'Called' ? { called_time: new Date().toISOString() } : {})
+        queue_status: status
       });
-      UI.showToast(`Token marked as ${status}.`, 'success');
+      UI.showToast(I18n.format('token_marked_status', 'Token marked as {status}.', { status: I18n.translateStatus(status) }), 'success');
       loadQueueManagement();
     } catch (err) {
-      UI.showToast(err.message || 'Could not update token.', 'error');
+      UI.showToast(err.message ? I18n.translateError(err.message) : t('msg_update_token_failed', 'Could not update token.'), 'error');
     }
   }
 </script>

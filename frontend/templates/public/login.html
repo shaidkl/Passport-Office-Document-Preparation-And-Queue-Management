@@ -1,145 +1,249 @@
 {% extends "base.html" %}
 
-{% block title %}Sign In — Nepal Passport Portal{% endblock %}
+{% block title %}{% if portal_role == 'staff' %}Staff Sign In{% elif portal_role == 'administrator' %}Administrator Sign In{% else %}Citizen Sign In{% endif %} — Nepal Passport Portal{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="/static/css/public.css">
+<link rel="stylesheet" href="/static/css/public.css?v=20260914-2">
 {% endblock %}
 
 {% block content %}
-<div class="auth-page-wrapper">
-  <div class="auth-card">
-    
-    <!-- Branding Header -->
-    <div class="auth-header">
+<div class="auth-page-wrapper portal-auth-page">
+  <div class="auth-card auth-card--{{ portal_role|default:'citizen' }}" id="login-card" data-portal-role="{{ portal_role|default:'citizen' }}">
+    <nav class="portal-login-switcher" aria-label="Choose sign-in portal" data-i18n-aria-label="login_choose_portal">
+      <a href="/login/" class="portal-login-option {% if portal_role == 'citizen' %}active{% endif %}" {% if portal_role == 'citizen' %}aria-current="page"{% endif %}>
+        <span class="material-symbols-outlined">person</span>
+        <span data-i18n="portal_citizen">Citizen Portal</span>
+      </a>
+      <a href="/staff/login/" class="portal-login-option {% if portal_role == 'staff' %}active{% endif %}" {% if portal_role == 'staff' %}aria-current="page"{% endif %}>
+        <span class="material-symbols-outlined">badge</span>
+        <span data-i18n="portal_staff">Staff Portal</span>
+      </a>
+      <a href="/admin-portal/login/" class="portal-login-option {% if portal_role == 'administrator' %}active{% endif %}" {% if portal_role == 'administrator' %}aria-current="page"{% endif %}>
+        <span class="material-symbols-outlined">admin_panel_settings</span>
+        <span data-i18n="portal_admin">Admin Portal</span>
+      </a>
+    </nav>
+
+    <header class="auth-header portal-auth-header">
       <div class="auth-header-icon">
-        <span class="material-symbols-outlined" style="font-size: 32px;">account_balance</span>
+        {% if portal_role == 'staff' %}
+          <span class="material-symbols-outlined">badge</span>
+        {% elif portal_role == 'administrator' %}
+          <span class="material-symbols-outlined">shield_person</span>
+        {% else %}
+          <span class="material-symbols-outlined">person</span>
+        {% endif %}
       </div>
-      <h1 class="auth-title" data-i18n="signin_title">Sign In</h1>
-      <p class="auth-subtitle" data-i18n="signin_subtitle">Citizen &amp; Administrative Unified Access</p>
-    </div>
+      {% if portal_role == 'staff' %}
+        <h1 class="auth-title" data-i18n="staff_login_title">Staff Sign In</h1>
+        <p class="auth-subtitle" data-i18n="staff_login_subtitle">Review applications, verify documents, and manage the service queue.</p>
+      {% elif portal_role == 'administrator' %}
+        <h1 class="auth-title" data-i18n="admin_login_title">Administrator Sign In</h1>
+        <p class="auth-subtitle" data-i18n="admin_login_subtitle">Manage personnel, reports, payments, and system oversight.</p>
+      {% else %}
+        <h1 class="auth-title" data-i18n="citizen_login_title">Citizen Sign In</h1>
+        <p class="auth-subtitle" data-i18n="citizen_login_subtitle">Apply, upload documents, and track your passport application.</p>
+      {% endif %}
+    </header>
 
-    <!-- Alert Container -->
-    <div id="login-alert" class="alert alert-danger" style="display: none;"></div>
+    <div id="login-alert" class="alert alert-danger" role="alert" aria-live="polite" style="display: none;"></div>
 
-    <!-- Login Form -->
+    <section id="mfa-panel" aria-labelledby="mfa-title" style="display: none;">
+      <h2 id="mfa-title" class="auth-title" data-i18n="mfa_title">Verify your identity</h2>
+      <p class="auth-subtitle" data-i18n="mfa_description">Enter the six-digit code sent to your registered personnel email.</p>
+      <form id="mfa-form" onsubmit="handleMfaSubmit(event)">
+        <div class="form-group">
+          <label class="form-label" for="mfa-code" data-i18n="mfa_code_label">Verification code</label>
+          <input id="mfa-code" class="form-control" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required>
+        </div>
+        <button type="submit" id="mfa-submit-btn" class="btn btn-primary btn-block btn-lg portal-login-submit">
+          <span class="material-symbols-outlined">verified_user</span>
+          <span id="mfa-btn-text" data-i18n="mfa_verify_button">Verify and sign in</span>
+        </button>
+      </form>
+    </section>
+
     <form id="login-form" onsubmit="handleLoginSubmit(event)">
-      
-      <!-- Email / Username Identifier -->
       <div class="form-group">
         <label class="form-label" for="login-email">
           <span data-i18n="login_identifier_label">Email Address or Username</span> <span class="required">*</span>
         </label>
-        <div style="position: relative;">
-          <input 
-            type="text" 
-            id="login-email" 
-            class="form-control" 
-            placeholder="e.g. citizen@example.com or officer_username" 
-            data-i18n-placeholder="login_identifier_placeholder"
-            required 
-            autocomplete="username"
-            autofocus
-          >
-        </div>
+        <input
+          type="text"
+          id="login-email"
+          class="form-control"
+          placeholder="e.g. citizen@example.com or officer_username"
+          data-i18n-placeholder="login_identifier_placeholder"
+          required
+          autocomplete="username"
+          autofocus
+        >
       </div>
 
-      <!-- Password -->
       <div class="form-group">
         <div class="flex justify-between items-center mb-xs">
           <label class="form-label m-0" for="login-password">
             <span data-i18n="password_label">Password</span> <span class="required">*</span>
           </label>
-          <a href="#" onclick="UI.showToast((typeof I18n !== 'undefined' && I18n.currentLang === 'ne') ? 'कृपया सहायताको लागि १६६०-०१-००१२३ मा सम्पर्क गर्नुहोस्।' : 'Please contact office helpline 1660-01-00123 for credential assistance.', 'info')" class="text-xs text-primary font-medium hover:underline" data-i18n="forgot_password">Forgot password?</a>
+          <a href="#" onclick="showCredentialHelp(event)" class="text-xs text-primary font-medium hover:underline" data-i18n="forgot_password">Forgot password?</a>
         </div>
-        <div style="position: relative;">
-          <input 
-            type="password" 
-            id="login-password" 
-            class="form-control" 
-            placeholder="Enter your account password" 
+        <div class="password-input-wrap">
+          <input
+            type="password"
+            id="login-password"
+            class="form-control"
+            placeholder="Enter your account password"
             data-i18n-placeholder="password_placeholder"
             required
             autocomplete="current-password"
           >
-          <button 
-            type="button" 
+          <button
+            type="button"
+            class="password-visibility-button"
             onclick="togglePasswordVisibility('login-password', this)"
-            style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--outline); cursor: pointer;"
-            title="Toggle password visibility"
+            title="Show or hide password"
+            data-i18n-title="register_toggle_password"
+            aria-label="Show or hide password"
+            data-i18n-aria-label="register_toggle_password"
           >
-            <span class="material-symbols-outlined" style="font-size: 18px;">visibility</span>
+            <span class="material-symbols-outlined">visibility</span>
           </button>
         </div>
       </div>
 
-      <!-- Remember device & Portal hint -->
-      <div class="flex justify-between items-center mb-md">
-        <label class="flex items-center gap-xs text-sm text-muted" style="cursor: pointer;">
-          <input type="checkbox" id="remember-me" checked>
-          <span data-i18n="remember_me">Remember me on this device</span>
-        </label>
-      </div>
+      <label class="login-remember-row">
+        <input type="checkbox" id="remember-me" checked>
+        <span data-i18n="remember_me">Remember me on this device</span>
+      </label>
 
-      <!-- Submit Button -->
-      <button type="submit" id="login-submit-btn" class="btn btn-primary btn-block btn-lg mb-sm">
+      <button type="submit" id="login-submit-btn" class="btn btn-primary btn-block btn-lg portal-login-submit">
         <span class="material-symbols-outlined">login</span>
-        <span id="login-btn-text" data-i18n="signin_btn">Sign In to Account</span>
+        {% if portal_role == 'staff' %}
+          <span id="login-btn-text" data-i18n="staff_login_button">Enter Staff Portal</span>
+        {% elif portal_role == 'administrator' %}
+          <span id="login-btn-text" data-i18n="admin_login_button">Enter Admin Portal</span>
+        {% else %}
+          <span id="login-btn-text" data-i18n="citizen_login_button">Enter Citizen Portal</span>
+        {% endif %}
       </button>
 
-      <!-- Citizen Registration CTA -->
-      <div class="mt-lg pt-md text-center" style="border-top: 1px solid var(--outline-variant);">
-        <p class="text-sm text-muted m-0">
-          <span data-i18n="no_account_yet">Don't have a citizen account yet?</span>
-          <a href="/register/" class="font-bold text-primary hover:underline" data-i18n="nav_register">Register here</a>
-        </p>
-      </div>
-
+      {% if portal_role == 'citizen' %}
+        <div class="portal-login-footer">
+          <p class="text-sm text-muted m-0">
+            <span data-i18n="no_account_yet">Don't have a citizen account yet?</span>
+            <a href="/register/" class="font-bold text-primary hover:underline" data-i18n="nav_register">Register here</a>
+          </p>
+        </div>
+      {% else %}
+        <div class="portal-login-footer personnel-login-footer">
+          <p class="personnel-access-note">
+            <span class="material-symbols-outlined" aria-hidden="true">lock</span>
+            <span data-i18n="login_personnel_note">Personnel accounts are issued by an authorized administrator.</span>
+          </p>
+          <a href="/login/" class="citizen-login-link">
+            <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
+            <span data-i18n="login_use_citizen">Citizen account? Use Citizen Sign In</span>
+          </a>
+        </div>
+      {% endif %}
     </form>
   </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
-<script>
-  // Check URL query parameters (e.g. ?msg=session_expired or ?msg=logged_out)
+<script nonce="{{ csp_nonce }}">
+  const loginCard = document.getElementById('login-card');
+  const expectedPortalRole = loginCard.dataset.portalRole;
+  const loginButtonKeys = {
+    citizen: ['citizen_login_button', 'Enter Citizen Portal'],
+    staff: ['staff_login_button', 'Enter Staff Portal'],
+    administrator: ['admin_login_button', 'Enter Admin Portal'],
+  };
+  const portalDestinations = {
+    citizen: '/applicant/dashboard/',
+    applicant: '/applicant/dashboard/',
+    staff: '/staff/dashboard/',
+    administrator: '/admin-portal/dashboard/',
+  };
+  let loginIsSubmitting = false;
+  let mfaChallengeId = null;
+
+  function translate(key, fallback) {
+    return (typeof I18n !== 'undefined') ? I18n.t(key, fallback) : fallback;
+  }
+
+  function normalizedRole(role) {
+    return role === 'applicant' ? 'citizen' : role;
+  }
+
+  function restoreLoginButton() {
+    if (loginIsSubmitting) return;
+    const [key, fallback] = loginButtonKeys[expectedPortalRole] || loginButtonKeys.citizen;
+    document.getElementById('login-btn-text').textContent = translate(key, fallback);
+  }
+
+  function safeNextDestination(nextUrl, role) {
+    if (!nextUrl || !nextUrl.startsWith('/') || nextUrl.startsWith('//')) return null;
+    const allowedPrefix = role === 'staff'
+      ? '/staff/'
+      : role === 'administrator'
+        ? '/admin-portal/'
+        : '/applicant/';
+    return nextUrl.startsWith(allowedPrefix) ? nextUrl : null;
+  }
+
+  function finishLogin(response) {
+    const responseRole = normalizedRole(response.role);
+    if (responseRole !== expectedPortalRole) {
+      Auth.logout(false);
+      throw new Error(translate('login_wrong_portal', 'These credentials do not belong to this portal. Choose the correct sign-in portal.'));
+    }
+    const welcomeName = response.name || translate('portal_user', 'User');
+    UI.showToast(translate('login_welcome', 'Welcome back, {name}!').replace('{name}', welcomeName), 'success');
+    const requestedNext = new URLSearchParams(window.location.search).get('next');
+    const destination = safeNextDestination(requestedNext, responseRole) || portalDestinations[responseRole];
+    setTimeout(() => { window.location.href = destination; }, 350);
+  }
+
+  function showCredentialHelp(event) {
+    event.preventDefault();
+    UI.showToast(
+      translate('credential_help', 'Please contact office helpline 1660-01-00123 for credential assistance.'),
+      'info'
+    );
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     const urlParams = new URLSearchParams(window.location.search);
     const msg = urlParams.get('msg');
-    const isNe = (typeof I18n !== 'undefined' && I18n.currentLang === 'ne');
+    const alertBox = document.getElementById('login-alert');
+
     if (msg === 'session_expired') {
-      const alertBox = document.getElementById('login-alert');
-      alertBox.textContent = isNe ? 'तपाईंको सत्र समाप्त भएको छ। कृपया पुनः लग-इन गर्नुहोस्।' : 'Your session has expired. Please sign in again.';
+      alertBox.textContent = translate('session_expired_msg', 'Your session has expired. Please sign in again.');
       alertBox.style.display = 'flex';
     } else if (msg === 'logged_out') {
-      UI.showToast(isNe ? 'तपाईं सुरक्षित रूपमा लग-आउट हुनुभएको छ।' : 'You have been signed out safely.', 'info');
+      UI.showToast(translate('logged_out_msg', 'You have been signed out safely.'), 'info');
     } else if (msg === 'registered') {
-      UI.showToast(isNe ? 'नागरिक खाता सफलतापूर्वक तयार भयो! कृपया आफ्नो विवरणबाट लग-इन गर्नुहोस्।' : 'Account created successfully! Please sign in with your credentials.', 'success');
+      alertBox.className = 'alert alert-success';
+      alertBox.textContent = translate('registration_success_login', 'Registration successful. You can now sign in.');
+      alertBox.style.display = 'flex';
     }
 
-    // If user is already logged in, redirect them to their portal
     if (Auth.isAuthenticated()) {
-      const role = Auth.getRole();
-      if (role === 'citizen' || role === 'applicant') {
-        window.location.href = '/applicant/dashboard/';
-      } else if (role === 'staff') {
-        window.location.href = '/staff/dashboard/';
-      } else if (role === 'administrator') {
-        window.location.href = '/admin-portal/dashboard/';
-      }
+      const destination = portalDestinations[Auth.getRole()];
+      if (destination) window.location.href = destination;
     }
   });
 
-  function togglePasswordVisibility(inputId, btn) {
+  window.addEventListener('languageChanged', restoreLoginButton);
+
+  function togglePasswordVisibility(inputId, button) {
     const input = document.getElementById(inputId);
-    const icon = btn.querySelector('.material-symbols-outlined');
-    if (input.type === 'password') {
-      input.type = 'text';
-      icon.textContent = 'visibility_off';
-    } else {
-      input.type = 'password';
-      icon.textContent = 'visibility';
-    }
+    const icon = button.querySelector('.material-symbols-outlined');
+    const showPassword = input.type === 'password';
+    input.type = showPassword ? 'text' : 'password';
+    icon.textContent = showPassword ? 'visibility_off' : 'visibility';
   }
 
   async function handleLoginSubmit(event) {
@@ -149,53 +253,77 @@
     const alertBox = document.getElementById('login-alert');
     const submitBtn = document.getElementById('login-submit-btn');
     const btnText = document.getElementById('login-btn-text');
-    const isNe = (typeof I18n !== 'undefined' && I18n.currentLang === 'ne');
-
-    alertBox.style.display = 'none';
-    const email = emailInput.value.trim();
+    const identifier = emailInput.value.trim();
     const password = passwordInput.value;
 
-    if (!email || !password) {
-      alertBox.textContent = isNe ? 'कृपया आफ्नो इमेल/प्रयोगकर्ता नाम र पासवर्ड दुबै प्रविष्ट गर्नुहोस्।' : 'Please enter both your email address and password.';
+    alertBox.style.display = 'none';
+    if (!identifier || !password) {
+      alertBox.textContent = translate('login_required_fields', 'Please enter both your email address or username and password.');
       alertBox.style.display = 'flex';
       return;
     }
 
-    // Button loading state
+    loginIsSubmitting = true;
     submitBtn.disabled = true;
-    btnText.textContent = isNe ? 'प्रवेश हुँदैछ...' : 'Signing in...';
+    btnText.textContent = translate('login_signing_in', 'Signing in...');
 
     try {
-      const res = await Auth.login(email, password);
-      const welcomeName = res.name || (isNe ? 'नागरिक' : 'Citizen');
-      UI.showToast(isNe ? `स्वागत छ, ${welcomeName}!` : `Welcome back, ${welcomeName}!`, 'success');
+      const rememberMe = document.getElementById('remember-me').checked;
+      const response = await Auth.login(identifier, password, expectedPortalRole, rememberMe);
+      if (response.mfa_required) {
+        mfaChallengeId = response.challenge_id;
+        document.getElementById('login-form').style.display = 'none';
+        document.getElementById('mfa-panel').style.display = 'block';
+        document.getElementById('mfa-code').focus();
+        alertBox.className = 'alert alert-info';
+        alertBox.textContent = translate('mfa_code_sent', 'A verification code was sent to your registered email address.');
+        alertBox.style.display = 'flex';
+        loginIsSubmitting = false;
+        submitBtn.disabled = false;
+        restoreLoginButton();
+        return;
+      }
+      finishLogin(response);
+    } catch (error) {
+      console.error('Login error:', error);
+      const wrongPortal = error.data && error.data.code === 'wrong_portal';
+      alertBox.textContent = wrongPortal
+        ? translate('login_wrong_portal', 'These credentials do not belong to this portal. Choose the correct sign-in portal.')
+        : ((typeof I18n !== 'undefined' && I18n.translateError) ? I18n.translateError(error.message) : error.message);
+      alertBox.style.display = 'flex';
+      loginIsSubmitting = false;
+      submitBtn.disabled = false;
+      restoreLoginButton();
+    }
+  }
 
-      // Check next param
-      const urlParams = new URLSearchParams(window.location.search);
-      const nextUrl = urlParams.get('next');
-
-      setTimeout(() => {
-        if (nextUrl && nextUrl.startsWith('/')) {
-          window.location.href = nextUrl;
-        } else {
-          // Route according to real backend role
-          if (res.role === 'staff') {
-            window.location.href = '/staff/dashboard/';
-          } else if (res.role === 'administrator') {
-            window.location.href = '/admin-portal/dashboard/';
-          } else {
-            window.location.href = '/applicant/dashboard/';
-          }
-        }
-      }, 500);
-
-    } catch (err) {
-      console.error('Login error:', err);
-      const errMsg = (typeof I18n !== 'undefined' && I18n.translateError) ? I18n.translateError(err.message) : err.message;
-      alertBox.textContent = errMsg || (isNe ? 'अमान्य इमेल वा पासवर्ड। कृपया पुनः प्रयास गर्नुहोस्।' : 'Invalid email or password. Please try again.');
+  async function handleMfaSubmit(event) {
+    event.preventDefault();
+    const codeInput = document.getElementById('mfa-code');
+    const alertBox = document.getElementById('login-alert');
+    const submitBtn = document.getElementById('mfa-submit-btn');
+    const buttonText = document.getElementById('mfa-btn-text');
+    const code = codeInput.value.trim();
+    if (!/^\d{6}$/.test(code) || !mfaChallengeId) {
+      alertBox.className = 'alert alert-danger';
+      alertBox.textContent = translate('mfa_invalid_code', 'Enter the six-digit verification code.');
+      alertBox.style.display = 'flex';
+      return;
+    }
+    submitBtn.disabled = true;
+    buttonText.textContent = translate('mfa_verifying', 'Verifying...');
+    try {
+      const response = await Auth.completeMfa(mfaChallengeId, code);
+      finishLogin(response);
+    } catch (error) {
+      alertBox.className = 'alert alert-danger';
+      alertBox.textContent = (typeof I18n !== 'undefined' && I18n.translateError)
+        ? I18n.translateError(error.message)
+        : error.message;
       alertBox.style.display = 'flex';
       submitBtn.disabled = false;
-      btnText.textContent = isNe ? 'खातामा प्रवेश गर्नुहोस्' : 'Sign In to Account';
+      buttonText.textContent = translate('mfa_verify_button', 'Verify and sign in');
+      codeInput.select();
     }
   }
 </script>

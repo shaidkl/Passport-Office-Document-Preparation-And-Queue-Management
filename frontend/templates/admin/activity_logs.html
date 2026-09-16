@@ -4,7 +4,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="/static/css/admin.css">
-<style>
+<style nonce="{{ csp_nonce }}">
   .admin-layout { display: flex; min-height: calc(100vh - var(--header-height) - var(--topbar-height) - 160px); }
   .admin-sidebar { width: var(--sidebar-width); background: var(--surface-container-low); border-right: 1px solid var(--outline-variant); padding: var(--spacing-lg) var(--spacing-md); display: flex; flex-direction: column; gap: var(--spacing-xs); flex-shrink: 0; }
   @media(max-width:900px){ .admin-sidebar{ display:none; } }
@@ -55,10 +55,7 @@
         <p class="text-sm text-muted m-0" data-i18n="admin_logs_subtitle">Permanent, chronological audit logs of administrative actions, status transitions, and security events.</p>
       </div>
       <div class="flex items-center gap-sm">
-        <button type="button" onclick="openCreateLogModal()" class="btn btn-primary">
-          <span class="material-symbols-outlined">add_circle</span> <span data-i18n="admin_record_manual_note">Record Manual Audit Note</span>
-        </button>
-        <button type="button" onclick="loadLogsData()" class="btn btn-outline" title="Refresh Logs">
+        <button type="button" onclick="loadLogsData()" class="btn btn-outline" title="Refresh Logs" data-i18n-title="title_refresh_logs">
           <span class="material-symbols-outlined">refresh</span>
         </button>
       </div>
@@ -121,36 +118,11 @@
   </main>
 </div>
 
-<!-- Record Manual Log Modal -->
-<div id="create-log-modal" class="modal-backdrop" style="display: none;">
-  <div class="modal-container" style="max-width: 500px;">
-    <div class="modal-header">
-      <h3 class="modal-title flex items-center gap-sm">
-        <span class="material-symbols-outlined text-primary">edit_note</span>
-        <span data-i18n="admin_record_manual_note">Record Audit Log Entry</span>
-      </h3>
-      <button type="button" onclick="UI.closeModal('create-log-modal')" class="modal-close-btn">&times;</button>
-    </div>
-    <form id="create-log-form" onsubmit="handleCreateLog(event)">
-      <div class="modal-body">
-        <div class="form-group">
-          <label class="form-label" for="log-action-text"><span data-i18n="label_details">Action Description</span> <span class="required">*</span></label>
-          <textarea id="log-action-text" class="form-control" rows="3" placeholder="e.g. Conducted weekly passport verification queue audit and reviewed server load." required></textarea>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" onclick="UI.closeModal('create-log-modal')" class="btn btn-outline" data-i18n="btn_cancel">Cancel</button>
-        <button type="submit" id="btn-save-log" class="btn btn-primary">
-          <span class="material-symbols-outlined">save</span> <span data-i18n="btn_save">Record Entry</span>
-        </button>
-      </div>
-    </form>
-  </div>
-</div>
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ csp_nonce }}">
+  const esc = value => UI.escapeHtml(value);
   let allLogs = [];
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -166,7 +138,7 @@
   });
 
   async function loadLogsData() {
-    UI.showLoading('Loading activity audit trail...');
+    UI.showLoading(t('loading_activity_logs', 'Loading activity audit trail...'));
     try {
       const logsRes = await API.get('/activity-logs/');
       allLogs = Array.isArray(logsRes) ? logsRes : (logsRes.results || []);
@@ -178,9 +150,9 @@
       filterLogs();
     } catch (err) {
       console.error('Logs fetch error:', err);
-      UI.showToast(err.message || 'Could not load audit logs.', 'error');
+      UI.showToast(err.message ? I18n.translateError(err.message) : t('msg_load_audit_failed', 'Could not load audit logs.'), 'error');
       document.getElementById('logs-table-body').innerHTML = `
-        <tr><td colspan="4" class="text-center text-error py-lg">Error loading logs: ${err.message}</td></tr>
+        <tr><td colspan="4" class="text-center text-error py-lg">${esc(I18n.format('error_loading_logs', 'Error loading logs: {error}', { error: I18n.translateError(err.message) }))}</td></tr>
       `;
     } finally {
       UI.hideLoading();
@@ -216,7 +188,11 @@
 
   function renderLogsTable(logs) {
     const tbody = document.getElementById('logs-table-body');
-    document.getElementById('logs-count-text').textContent = `Showing ${logs.length} of ${allLogs.length} audit entries`;
+    document.getElementById('logs-count-text').textContent = I18n.format(
+      'showing_audit_entries',
+      'Showing {shown} of {total} audit entries',
+      { shown: logs.length, total: allLogs.length }
+    );
 
     if (!logs.length) {
       tbody.innerHTML = `
@@ -233,17 +209,20 @@
 
     tbody.innerHTML = logs.map(l => {
       const timeStr = l.timestamp ? UI.formatDateTime(l.timestamp) : '--';
+      const actorLabel = l.administrator
+        ? `Admin #ADM-${String(l.administrator).padStart(3, '0')}`
+        : t('label_system_actor', 'System Workflow');
       return `
         <tr>
           <td class="font-bold text-primary">#LOG-${String(l.log_id).padStart(4, '0')}</td>
           <td>
             <div class="flex items-center gap-xs">
               <span class="material-symbols-outlined text-muted" style="font-size:1rem;">admin_panel_settings</span>
-              <span class="text-xs font-semibold">Admin #ADM-${l.administrator}</span>
+              <span class="text-xs font-semibold">${esc(actorLabel)}</span>
             </div>
           </td>
           <td class="text-sm font-medium" style="max-width:450px;">
-            ${l.action_taken}
+            ${esc(l.action_taken)}
           </td>
           <td class="text-xs text-muted font-mono">${timeStr}</td>
         </tr>
@@ -259,39 +238,5 @@
     filterLogs();
   });
 
-  function openCreateLogModal() {
-    document.getElementById('create-log-form').reset();
-    UI.openModal('create-log-modal');
-  }
-
-  async function handleCreateLog(event) {
-    event.preventDefault();
-    const actionText = document.getElementById('log-action-text').value.trim();
-    if (!actionText) return;
-
-    const currentUser = Auth.getUser();
-    const adminId = currentUser ? (currentUser.user_id || currentUser.id) : 1;
-    const submitBtn = document.getElementById('btn-save-log');
-
-    submitBtn.disabled = true;
-    UI.showLoading('Recording audit log entry...');
-
-    try {
-      await API.post('/activity-logs/', {
-        administrator: adminId,
-        action_taken: actionText
-      });
-
-      UI.showToast('Audit entry recorded.', 'success');
-      UI.closeModal('create-log-modal');
-      await loadLogsData();
-    } catch (err) {
-      console.error('Create log error:', err);
-      UI.showToast(err.message || 'Could not record log entry.', 'error');
-    } finally {
-      submitBtn.disabled = false;
-      UI.hideLoading();
-    }
-  }
 </script>
 {% endblock %}

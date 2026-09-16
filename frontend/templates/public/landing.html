@@ -1,531 +1,174 @@
 {% extends "base.html" %}
 
-{% block title %}Nepal Passport Office — Official Application & Queue Management Portal{% endblock %}
+{% block title %}Nepal Passport Office — Official Application Portal{% endblock %}
+{% block body_class %}landing-page{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="/static/css/public.css">
+<link rel="stylesheet" href="/static/css/public.css?v=20260914-4">
 {% endblock %}
 
 {% block content %}
-<!-- 1. Hero Section -->
-<section class="hero-section">
-  <div class="hero-pattern"></div>
-  <div class="container relative" style="z-index: 2;">
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-xl items-center">
-      
-      <!-- Left Column: Headline & CTA -->
-      <div>
-        <div class="hero-badge">
-          <span class="material-symbols-outlined" style="font-size: 14px; color: var(--secondary);">verified</span>
-          <span data-i18n="hero_badge">Official Government of Nepal Portal</span>
-        </div>
-        
-        <h1 class="hero-title">
-          <span data-i18n="hero_title_1">Passport Application &amp;</span><br>
-          <span style="color: var(--secondary);" data-i18n="hero_title_2">Queue Management</span>
-        </h1>
-        
-        <p class="hero-desc" data-i18n="hero_desc">
-          Apply online, complete seamless digital verification, and access your verified <strong>Virtual e-Passport</strong> directly on your device. Instant, secure, and 100% paperless passport services for all Nepali citizens.
-        </p>
-
-        <div class="flex flex-wrap gap-md mb-lg">
-          <a href="/applicant/apply/" class="btn btn-primary btn-lg">
-            <span class="material-symbols-outlined">badge</span>
-            <span data-i18n="btn_apply_now">Apply for Digital Passport</span>
-          </a>
-          <a href="/track/" class="btn btn-outline btn-lg">
-            <span class="material-symbols-outlined">search</span>
-            <span data-i18n="btn_track_status">Track Status</span>
-          </a>
-        </div>
-
-        <!-- Quick Track Box (Stitch Design) -->
-        <div class="hero-track-box">
-          <label class="form-label" style="margin-bottom: 4px; font-size: 0.8125rem;">
-            <span class="material-symbols-outlined text-primary" style="font-size: 16px; vertical-align: text-bottom;">qr_code_scanner</span>
-            <span data-i18n="quick_lookup_title">Quick Application Status Lookup</span>
-          </label>
-          <form onsubmit="handleQuickTrack(event)" class="track-input-group">
-            <input type="text" id="quick-track-id" placeholder="Enter Application ID (e.g. 1)" data-i18n-placeholder="quick_lookup_placeholder" required>
-            <button type="submit" title="Search application status" data-i18n-title="btn_track_status">
-              <span class="material-symbols-outlined">search</span>
-            </button>
-          </form>
-        </div>
+<section class="simple-hero">
+  <div class="simple-hero-pattern" aria-hidden="true"></div>
+  <div class="container simple-hero-grid">
+    <div class="simple-hero-copy">
+      <div class="hero-badge">
+        <span class="material-symbols-outlined" aria-hidden="true">verified</span>
+        <span data-i18n="hero_badge">Official Government of Nepal Portal</span>
       </div>
 
-      <!-- Right Column: Visual Showcase -->
-      <div class="flex justify-center">
-        <div class="card" style="width: 100%; max-width: 460px; background: linear-gradient(145deg, #ffffff 0%, var(--surface-container-low) 100%); border: 1px solid var(--outline-variant); padding: var(--spacing-xl);">
-          
-          <div class="flex items-center justify-between pb-md mb-md" style="border-bottom: 1px solid var(--outline-variant);">
-            <div class="flex items-center gap-sm">
-              <div style="width: 36px; height: 36px; border-radius: var(--radius-sm); background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center;">
-                <span class="material-symbols-outlined" style="font-size: 20px;">badge</span>
-              </div>
-              <div>
-                <h4 style="font-size: 0.9375rem; margin: 0; color: var(--primary);" data-i18n="showcase_title">Virtual e-Passport Nepal</h4>
-                <span class="text-xs text-muted">ICAO 9303 &amp; QR Validated</span>
-              </div>
-            </div>
-            <span class="badge badge-approved" data-i18n="showcase_badge">100% Digital</span>
-          </div>
+      <h1 class="simple-hero-title" data-i18n="simple_hero_title">Apply your e-passport</h1>
+      <p class="simple-hero-desc" data-i18n="simple_hero_desc">
+        Apply online, submit your documents, and follow every stage from one secure citizen portal.
+      </p>
 
-          <!-- Feature items -->
-          <div class="flex flex-col gap-md">
-            <div class="flex items-start gap-md">
-              <span class="material-symbols-outlined text-primary" style="background: var(--surface-variant); padding: 8px; border-radius: var(--radius-md);">schedule</span>
-              <div>
-                <strong class="text-sm block text-primary" data-i18n="showcase_feat_1_title">Instant Virtual Issuance</strong>
-                <span class="text-xs text-muted" data-i18n="showcase_feat_1_desc">Upon verification, your digital passport is immediately generated and ready in your portal.</span>
-              </div>
-            </div>
-
-            <div class="flex items-start gap-md">
-              <span class="material-symbols-outlined text-primary" style="background: var(--surface-variant); padding: 8px; border-radius: var(--radius-md);">qr_code_2</span>
-              <div>
-                <strong class="text-sm block text-primary" data-i18n="showcase_feat_2_title">Cryptographic QR Verification</strong>
-                <span class="text-xs text-muted" data-i18n="showcase_feat_2_desc">Use and present your virtual passport digitally with real-time verification credentials.</span>
-              </div>
-            </div>
-
-            <div class="flex items-start gap-md">
-              <span class="material-symbols-outlined text-primary" style="background: var(--surface-variant); padding: 8px; border-radius: var(--radius-md);">notifications_active</span>
-              <div>
-                <strong class="text-sm block text-primary" data-i18n="showcase_feat_3_title">Real-Time Digital Queue</strong>
-                <span class="text-xs text-muted" data-i18n="showcase_feat_3_desc">Automated verification updates and instant alerts as your documents are reviewed.</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="mt-lg pt-md flex items-center justify-between" style="border-top: 1px solid var(--outline-variant);">
-            <span class="text-xs text-muted" data-i18n="digital_support">Digital Support:</span>
-            <span class="text-xs font-bold text-primary">1660-01-00123</span>
-          </div>
-        </div>
+      <div class="simple-hero-actions">
+        <a href="/applicant/apply/" class="btn btn-primary btn-lg landing-primary-cta">
+          <span class="material-symbols-outlined" aria-hidden="true">description</span>
+          <span data-i18n="simple_apply_button">Apply for Passport</span>
+        </a>
       </div>
 
-    </div>
-  </div>
-</section>
-
-<!-- 2. Statistics Bar -->
-<section style="background-color: var(--surface); border-bottom: 1px solid var(--outline-variant); padding: var(--spacing-lg) 0;">
-  <div class="container">
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-md text-center">
-      <div class="p-sm">
-        <div class="stat-value text-primary" style="font-size: 2rem;">500K+</div>
-        <div class="stat-label" data-i18n="stat_passports">Virtual Passports Issued</div>
-      </div>
-      <div class="p-sm">
-        <div class="stat-value text-primary" style="font-size: 2rem;">77</div>
-        <div class="stat-label" data-i18n="stat_districts">Districts Supported</div>
-      </div>
-      <div class="p-sm">
-        <div class="stat-value text-secondary" style="font-size: 2rem;">Zero Wait</div>
-        <div class="stat-label" data-i18n="stat_wait">Instant Digital Access</div>
-      </div>
-      <div class="p-sm">
-        <div class="stat-value text-success" style="font-size: 2rem;">100%</div>
-        <div class="stat-label" data-i18n="stat_flow">Paperless Digital Flow</div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- 3. 9-Step Application Process (Stitch Bento Cards) -->
-<section id="process" class="process-section">
-  <div class="container">
-    <div class="text-center mb-xl">
-      <h2 style="color: var(--primary); margin-bottom: 8px;" data-i18n="process_title">9-Step Digital Application &amp; Verification Journey</h2>
-      <p class="text-muted" style="max-width: 600px; margin: 0 auto;" data-i18n="process_subtitle">Everything is processed digitally — apply, verify, and use your passport virtually with zero paperwork.</p>
-    </div>
-
-    <!-- Bento Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-md">
-      
-      <!-- Step 1 -->
-      <div class="process-card" id="card-step-1" onclick="handleProcessStepClick(1)">
-        <div class="process-card-watermark">1</div>
-        <span class="material-symbols-outlined process-card-icon">app_registration</span>
-        <h3 class="process-card-title" data-i18n="step1_title">Online Registration</h3>
-        <p class="process-card-desc" data-i18n="step1_desc">Create your citizen profile using your valid details, email, and phone number.</p>
-        <div class="mt-auto pt-sm flex items-center justify-between" style="border-top: 1px dashed var(--outline-variant); margin-top: 12px;">
-          <span class="badge text-xs" id="step-badge-1">Not Started</span>
-          <span class="material-symbols-outlined text-xs text-muted">arrow_forward</span>
-        </div>
-      </div>
-
-      <!-- Step 2 -->
-      <div class="process-card" id="card-step-2" onclick="handleProcessStepClick(2)">
-        <div class="process-card-watermark">2</div>
-        <span class="material-symbols-outlined process-card-icon">edit_document</span>
-        <h3 class="process-card-title" data-i18n="step2_title">Fill Application</h3>
-        <p class="process-card-desc" data-i18n="step2_desc">Complete your e-passport application form with accurate personal and contact information.</p>
-        <div class="mt-auto pt-sm flex items-center justify-between" style="border-top: 1px dashed var(--outline-variant); margin-top: 12px;">
-          <span class="badge text-xs" id="step-badge-2">Not Started</span>
-          <span class="material-symbols-outlined text-xs text-muted">arrow_forward</span>
-        </div>
-      </div>
-
-      <!-- Step 3 -->
-      <div class="process-card" id="card-step-3" onclick="handleProcessStepClick(3)">
-        <div class="process-card-watermark">3</div>
-        <span class="material-symbols-outlined process-card-icon">upload_file</span>
-        <h3 class="process-card-title" data-i18n="step3_title">Upload Documents</h3>
-        <p class="process-card-desc" data-i18n="step3_desc">Upload clear scanned copies of your Nepali Citizenship Certificate and required proofs.</p>
-        <div class="mt-auto pt-sm flex items-center justify-between" style="border-top: 1px dashed var(--outline-variant); margin-top: 12px;">
-          <span class="badge text-xs" id="step-badge-3">Not Started</span>
-          <span class="material-symbols-outlined text-xs text-muted">arrow_forward</span>
-        </div>
-      </div>
-
-      <!-- Step 4 -->
-      <div class="process-card" id="card-step-4" onclick="handleProcessStepClick(4)">
-        <div class="process-card-watermark">4</div>
-        <span class="material-symbols-outlined process-card-icon">event_available</span>
-        <h3 class="process-card-title" data-i18n="step4_title">Queue Token Generation</h3>
-        <p class="process-card-desc" data-i18n="step4_desc">Receive an automated digital queue token with a designated processing slot.</p>
-        <div class="mt-auto pt-sm flex items-center justify-between" style="border-top: 1px dashed var(--outline-variant); margin-top: 12px;">
-          <span class="badge text-xs" id="step-badge-4">Not Started</span>
-          <span class="material-symbols-outlined text-xs text-muted">arrow_forward</span>
-        </div>
-      </div>
-
-      <!-- Step 5 -->
-      <div class="process-card" id="card-step-5" onclick="handleProcessStepClick(5)">
-        <div class="process-card-watermark">5</div>
-        <span class="material-symbols-outlined process-card-icon">payments</span>
-        <h3 class="process-card-title" data-i18n="step5_title">Fee Assessment</h3>
-        <p class="process-card-desc" data-i18n="step5_desc">Verify your category (34 pages / 66 pages / Urgent Express) and fee details.</p>
-        <div class="mt-auto pt-sm flex items-center justify-between" style="border-top: 1px dashed var(--outline-variant); margin-top: 12px;">
-          <span class="badge text-xs" id="step-badge-5">Not Started</span>
-          <span class="material-symbols-outlined text-xs text-muted">arrow_forward</span>
-        </div>
-      </div>
-
-      <!-- Step 6 -->
-      <div class="process-card" id="card-step-6" onclick="handleProcessStepClick(6)">
-        <div class="process-card-watermark">6</div>
-        <span class="material-symbols-outlined process-card-icon">fingerprint</span>
-        <h3 class="process-card-title" data-i18n="step6_title">Digital Biometrics Match</h3>
-        <p class="process-card-desc" data-i18n="step6_desc">Your digital photo and biometric credentials are authenticated electronically against national databases.</p>
-        <div class="mt-auto pt-sm flex items-center justify-between" style="border-top: 1px dashed var(--outline-variant); margin-top: 12px;">
-          <span class="badge text-xs" id="step-badge-6">Not Started</span>
-          <span class="material-symbols-outlined text-xs text-muted">arrow_forward</span>
-        </div>
-      </div>
-
-      <!-- Step 7 -->
-      <div class="process-card" id="card-step-7" onclick="handleProcessStepClick(7)">
-        <div class="process-card-watermark">7</div>
-        <span class="material-symbols-outlined process-card-icon">fact_check</span>
-        <h3 class="process-card-title" data-i18n="step7_title">Staff Verification</h3>
-        <p class="process-card-desc" data-i18n="step7_desc">Staff officer reviews and validates your submitted digital documents and verifies eligibility.</p>
-        <div class="mt-auto pt-sm flex items-center justify-between" style="border-top: 1px dashed var(--outline-variant); margin-top: 12px;">
-          <span class="badge text-xs" id="step-badge-7">Not Started</span>
-          <span class="material-symbols-outlined text-xs text-muted">arrow_forward</span>
-        </div>
-      </div>
-
-      <!-- Step 8 -->
-      <div class="process-card" id="card-step-8" onclick="handleProcessStepClick(8)">
-        <div class="process-card-watermark">8</div>
-        <span class="material-symbols-outlined process-card-icon">draw</span>
-        <h3 class="process-card-title" data-i18n="step8_title">Government Digital Signature</h3>
-        <p class="process-card-desc" data-i18n="step8_desc">Upon verification, your Virtual e-Passport is cryptographically signed and authenticated by the Government of Nepal certifying authority.</p>
-        <div class="mt-auto pt-sm flex items-center justify-between" style="border-top: 1px dashed var(--outline-variant); margin-top: 12px;">
-          <span class="badge text-xs" id="step-badge-8">Not Started</span>
-          <span class="material-symbols-outlined text-xs text-muted">arrow_forward</span>
-        </div>
-      </div>
-
-      <!-- Step 9 -->
-      <div class="process-card" id="card-step-9" onclick="handleProcessStepClick(9)">
-        <div class="process-card-watermark">9</div>
-        <span class="material-symbols-outlined process-card-icon">badge</span>
-        <h3 class="process-card-title" data-i18n="step9_title">Virtual Passport Ready</h3>
-        <p class="process-card-desc" data-i18n="step9_desc">Access, view, and use your active Virtual e-Passport directly from your citizen portal anytime.</p>
-        <div class="mt-auto pt-sm flex items-center justify-between" style="border-top: 1px dashed var(--outline-variant); margin-top: 12px;">
-          <span class="badge text-xs" id="step-badge-9">Not Started</span>
-          <span class="material-symbols-outlined text-xs text-muted">arrow_forward</span>
-        </div>
-      </div>
-
-    </div>
-  </div>
-</section>
-
-<!-- 4. Passport Categories & Fee Structure -->
-<section id="services" style="padding: 80px 0; background-color: var(--surface); border-top: 1px solid var(--outline-variant);">
-  <div class="container">
-    <div class="text-center mb-xl">
-      <h2 style="color: var(--primary); margin-bottom: 8px;" data-i18n="tariff_title">Passport Categories &amp; Fee Structure</h2>
-      <p class="text-muted" style="max-width: 600px; margin: 0 auto;" data-i18n="tariff_subtitle">Standard official fee tariffs established by the Ministry of Foreign Affairs, Government of Nepal.</p>
-    </div>
-
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-lg">
-      
-      <!-- Tier 1 -->
-      <div class="service-tier-card">
-        <h4 style="color: var(--primary);" data-i18n="tier1_title">Ordinary e-Passport (34 Pages)</h4>
-        <p class="text-sm text-muted" data-i18n="tier1_desc">Recommended for regular tourists, students, and travelers.</p>
-        <div class="service-price" data-i18n="tier1_price">NPR 5,000 / Standard Delivery</div>
-        <ul style="list-style: none; margin: var(--spacing-md) 0; display: flex; flex-direction: column; gap: 8px; font-size: 0.875rem;">
-          <li class="flex items-center gap-xs"><span class="material-symbols-outlined text-success" style="font-size: 18px;">check</span> 10 Years Validity (Adults)</li>
-          <li class="flex items-center gap-xs"><span class="material-symbols-outlined text-success" style="font-size: 18px;">check</span> 34 Digital Pages</li>
-          <li class="flex items-center gap-xs"><span class="material-symbols-outlined text-success" style="font-size: 18px;">check</span> Standard processing: 7–14 days</li>
-        </ul>
-        <a href="/register/" class="btn btn-outline-primary btn-block mt-auto" data-i18n="btn_apply_34">Apply for 34 Pages</a>
-      </div>
-
-      <!-- Tier 2 (Featured) -->
-      <div class="service-tier-card featured">
-        <div class="service-tier-badge">Frequent Traveler</div>
-        <h4 style="color: var(--primary);" data-i18n="tier2_title">Ordinary e-Passport (66 Pages)</h4>
-        <p class="text-sm text-muted" data-i18n="tier2_desc">Ideal for business travelers, frequent flyers, and expatriates.</p>
-        <div class="service-price" data-i18n="tier2_price">NPR 10,000 / Standard Delivery</div>
-        <ul style="list-style: none; margin: var(--spacing-md) 0; display: flex; flex-direction: column; gap: 8px; font-size: 0.875rem;">
-          <li class="flex items-center gap-xs"><span class="material-symbols-outlined text-success" style="font-size: 18px;">check</span> 10 Years Validity (Adults)</li>
-          <li class="flex items-center gap-xs"><span class="material-symbols-outlined text-success" style="font-size: 18px;">check</span> 66 Digital Pages</li>
-          <li class="flex items-center gap-xs"><span class="material-symbols-outlined text-success" style="font-size: 18px;">check</span> Standard processing: 7–14 days</li>
-        </ul>
-        <a href="/register/" class="btn btn-primary btn-block mt-auto" data-i18n="btn_apply_66">Apply for 66 Pages</a>
-      </div>
-
-      <!-- Tier 3 -->
-      <div class="service-tier-card">
-        <h4 style="color: var(--primary);" data-i18n="tier3_title">Express Urgent Processing</h4>
-        <p class="text-sm text-muted" data-i18n="tier3_desc">Expedited priority queue for medical and official emergencies.</p>
-        <div class="service-price" data-i18n="tier3_price">NPR 12,000 / Fast-Track Delivery</div>
-        <ul style="list-style: none; margin: var(--spacing-md) 0; display: flex; flex-direction: column; gap: 8px; font-size: 0.875rem;">
-          <li class="flex items-center gap-xs"><span class="material-symbols-outlined text-success" style="font-size: 18px;">check</span> Priority Electronic Verification</li>
-          <li class="flex items-center gap-xs"><span class="material-symbols-outlined text-success" style="font-size: 18px;">check</span> Expedited digital approval</li>
-          <li class="flex items-center gap-xs"><span class="material-symbols-outlined text-success" style="font-size: 18px;">check</span> Ready within 2–3 business days</li>
-        </ul>
-        <a href="/register/" class="btn btn-outline-primary btn-block mt-auto" data-i18n="btn_apply_urgent">Apply Urgent Service</a>
-      </div>
-
-    </div>
-  </div>
-</section>
-
-<!-- 5. Call To Action -->
-<section style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-container) 100%); color: #ffffff; padding: 70px 0;">
-  <div class="container text-center">
-    <h2 style="color: #ffffff; font-size: 2rem; margin-bottom: var(--spacing-sm);" data-i18n="cta_title">Ready to Apply for your Nepali e-Passport?</h2>
-    <p style="color: #cbd5e1; max-width: 540px; margin: 0 auto var(--spacing-lg) auto; font-size: 1rem;" data-i18n="cta_desc">
-      Register online in less than 2 minutes, submit required documents, and obtain your official queue token.
-    </p>
-    <div class="flex justify-center gap-md">
-      <a href="/register/" class="btn btn-secondary btn-lg">
-        <span class="material-symbols-outlined">person_add</span>
-        <span data-i18n="btn_create_account">Create Citizen Account</span>
+      <a href="/track/" class="hero-status-preview">
+        <span class="hero-status-icon material-symbols-outlined" aria-hidden="true">travel_explore</span>
+        <span class="hero-status-copy">
+          <strong data-i18n="status_preview_title">Already applied?</strong>
+          <small data-i18n="status_preview_desc">Use your application number to see the latest progress.</small>
+        </span>
+        <span class="hero-status-action" data-i18n="btn_track_status">Track Application</span>
+        <span class="material-symbols-outlined hero-status-arrow" aria-hidden="true">arrow_forward</span>
       </a>
-      <a href="/login/" class="btn btn-outline btn-lg" style="color: #ffffff; border-color: rgba(255,255,255,0.4);">
-        <span class="material-symbols-outlined">login</span>
-        <span data-i18n="nav_login">Sign In</span>
+
+      <p class="simple-hero-help">
+        <span class="material-symbols-outlined" aria-hidden="true">support_agent</span>
+        <span data-i18n="simple_hero_help">Need help? Call the toll-free helpline</span>
+        <strong>1660-01-00123</strong>
+      </p>
+    </div>
+
+    <aside class="start-card" aria-labelledby="start-card-title">
+      <div class="start-card-heading">
+        <span class="start-card-icon material-symbols-outlined" aria-hidden="true">task_alt</span>
+        <div>
+          <h2 id="start-card-title" data-i18n="start_card_title">Before you start</h2>
+          <p data-i18n="start_card_subtitle">Keep these essentials ready.</p>
+        </div>
+      </div>
+
+      <ul class="start-checklist">
+        <li>
+          <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
+          <span data-i18n="start_item_account">A verified mobile number and email address</span>
+        </li>
+        <li>
+          <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
+          <span data-i18n="start_item_documents">Your citizenship certificate or National ID</span>
+        </li>
+        <li>
+          <span class="material-symbols-outlined" aria-hidden="true">check_circle</span>
+          <span data-i18n="start_item_photo">A clear passport photo and supporting documents</span>
+        </li>
+      </ul>
+
+      <a href="/requirements/" class="start-card-link">
+        <span data-i18n="view_requirements">View requirements and fees</span>
+        <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
+      </a>
+    </aside>
+  </div>
+</section>
+
+<section id="process" class="simple-process-section">
+  <div class="container">
+    <div class="section-heading-simple">
+      <span class="section-eyebrow" data-i18n="simple_process_eyebrow">Simple and transparent</span>
+      <h2 data-i18n="simple_process_title">Three stages from application to passport</h2>
+      <p data-i18n="simple_process_subtitle">The portal guides you and shows what needs your attention at every stage.</p>
+    </div>
+
+    <div class="simple-process-grid">
+      <article class="simple-process-card">
+        <span class="process-number">1</span>
+        <span class="material-symbols-outlined process-icon" aria-hidden="true">upload_file</span>
+        <h3 data-i18n="simple_phase_1_title">Apply and upload</h3>
+        <p data-i18n="simple_phase_1_desc">Create your citizen account, complete the form, and upload the required documents.</p>
+      </article>
+
+      <article class="simple-process-card">
+        <span class="process-number">2</span>
+        <span class="material-symbols-outlined process-icon" aria-hidden="true">fact_check</span>
+        <h3 data-i18n="simple_phase_2_title">Payment and staff review</h3>
+        <p data-i18n="simple_phase_2_desc">Pay securely with eSewa after uploading; staff then inspect every required document.</p>
+      </article>
+
+      <article class="simple-process-card">
+        <span class="process-number">3</span>
+        <span class="material-symbols-outlined process-icon" aria-hidden="true">fingerprint</span>
+        <h3 data-i18n="simple_phase_3_title">Biometrics, processing, and issue</h3>
+        <p data-i18n="simple_phase_3_desc">Staff verify biometrics, authorize the digital signature, complete queue processing, and generate your passport.</p>
+      </article>
+    </div>
+
+    <div class="section-link-row">
+      <a href="/how-to-apply/" class="btn btn-outline-primary">
+        <span data-i18n="view_full_process">View the complete application guide</span>
+        <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
       </a>
     </div>
   </div>
-<!-- Step Detail Modal -->
-<div id="step-detail-modal" class="modal-backdrop" style="display: none;">
-  <div class="modal-container" style="max-width: 520px;">
-    <div class="modal-header">
-      <h3 class="modal-title flex items-center gap-xs">
-        <span class="material-symbols-outlined text-primary" id="modal-step-icon">info</span>
-        <span id="modal-step-title">Step Details</span>
-      </h3>
-      <button type="button" onclick="UI.closeModal('step-detail-modal')" style="background:none; border:none; cursor:pointer;">
-        <span class="material-symbols-outlined">close</span>
-      </button>
+</section>
+
+<section id="services" class="landing-links-section">
+  <div class="container">
+    <div class="section-heading-simple compact">
+      <h2 data-i18n="quick_access_title">Find what you need</h2>
+      <p data-i18n="quick_access_subtitle">Detailed guidance is kept on focused pages so this home page stays clear.</p>
     </div>
-    <div class="modal-body">
-      <div class="flex items-center justify-between p-sm rounded-lg mb-md" style="background-color: var(--surface-container-low); border: 1px solid var(--outline-variant);">
-        <span class="text-xs text-muted">Current System Status:</span>
-        <span id="modal-step-badge" class="badge">Not Started</span>
-      </div>
-      <p id="modal-step-details" class="text-sm text-muted mb-lg" style="line-height: 1.6;"></p>
-      <div id="modal-step-extra" class="mb-md"></div>
-    </div>
-    <div class="modal-footer">
-      <button type="button" onclick="UI.closeModal('step-detail-modal')" class="btn btn-outline">Close</button>
-      <a id="modal-step-action-btn" href="#" class="btn btn-primary">
-        <span class="material-symbols-outlined" id="modal-step-btn-icon">arrow_forward</span>
-        <span id="modal-step-btn-text">Proceed</span>
+
+    <div class="landing-link-grid">
+      <a href="/how-to-apply/" class="landing-link-card">
+        <span class="landing-link-icon material-symbols-outlined" aria-hidden="true">route</span>
+        <span>
+          <strong data-i18n="nav_how_to_apply">How to Apply</strong>
+          <small data-i18n="how_link_desc">See the complete process and approval stages.</small>
+        </span>
+        <span class="material-symbols-outlined landing-link-arrow" aria-hidden="true">arrow_forward</span>
+      </a>
+
+      <a href="/requirements/" class="landing-link-card">
+        <span class="landing-link-icon material-symbols-outlined" aria-hidden="true">checklist</span>
+        <span>
+          <strong data-i18n="nav_requirements">Requirements &amp; Fees</strong>
+          <small data-i18n="requirements_link_desc">Check documents, photo rules, categories, and fees.</small>
+        </span>
+        <span class="material-symbols-outlined landing-link-arrow" aria-hidden="true">arrow_forward</span>
+      </a>
+
+      <a href="/login/" class="landing-link-card">
+        <span class="landing-link-icon material-symbols-outlined" aria-hidden="true">person</span>
+        <span>
+          <strong data-i18n="portal_citizen">Citizen Portal</strong>
+          <small data-i18n="citizen_link_desc">Continue an application or view your latest status.</small>
+        </span>
+        <span class="material-symbols-outlined landing-link-arrow" aria-hidden="true">arrow_forward</span>
       </a>
     </div>
   </div>
-</div>
-{% endblock %}
+</section>
 
-{% block extra_js %}
-<script>
-  let currentWorkflow = null;
-
-  document.addEventListener('DOMContentLoaded', () => {
-    loadLandingWorkflowState();
-  });
-
-  async function loadLandingWorkflowState() {
-    try {
-      const data = await API.get('/applications/current-workflow/');
-      currentWorkflow = data;
-      if (data && data.steps) {
-        data.steps.forEach(step => {
-          updateCardBadge(step.step, step.status);
-        });
-      }
-    } catch (err) {
-      console.log('Landing workflow status info:', err);
-    }
-  }
-
-  function updateCardBadge(stepNum, status) {
-    const badgeEl = document.getElementById(`step-badge-${stepNum}`);
-    if (!badgeEl) return;
-
-    badgeEl.textContent = status;
-    badgeEl.className = 'badge text-xs';
-    if (status === 'Completed') {
-      badgeEl.classList.add('badge-approved');
-    } else if (status === 'In Progress' || status === 'Pending Verification') {
-      badgeEl.classList.add('badge-pending');
-    } else if (status === 'Action Required' || status === 'Rejected') {
-      badgeEl.classList.add('badge-rejected');
-    } else {
-      badgeEl.classList.add('badge-outline');
-    }
-  }
-
-  function openStepModal(stepData) {
-    if (!stepData) return;
-    document.getElementById('modal-step-title').textContent = `Step ${stepData.step}: ${stepData.title}`;
-    
-    const badge = document.getElementById('modal-step-badge');
-    badge.textContent = stepData.status;
-    badge.className = 'badge';
-    if (stepData.status === 'Completed') badge.classList.add('badge-approved');
-    else if (stepData.status === 'In Progress' || stepData.status === 'Pending Verification') badge.classList.add('badge-pending');
-    else if (stepData.status === 'Action Required' || stepData.status === 'Rejected') badge.classList.add('badge-rejected');
-    else badge.classList.add('badge-outline');
-
-    document.getElementById('modal-step-details').textContent = stepData.details || '';
-    
-    const actionBtn = document.getElementById('modal-step-action-btn');
-    actionBtn.href = stepData.action_url || '#';
-    document.getElementById('modal-step-btn-text').textContent = stepData.action_label || 'Proceed';
-    
-    if (stepData.step === 9 && stepData.can_download && currentWorkflow && currentWorkflow.application_id) {
-      actionBtn.onclick = (e) => {
-        e.preventDefault();
-        window.location.href = `/api/applications/${currentWorkflow.application_id}/download-pdf/`;
-      };
-      document.getElementById('modal-step-btn-icon').textContent = 'download';
-    } else {
-      actionBtn.onclick = null;
-      document.getElementById('modal-step-btn-icon').textContent = 'arrow_forward';
-    }
-
-    UI.openModal('step-detail-modal');
-  }
-
-  function handleProcessStepClick(stepNum) {
-    const user = Auth.getUser();
-    const step = (currentWorkflow && currentWorkflow.steps) 
-      ? currentWorkflow.steps.find(s => s.step === stepNum) 
-      : null;
-
-    if (stepNum === 1) {
-      if (user) {
-        openStepModal(step || {
-          step: 1,
-          title: "Online Registration",
-          status: "Completed",
-          details: `Registered Citizen: ${user.name || 'Citizen User'} (${user.email || ''}). Your account profile is active in PostgreSQL.`,
-          action_url: "/applicant/dashboard/",
-          action_label: "Open Citizen Dashboard"
-        });
-      } else {
-        window.location.href = '/register/';
-      }
-    } else if (stepNum === 2) {
-      if (!user) {
-        window.location.href = '/login/?next=/applicant/apply/';
-      } else if (currentWorkflow && currentWorkflow.has_application) {
-        openStepModal(step);
-      } else {
-        window.location.href = '/applicant/apply/';
-      }
-    } else if (stepNum === 3) {
-      if (!user) window.location.href = '/login/?next=/applicant/documents/';
-      else if (step) openStepModal(step);
-      else window.location.href = '/applicant/documents/';
-    } else if (stepNum === 4) {
-      if (!user) window.location.href = '/track/';
-      else if (step) openStepModal(step);
-      else window.location.href = '/applicant/queue/';
-    } else if (stepNum === 5) {
-      openStepModal(step || {
-        step: 5,
-        title: "Fee Assessment",
-        status: user ? "Pending Assessment" : "Official Tariff",
-        details: "Official Government Tariffs: Ordinary 34 Pages (NPR 5,000) • Ordinary 66 Pages (NPR 10,000) • Express Urgent (NPR 12,000). Assessed digitally upon application submission.",
-        action_url: user ? "/applicant/apply/" : "/login/",
-        action_label: user ? "View Fee Details" : "Login to Apply"
-      });
-    } else if (stepNum === 6) {
-      openStepModal(step || {
-        step: 6,
-        title: "Digital Biometrics Match",
-        status: "System Electronic Validation",
-        details: "Project-level digital biometric match workflow. Photo and biometric credentials are authenticated by desk officers within the Passport Management System.",
-        action_url: user ? "/applicant/documents/" : "/login/",
-        action_label: user ? "Upload Photo / Biometrics" : "Citizen Sign In"
-      });
-    } else if (stepNum === 7) {
-      openStepModal(step || {
-        step: 7,
-        title: "Staff Verification",
-        status: "Pending Desk Review",
-        details: "Authorized verification officers inspect submitted digital citizenship credentials, inspect photograph parameters, and approve or reject submissions.",
-        action_url: user ? (user.role === 'staff' ? "/staff/verify/" : "/applicant/dashboard/") : "/login/",
-        action_label: user ? (user.role === 'staff' ? "Open Staff Desk" : "Check Application Status") : "Sign In"
-      });
-    } else if (stepNum === 8) {
-      openStepModal(step || {
-        step: 8,
-        title: "Government Digital Signature",
-        status: "RSA-SHA256 PKI System",
-        details: "Certified electronic signing: Department of Passports certifying authority embeds cryptographic signature hash into verified applications.",
-        action_url: user ? "/applicant/dashboard/" : "/login/",
-        action_label: user ? "View Digital Signature" : "Sign In"
-      });
-    } else if (stepNum === 9) {
-      if (step && step.can_download && currentWorkflow && currentWorkflow.application_id) {
-        window.location.href = `/api/applications/${currentWorkflow.application_id}/download-pdf/`;
-      } else if (user) {
-        openStepModal(step || {
-          step: 9,
-          title: "Virtual Passport Ready",
-          status: "Pending Previous Steps",
-          details: "Your official Virtual e-Passport PDF document is generated once staff verification and digital signature authorization are finalized.",
-          action_url: "/applicant/dashboard/",
-          action_label: "Go to Dashboard"
-        });
-      } else {
-        window.location.href = '/login/';
-      }
-    }
-  }
-
-  function handleQuickTrack(e) {
-    e.preventDefault();
-    const id = document.getElementById('quick-track-id').value.trim();
-    if (id) {
-      window.location.href = `/track/?id=${encodeURIComponent(id)}`;
-    }
-  }
-</script>
+<section class="landing-assurance-section">
+  <div class="container landing-assurance-inner">
+    <div>
+      <span class="material-symbols-outlined" aria-hidden="true">lock</span>
+      <span>
+        <strong data-i18n="assurance_title">Secure government service</strong>
+        <small data-i18n="assurance_desc">Your application and documents are protected through authenticated access.</small>
+      </span>
+    </div>
+    <a href="/register/" class="btn btn-secondary">
+      <span data-i18n="btn_create_account">Create Citizen Account</span>
+      <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
+    </a>
+  </div>
+</section>
 {% endblock %}
