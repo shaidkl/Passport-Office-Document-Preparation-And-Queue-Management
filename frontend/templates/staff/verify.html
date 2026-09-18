@@ -465,32 +465,37 @@
     if (!activeViewerDoc) return;
     const isPending = activeViewerDoc.verification_status === 'Pending';
     const isPaymentVerified = paymentVerifiedForApplication(activeViewerDoc.application);
+    const fileAvailable = activeViewerDoc.file_available !== false;
     const isBusy = documentActionInFlight.has(String(activeViewerDoc.document_id));
     const verifyButton = document.getElementById('viewer-verify-button');
     const rejectButton = document.getElementById('viewer-reject-button');
     const rejectionInput = document.getElementById('viewer-rejection-input');
     if (verifyButton) {
-      verifyButton.disabled = !isPending || !isPaymentVerified || !activeViewerDoc.is_inspected || isBusy;
-      verifyButton.title = !isPaymentVerified
+      verifyButton.disabled = !isPending || !fileAvailable || !isPaymentVerified || !activeViewerDoc.is_inspected || isBusy;
+      verifyButton.title = !fileAvailable
+        ? t('document_file_missing_reject', 'File missing — reject for re-upload')
+        : (!isPaymentVerified
         ? t('msg_payment_first', 'Payment must be verified first.')
         : (!isPending
         ? I18n.format('decision_is_final', 'Decision is final: {status}', { status: I18n.translateStatus(activeViewerDoc.verification_status) })
-        : (!activeViewerDoc.is_inspected ? t('msg_inspect_before_verify', 'Inspect the real file before verifying it.') : t('btn_verify_document', 'Verify document')));
+        : (!activeViewerDoc.is_inspected ? t('msg_inspect_before_verify', 'Inspect the real file before verifying it.') : t('btn_verify_document', 'Verify document'))));
     }
     if (rejectButton) {
-      rejectButton.disabled = !isPending || !isPaymentVerified || isBusy;
-      rejectButton.title = !isPaymentVerified
+      rejectButton.disabled = !isPending || (!isPaymentVerified && fileAvailable) || isBusy;
+      rejectButton.title = !fileAvailable
+        ? t('reject_missing_file_title', 'Reject missing file and request re-upload')
+        : (!isPaymentVerified
         ? t('msg_payment_first', 'Payment must be verified first.')
         : (isPending
         ? t('btn_reject_document', 'Reject document')
-        : I18n.format('decision_is_final', 'Decision is final: {status}', { status: I18n.translateStatus(activeViewerDoc.verification_status) }));
+        : I18n.format('decision_is_final', 'Decision is final: {status}', { status: I18n.translateStatus(activeViewerDoc.verification_status) })));
     }
-    if (rejectionInput) rejectionInput.disabled = !isPending || !isPaymentVerified || isBusy;
+    if (rejectionInput) rejectionInput.disabled = !isPending || (!isPaymentVerified && fileAvailable) || isBusy;
   }
 
   function beginDocumentDecision(doc, requiresInspection = false) {
     if (!doc) return null;
-    if (!paymentVerifiedForApplication(doc.application)) {
+    if (!paymentVerifiedForApplication(doc.application) && (requiresInspection || doc.file_available !== false)) {
       UI.showToast(t('msg_payment_first', 'Payment must be verified first.'), 'warning');
       return null;
     }
@@ -820,6 +825,7 @@
       }
 
       const isInspected = Boolean(doc.is_inspected);
+      const fileAvailable = doc.file_available !== false;
       const isPending = doc.verification_status === 'Pending';
       const isBusy = documentActionInFlight.has(String(doc.document_id));
       const inspectBadge = isInspected
@@ -861,15 +867,15 @@
           </div>
 
           <div class="pt-sm flex items-center gap-xs flex-wrap" style="border-top:1px solid var(--outline-variant);margin-top:12px;">
-            <button type="button" onclick="openRealDocumentViewer(${doc.document_id})" class="btn btn-sm btn-primary flex-1" style="min-width:110px;">
-              <span class="material-symbols-outlined" style="font-size:16px;">visibility</span> ${t('btn_view_document', 'View Document')}
+            <button type="button" onclick="openRealDocumentViewer(${doc.document_id})" class="btn btn-sm btn-primary flex-1" style="min-width:110px;" ${fileAvailable ? '' : 'disabled'}>
+              <span class="material-symbols-outlined" style="font-size:16px;">visibility</span> ${fileAvailable ? t('btn_view_document', 'View Document') : t('document_file_missing_reject', 'File missing — reject for re-upload')}
             </button>
 
             ${isPending ? `
-              <button type="button" onclick="verifyDocumentDirect(${doc.document_id})" class="btn btn-sm btn-outline text-success" ${(!isPaymentVerified || !isInspected || isBusy) ? 'disabled' : ''} title="${!isPaymentVerified ? t('msg_payment_first', 'Payment must be verified first.') : (!isInspected ? t('msg_open_before_verify', 'You must click View Document to inspect the real file first') : t('btn_verify_document', 'Verify document'))}">
+              <button type="button" onclick="verifyDocumentDirect(${doc.document_id})" class="btn btn-sm btn-outline text-success" ${(!fileAvailable || !isPaymentVerified || !isInspected || isBusy) ? 'disabled' : ''} title="${!fileAvailable ? t('document_file_missing_reject', 'File missing — reject for re-upload') : (!isPaymentVerified ? t('msg_payment_first', 'Payment must be verified first.') : (!isInspected ? t('msg_open_before_verify', 'You must click View Document to inspect the real file first') : t('btn_verify_document', 'Verify document')))}">
                 <span class="material-symbols-outlined" style="font-size:16px;">check</span> ${isBusy ? t('status_saving', 'Saving…') : t('btn_verify_document', 'Verify Document')}
               </button>
-              <button type="button" onclick="openQuickRejectModal(${doc.document_id})" class="btn btn-sm btn-outline text-error" ${(!isPaymentVerified || isBusy) ? 'disabled' : ''} title="${!isPaymentVerified ? t('msg_payment_first', 'Payment must be verified first.') : t('btn_reject_document', 'Reject')}">
+              <button type="button" onclick="openQuickRejectModal(${doc.document_id})" class="btn btn-sm btn-outline text-error" ${((!isPaymentVerified && fileAvailable) || isBusy) ? 'disabled' : ''} title="${!fileAvailable ? t('reject_missing_file_title', 'Reject missing file and request re-upload') : (!isPaymentVerified ? t('msg_payment_first', 'Payment must be verified first.') : t('btn_reject_document', 'Reject'))}">
                 <span class="material-symbols-outlined" style="font-size:16px;">cancel</span> ${t('btn_reject_document', 'Reject')}
               </button>
             ` : `
@@ -888,6 +894,12 @@
   async function openRealDocumentViewer(docId) {
     const doc = allDocuments.find(d => String(d.document_id) === String(docId));
     if (!doc) return;
+
+    if (doc.file_available === false) {
+      UI.showToast(t('document_file_missing_reject', 'File missing — reject for re-upload'), 'error');
+      openQuickRejectModal(doc.document_id);
+      return;
+    }
 
     if (currentViewMode === 'app' && String(doc.application) !== String(currentSelectedAppId)) {
       UI.showToast(t('msg_doc_wrong_applicant', 'This document does not belong to the selected applicant.'), 'error');
@@ -1129,7 +1141,9 @@
     targetRejectDocId = doc.document_id;
     const descEl = document.getElementById('quick-reject-target-desc');
     const inputEl = document.getElementById('quick-reject-reason-input');
-    inputEl.value = '';
+    inputEl.value = doc.file_available === false
+      ? t('missing_file_reupload_reason', 'Uploaded file is missing from secure storage. Please re-upload the document.')
+      : '';
 
     if (doc && descEl) {
       descEl.textContent = I18n.format(
@@ -1257,6 +1271,7 @@
       const isPending = doc.verification_status === 'Pending';
       const isBusy = documentActionInFlight.has(String(doc.document_id));
       const isPaymentVerified = paymentVerifiedForApplication(doc.application);
+      const fileAvailable = doc.file_available !== false;
       const inspectBadge = isInspected
         ? `<span class="inspected-badge-yes"><span class="material-symbols-outlined" style="font-size:12px;">visibility</span> ${t('legacy_inspection', 'Inspected')}</span>`
         : `<span class="inspected-badge-no"><span class="material-symbols-outlined" style="font-size:12px;">visibility_off</span> ${t('status_not_inspected', 'Not Inspected')}</span>`;
@@ -1285,14 +1300,14 @@
           </td>
           <td>
             <div class="flex items-center gap-xs">
-              <button type="button" onclick="openRealDocumentViewer(${doc.document_id})" class="btn btn-sm btn-primary" title="${t('title_view_inspect_file', 'View & Inspect Real File')}">
+              <button type="button" onclick="openRealDocumentViewer(${doc.document_id})" class="btn btn-sm btn-primary" title="${fileAvailable ? t('title_view_inspect_file', 'View & Inspect Real File') : t('document_file_missing_reject', 'File missing — reject for re-upload')}" ${fileAvailable ? '' : 'disabled'}>
                 <span class="material-symbols-outlined" style="font-size:15px;">visibility</span> ${t('btn_inspect', 'Inspect')}
               </button>
               ${isPending ? `
-                <button type="button" onclick="verifyDocumentDirect(${doc.document_id})" class="btn btn-sm btn-outline text-success" ${(!isPaymentVerified || !isInspected || isBusy) ? 'disabled' : ''} title="${!isPaymentVerified ? t('msg_payment_first', 'Payment must be verified first.') : (!isInspected ? t('msg_inspect_before_verify', 'Must inspect first') : t('btn_verify_document', 'Verify'))}">
+                <button type="button" onclick="verifyDocumentDirect(${doc.document_id})" class="btn btn-sm btn-outline text-success" ${(!fileAvailable || !isPaymentVerified || !isInspected || isBusy) ? 'disabled' : ''} title="${!fileAvailable ? t('document_file_missing_reject', 'File missing — reject for re-upload') : (!isPaymentVerified ? t('msg_payment_first', 'Payment must be verified first.') : (!isInspected ? t('msg_inspect_before_verify', 'Must inspect first') : t('btn_verify_document', 'Verify')))}">
                   <span class="material-symbols-outlined" style="font-size:15px;">check</span>
                 </button>
-                <button type="button" onclick="openQuickRejectModal(${doc.document_id})" class="btn btn-sm btn-outline text-error" title="${!isPaymentVerified ? t('msg_payment_first', 'Payment must be verified first.') : t('btn_reject_document', 'Reject')}" ${(!isPaymentVerified || isBusy) ? 'disabled' : ''}>
+                <button type="button" onclick="openQuickRejectModal(${doc.document_id})" class="btn btn-sm btn-outline text-error" title="${!fileAvailable ? t('reject_missing_file_title', 'Reject missing file and request re-upload') : (!isPaymentVerified ? t('msg_payment_first', 'Payment must be verified first.') : t('btn_reject_document', 'Reject'))}" ${((!isPaymentVerified && fileAvailable) || isBusy) ? 'disabled' : ''}>
                   <span class="material-symbols-outlined" style="font-size:15px;">cancel</span>
                 </button>
               ` : `<span class="text-xs text-muted font-semibold" title="${t('title_final_decision', 'Final document decisions cannot be changed.')}">${t('status_decision_final', 'Decision final')}</span>`}

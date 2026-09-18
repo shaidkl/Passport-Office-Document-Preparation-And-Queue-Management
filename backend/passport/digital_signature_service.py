@@ -43,7 +43,7 @@ def _canonical_payload(application, schema='np-passport-credential-v1'):
         file_digest = ''
         try:
             digest = hashlib.sha256()
-            with document.file_path.open('rb') as source:
+            with document.open_preserved_file() as source:
                 for chunk in iter(lambda: source.read(64 * 1024), b''):
                     digest.update(chunk)
             file_digest = digest.hexdigest()

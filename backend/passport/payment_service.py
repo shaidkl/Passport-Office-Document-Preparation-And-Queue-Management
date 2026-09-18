@@ -27,6 +27,7 @@ from django.conf import settings
 
 from .models import Payment, Application, Applicant, ActivityLog, Notification
 from .qr_generator import generate_qr_data_uri, generate_qr_svg
+from .queue_service import ensure_processing_queue_token
 
 
 class PaymentService:
@@ -459,6 +460,7 @@ class PaymentService:
         """Atomically apply a validated eSewa status response to a payment."""
         payment = Payment.objects.select_for_update().get(payment_id=payment_id)
         if payment.status == 'VERIFIED':
+            ensure_processing_queue_token(payment.application)
             return True, "Payment is already verified and processed (idempotent)", payment
 
         gateway_status = str(status_payload.get('status') or '').upper()
@@ -487,6 +489,7 @@ class PaymentService:
                 payment.refresh_from_db()
                 return False, "This eSewa transaction ID has already been used.", payment
             cls._mark_application_pending_for_final_review(payment)
+            token = ensure_processing_queue_token(payment.application)
 
             try:
                 ActivityLog.objects.create(
@@ -508,8 +511,9 @@ class PaymentService:
                     message=(
                         f"Official receipt: eSewa fee payment of NPR {payment.amount:,.2f} "
                         f"for application #NP-{payment.application.application_id:04d} "
-                        "has been verified. The application is now Pending for biometric "
-                        "verification and digital signature."
+                        f"has been verified. Queue token T-{token.token_number:03d} was issued. "
+                        "Document review, biometrics, and digital signature must be completed "
+                        "before the token can be called."
                     ),
                     status='Unread',
                 )
@@ -543,6 +547,7 @@ class PaymentService:
     def verify_esewa_transaction(cls, payment: Payment) -> tuple[bool, str, Payment]:
         """Confirm a payment server-to-server before treating it as paid."""
         if payment.status == 'VERIFIED':
+            ensure_processing_queue_token(payment.application)
             return True, "Payment is already verified and processed (idempotent)", payment
         try:
             status_payload = cls.fetch_esewa_status(payment)
@@ -566,6 +571,7 @@ class PaymentService:
             if not payment:
                 return False, "No payment request matches the eSewa transaction reference.", None
             if payment.status == 'VERIFIED':
+                ensure_processing_queue_token(payment.application)
                 return True, "Payment is already verified and processed (idempotent)", payment
             if str(payload['product_code']) != cls.MERCHANT_ID:
                 return False, "eSewa response product code does not match this merchant.", payment
@@ -640,6 +646,7 @@ class PaymentService:
         if payment.status == "VERIFIED":
             if str(payment.transaction_id) != str(txn_id):
                 return False, "Verified payment transaction ID does not match", payment
+            ensure_processing_queue_token(payment.application)
             return True, "Payment is already verified and processed (idempotent)", payment
 
         if Payment.objects.exclude(pk=payment.pk).filter(
@@ -662,6 +669,7 @@ class PaymentService:
             payment.refresh_from_db()
             return False, "Gateway transaction ID has already been used", payment
         cls._mark_application_pending_for_final_review(payment)
+        token = ensure_processing_queue_token(payment.application)
 
         # 7. Audit log & Citizen notification
         try:
@@ -680,8 +688,9 @@ class PaymentService:
                 type="Payment Verification",
                 message=(
                     f"Payment receipt: Fee of NPR {payment.amount:,.2f} for application "
-                    f"#NP-{payment.application.application_id:04d} is verified. The application "
-                    "is now Pending for biometric verification and digital signature."
+                    f"#NP-{payment.application.application_id:04d} is verified. Queue token "
+                    f"T-{token.token_number:03d} was issued. Document review, biometrics, and "
+                    "digital signature must be completed before the token can be called."
                 ),
                 status="Unread"
             )

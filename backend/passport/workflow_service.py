@@ -56,7 +56,7 @@ def build_workflow_facts(application):
     )
 
     queue_token_info = None
-    if token and signature_is_valid:
+    if token and verified_payment:
         queue_token_info = {
             'token_id': token.token_id,
             'token_number': token.token_number,

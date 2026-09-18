@@ -15,6 +15,7 @@ SECURE_HSTS_PRELOAD = True
 PERSONNEL_MFA_REQUIRED = True
 MALWARE_SCAN_ENABLED = True
 DEFAULT_FROM_EMAIL = 'no-reply@passport.example.invalid'
+PUBLIC_BASE_URL = 'https://passport.example.invalid'
 MAILERS = {
     'default': {
         'BACKEND': 'django.core.mail.backends.smtp.EmailBackend',

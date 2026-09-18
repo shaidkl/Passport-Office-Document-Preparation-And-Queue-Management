@@ -25,6 +25,9 @@ def admin_login_page(request):
 def register_page(request):
     return _render(request, 'public/register.html')
 
+def verify_email_page(request):
+    return _render(request, 'public/verify_email.html')
+
 def track_page(request):
     return _render(request, 'public/track.html')
 

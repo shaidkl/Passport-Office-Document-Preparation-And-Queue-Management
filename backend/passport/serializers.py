@@ -254,6 +254,7 @@ class StaffSerializer(serializers.ModelSerializer):
     class Meta:
         model = Staff
         fields = '__all__'
+        read_only_fields = ['is_active', 'status']
         extra_kwargs = {
             'password': {
                 'write_only': True,
@@ -381,6 +382,7 @@ class DocumentSerializer(serializers.ModelSerializer):
     application_status = serializers.CharField(source='application.status', read_only=True)
     applicant_name = serializers.CharField(source='application.applicant.full_name', read_only=True)
     file_url = serializers.SerializerMethodField(read_only=True)
+    file_available = serializers.SerializerMethodField(read_only=True)
     is_replacement_upload = serializers.SerializerMethodField(read_only=True)
 
     DOCUMENT_TYPE_ALIASES = {
@@ -394,7 +396,7 @@ class DocumentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Document
-        fields = '__all__'
+        exclude = ['file_content']
 
         read_only_fields = [
             'document_id',
@@ -429,11 +431,14 @@ class DocumentSerializer(serializers.ModelSerializer):
         return None
 
     def get_file_url(self, obj):
-        if not obj.file_path:
+        if not obj.has_available_file():
             return None
         path = f'/api/documents/{obj.document_id}/view-file/'
         request = self.context.get('request')
         return request.build_absolute_uri(path) if request else path
+
+    def get_file_available(self, obj):
+        return obj.has_available_file()
 
     def get_is_replacement_upload(self, obj):
         return bool(getattr(obj, '_is_replacement_upload', False))

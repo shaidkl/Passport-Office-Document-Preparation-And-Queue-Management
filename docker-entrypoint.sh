@@ -3,6 +3,7 @@ set -eu
 
 python manage.py migrate --noinput
 python manage.py collectstatic --noinput
+python manage.py run_email_otp_cleanup &
 
 exec gunicorn --chdir backend config.wsgi:application \
   --bind 0.0.0.0:8000 \

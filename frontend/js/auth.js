@@ -87,6 +87,8 @@ class AuthManager {
       email: result.email,
       department: result.department || null,
       designation: result.designation || null,
+      status: result.status || null,
+      is_active: result.is_active === true,
     }));
   }
 

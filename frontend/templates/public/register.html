@@ -584,12 +584,22 @@
 
     try {
       await Auth.register(payload);
-      UI.showToast(isNe ? 'नागरिक खाता सफलतापूर्वक बन्यो। अब लग-इन गर्न सक्नुहुन्छ।' : 'Registration successful! You can now log in.', 'success');
+      UI.showToast(isNe ? 'खाता बन्यो। आफ्नो इमेलमा पठाइएको छ-अङ्कको OTP प्रविष्ट गर्नुहोस्।' : 'Account created. Enter the six-digit OTP sent to your email.', 'success');
       setTimeout(() => {
-        window.location.href = '/login/?msg=registered';
+        window.location.href = `/verify-email/?email=${encodeURIComponent(email)}`;
       }, 800);
     } catch (err) {
       console.error('Registration failed:', err);
+      if (err.data && err.data.account_created) {
+        UI.showToast(
+          isNe ? 'खाता बन्यो, तर OTP इमेल पठाउन सकिएन। SMTP सेटअपपछि पुनः पठाउनुहोस्।' : 'Account created, but the OTP email could not be sent. Use resend after SMTP is configured.',
+          'error'
+        );
+        setTimeout(() => {
+          window.location.href = `/verify-email/?send_failed=1&email=${encodeURIComponent(email)}`;
+        }, 1200);
+        return;
+      }
       applyRegistrationApiErrors(
         err.data,
         err.message || (isNe ? 'दर्ता पूरा गर्न सकिएन। कृपया पुनः प्रयास गर्नुहोस्।' : 'Registration could not be completed. Please try again.')

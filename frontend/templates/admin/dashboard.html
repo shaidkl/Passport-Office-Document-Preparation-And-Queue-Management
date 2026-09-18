@@ -250,14 +250,12 @@
               <tr>
                 <th>Officer Name</th>
                 <th>Username</th>
-                <th>Department / Unit</th>
                 <th>Status</th>
-                <th>Action</th>
               </tr>
             </thead>
             <tbody id="admin-staff-table-body">
               <tr>
-                <td colspan="5" class="text-center text-muted py-md">Loading staff roster...</td>
+              <td colspan="3" class="text-center text-muted py-md">Loading staff roster...</td>
               </tr>
             </tbody>
           </table>
@@ -336,30 +334,10 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-md">
-          <div class="form-group">
-            <label class="form-label" for="staff-department">Department / Unit</label>
-            <input type="text" id="staff-department" class="form-control" placeholder="e.g. Verification Desk" data-i18n-placeholder="staff_department_placeholder">
-          </div>
-
-          <div class="form-group">
-            <label class="form-label" for="staff-designation">Designation</label>
-            <input type="text" id="staff-designation" class="form-control" placeholder="e.g. Verification Officer" data-i18n-placeholder="staff_designation_placeholder">
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-md">
+        <div class="grid grid-cols-1 gap-md">
           <div class="form-group">
             <label class="form-label" for="staff-password">Initial Password <span class="required">*</span></label>
             <input type="password" id="staff-password" class="form-control" minlength="8" placeholder="Minimum 8 characters" data-i18n-placeholder="staff_password_placeholder" required>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label" for="staff-initial-status">Initial Status</label>
-            <select id="staff-initial-status" class="form-control">
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
-            </select>
           </div>
         </div>
       </div>
@@ -474,7 +452,7 @@
       const approved = allApplications.filter(a => a.status === 'Approved' || a.status === 'Completed').length;
       document.getElementById('admin-stat-approved-apps').textContent = approved;
       const activeStaff = allStaff.filter(s => s.status === 'Active').length;
-      document.getElementById('admin-stat-active-staff').textContent = activeStaff || allStaff.length;
+      document.getElementById('admin-stat-active-staff').textContent = activeStaff;
     }
   }
 
@@ -529,7 +507,7 @@
     if (!allStaff || allStaff.length === 0) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="5" class="text-center text-muted py-md">${t('empty_no_staff_officers', 'No staff officers registered yet.')}</td>
+          <td colspan="4" class="text-center text-muted py-md">${t('empty_no_staff_officers', 'No staff officers registered yet.')}</td>
         </tr>
       `;
       return;
@@ -537,7 +515,6 @@
 
     tbody.innerHTML = allStaff.map(s => {
       const isActive = s.status === 'Active' && s.is_active !== false;
-      const deptDesig = [s.department, s.designation].filter(Boolean).join(' • ') || '—';
 
       return `
         <tr>
@@ -551,15 +528,7 @@
             <span class="font-mono text-xs text-secondary">${esc(s.username ? '@' + s.username : '—')}</span>
           </td>
           <td>
-            <span class="text-xs font-medium">${esc(deptDesig)}</span>
-          </td>
-          <td>
             <span class="badge ${isActive ? 'badge-approved' : 'badge-inactive'}">${isActive ? I18n.translateStatus('Active') : t('status_inactive', 'Inactive')}</span>
-          </td>
-          <td>
-            <button type="button" onclick="handleToggleStaffStatus(${s.staff_id}, '${isActive ? 'Active' : 'Inactive'}')" class="btn btn-outline btn-sm">
-              ${isActive ? t('btn_deactivate', 'Deactivate') : t('btn_activate', 'Activate')}
-            </button>
           </td>
         </tr>
       `;
@@ -616,29 +585,6 @@
     }
   }
 
-  async function handleToggleStaffStatus(staffId, currentStatus) {
-    const willBeActive = currentStatus !== 'Active';
-    const newStatus = willBeActive ? 'Active' : 'Inactive';
-    UI.showLoading(I18n.format('updating_staff_status', 'Updating staff status to {status}...', {
-      status: willBeActive ? I18n.translateStatus('Active') : t('status_inactive', 'Inactive')
-    }));
-    try {
-      await API.patch(`/staff/${staffId}/`, {
-        status: newStatus,
-        is_active: willBeActive
-      });
-      UI.showToast(I18n.format('staff_status_updated', 'Staff officer updated to {status}.', {
-        status: willBeActive ? I18n.translateStatus('Active') : t('status_inactive', 'Inactive')
-      }), 'success');
-      loadAdminDashboardData();
-    } catch (err) {
-      console.error('Toggle staff error:', err);
-      UI.showToast(err.message ? I18n.translateError(err.message) : t('msg_update_staff_failed', 'Could not update staff status.'), 'error');
-    } finally {
-      UI.hideLoading();
-    }
-  }
-
   function openCreateStaffModal() {
     document.getElementById('modal-staff-alert').style.display = 'none';
     document.getElementById('add-staff-form').reset();
@@ -657,10 +603,7 @@
     const username = document.getElementById('staff-username').value.trim();
     const email = document.getElementById('staff-email').value.trim();
     const phone = document.getElementById('staff-phone').value.trim();
-    const department = document.getElementById('staff-department').value.trim();
-    const designation = document.getElementById('staff-designation').value.trim();
     const password = document.getElementById('staff-password').value;
-    const status = document.getElementById('staff-initial-status').value;
 
     try {
       await API.post('/staff/', {
@@ -669,11 +612,7 @@
         email: email,
         phone: phone,
         phone_number: phone,
-        department: department,
-        designation: designation,
-        password: password,
-        status: status,
-        is_active: status === 'Active'
+        password: password
       });
 
       UI.showToast(I18n.format('staff_created_success', 'Staff officer {name} created successfully!', { name: fullName }), 'success');

@@ -10,7 +10,7 @@ An academic Django application that demonstrates citizen registration, passport 
 flowchart LR
     Browser[Citizen / Staff / Admin browser] -->|HTTPS + HttpOnly session cookie| Django[Django REST API and templates]
     Django --> PostgreSQL[(PostgreSQL)]
-    Django --> Mail[Optional email for personnel MFA]
+    Django --> Mail[SMTP email for citizen verification and personnel MFA]
     Django --> Scan[ClamAV upload scanner]
     Django --> Pay[eSewa signed payment flow]
     Django --> Keys[RSA signing keys]
@@ -24,16 +24,16 @@ Requirements: Python 3.13, PostgreSQL, and Node.js only for JavaScript syntax ch
 
 1. Create and activate a virtual environment.
 2. Install packages with `pip install -r backend/requirements.txt`.
-3. Copy `.env.example` to `.env` and replace every placeholder. Citizen registration uses a required, validated, unique Nepali mobile number and does not require email delivery. For local development, keep `DJANGO_DEBUG=true`, `MALWARE_SCAN_ENABLED=false`, and `PERSONNEL_MFA_REQUIRED=false`.
+3. Copy `.env.example` to `.env` and replace every placeholder. Citizen registration always requires real SMTP delivery; console or browser-displayed verification is rejected. For local development, keep `DJANGO_DEBUG=true`, `MALWARE_SCAN_ENABLED=false`, and `PERSONNEL_MFA_REQUIRED=false`, but supply working SMTP credentials and a sender address.
 4. Create the PostgreSQL database and user named in `.env`.
 5. Set `DB_MIGRATION_USER` to the owner of the existing Django tables. Run `python manage.py migrate` and enter that role's password at the secure prompt, or set `DB_MIGRATION_PASSWORD` in the ignored `.env` file for non-interactive deployment. Only migration commands use the owner account; the web application continues using restricted `DB_USER` credentials.
-6. Run `python manage.py runserver` and open `http://127.0.0.1:8000/`.
+6. In one terminal run `python manage.py run_email_otp_cleanup`; in another run `python manage.py runserver`, then open `http://127.0.0.1:8000/`. The cleanup worker physically removes expired OTP state after five minutes.
 
 For an isolated local stack, run `docker compose up --build`. The Compose file is deliberately configured as a demonstration environment, not production.
 
 ## Workflow
 
-1. Citizen registration with validated, unique email and Nepali mobile fields.
+1. Citizen registration with a time-limited, single-use six-digit email OTP.
 2. Application submission and private UUID tracking reference.
 3. Identity document and passport-photo upload.
 4. Signed, server-verified eSewa payment.
@@ -79,7 +79,7 @@ CI also runs the real migration chain against PostgreSQL. Coverage includes work
 ## Production checklist
 
 - Start from `.env.example`; use a secrets manager rather than committing `.env`.
-- Set `DJANGO_DEBUG=false`, real hosts and trusted HTTPS origins, a long random Django key, database credentials, production eSewa credentials, and mounted RSA key files. Configure email only when personnel MFA is enabled.
+- Set `DJANGO_DEBUG=false`, real hosts and trusted HTTPS origins, a long random Django key, database credentials, real SMTP credentials, production eSewa credentials, and mounted RSA key files.
 - Keep `AUTH_TOKEN_COOKIE_SECURE=true`, `PERSONNEL_MFA_REQUIRED=true`, and `MALWARE_SCAN_ENABLED=true`.
 - Put the container behind a TLS reverse proxy, run ClamAV and PostgreSQL as private services, and store uploaded media in private object storage with authorized download endpoints.
 - Back up PostgreSQL and media, test restores, centralize audit logs, monitor authentication/payment failures, scan dependencies, and define retention and incident-response procedures.

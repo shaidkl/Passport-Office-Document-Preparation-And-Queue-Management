@@ -371,6 +371,22 @@ class WorkflowManager {
             )
           : `Your required documents are uploaded. Pay NPR ${parseFloat(fee).toLocaleString()} so staff verification can begin.`;
 
+        if (state.payment_status === 'PAID') {
+          return {
+            type: 'payment_verification_pending',
+            title: isNe ? 'भुक्तानी प्राप्त भयो — प्रमाणीकरण हुँदैछ' : 'Payment Received — Verification Pending',
+            description: isNe
+              ? 'eSewa ले भुक्तानी स्वीकार गरेको छ। राहदानी प्रणालीले अन्तिम स्थिति जाँच गर्दैछ; फेरि भुक्तानी नगर्नुहोस्।'
+              : 'eSewa accepted the payment. The passport system is checking its final status; do not pay again.',
+            buttonLabel: isNe ? 'स्थिति जाँच्नुहोस्' : 'Check Status',
+            buttonAction: 'checkCurrentPaymentStatus()',
+            buttonUrl: null,
+            icon: 'sync',
+            color: 'warning',
+            paymentReference: state.payment_reference,
+          };
+        }
+
         if (state.payment_status === 'QR_GENERATED' || state.payment_status === 'PENDING') {
           return {
             type: 'complete_payment',

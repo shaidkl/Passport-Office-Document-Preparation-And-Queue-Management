@@ -17,8 +17,11 @@ from .views import (
     verify_login_mfa,
     logout_view,
     register_view,
+    resend_registration_verification_email,
+    verify_registration_email,
     track_application_view,
     verify_signature_view,
+    staff_duty_status_view,
 )
 
 
@@ -111,7 +114,12 @@ router.register(
 
 
 urlpatterns = [
+    # Keep self-service duty status ahead of the staff CRUD router so it can
+    # never be interpreted as an administrator-only staff detail route.
+    path('staff/duty-status/', staff_duty_status_view, name='staff-duty-status-self'),
     path('', include(router.urls)),
+    path('registration/email-verification/verify/', verify_registration_email, name='registration-email-verify'),
+    path('registration/email-verification/resend/', resend_registration_verification_email, name='registration-email-resend'),
     path('login/', login_view, name='login'),
     path('login/mfa/verify/', verify_login_mfa, name='login-mfa-verify'),
     path('logout/', logout_view, name='logout'),

@@ -6,11 +6,12 @@ from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.mail import send_mail
+from django.core.validators import validate_email
 from django.contrib.sessions.backends.db import SessionStore
 from django.contrib.sessions.models import Session
 from django.conf import settings
-from django.db import IntegrityError, connection, transaction
-from django.db.models import Q, Max, Sum
+from django.db import IntegrityError, transaction
+from django.db.models import Q, Sum
 from django.utils import timezone
 from django.http import HttpResponse
 from django.shortcuts import redirect
@@ -19,6 +20,7 @@ import os
 import re
 import secrets
 import json
+import hashlib
 import logging
 from datetime import timedelta
 from decimal import Decimal
@@ -39,13 +41,22 @@ from .login_security import (
 from .upload_security import UploadSecurityError, validate_uploaded_document
 from .workflow_service import build_workflow_facts
 from .passport_number_service import assign_passport_number
+from .queue_service import ensure_processing_queue_token
 from .throttles import PublicTrackingThrottle
+from .email_verification_service import (
+    EmailVerificationDeliveryError,
+    ExpiredEmailVerificationOtp,
+    InvalidEmailVerificationOtp,
+    send_registration_verification_email,
+    verify_registration_email_otp,
+)
 
 from .permissions import (
     IsAdministrator,
-    IsStaff,
     IsApplicant,
-    IsStaffOrAdministrator
+    IsStaffOrAdministrator,
+    IsOnDutyStaffOrAdministrator,
+    IsAuthenticatedWithStaffOnDuty,
 )
 
 from .models import (
@@ -60,6 +71,7 @@ from .models import (
     ActivityLog,
     Notification,
     Payment,
+    LoginAttempt,
 )
 
 from .serializers import (
@@ -96,6 +108,7 @@ def _login_payload(user_type, user):
             'role': 'staff', 'user_id': user.staff_id,
             'name': user.full_name, 'username': user.username, 'email': user.email,
             'department': user.department, 'designation': user.designation,
+            'status': user.status, 'is_active': bool(user.is_active),
         }
     return {
         'role': 'citizen', 'user_id': user.applicant_id,
@@ -128,7 +141,10 @@ def _personnel_account_is_active(user_type, user):
     if user_type == 'administrator':
         return bool(user.is_active)
     if user_type == 'staff':
-        return bool(user.is_active and user.status == 'Active')
+        # Staff availability is self-managed after login. Inactive officers can
+        # sign in only to change their duty status; operational permissions
+        # remain blocked until they go active.
+        return True
     return True
 
 
@@ -167,53 +183,6 @@ def _start_personnel_mfa(user_type, user, remember_me):
         'role': 'administrator' if user_type == 'administrator' else 'staff',
         'expires_in': settings.PERSONNEL_MFA_TTL_SECONDS,
     }, status=status.HTTP_202_ACCEPTED)
-
-
-def _next_daily_queue_number(queue_date):
-    """Allocate the next daily queue number inside the caller's transaction."""
-    if connection.vendor == 'postgresql':
-        # Serialize daily MAX+1 allocation even when there is no row to lock.
-        with connection.cursor() as cursor:
-            cursor.execute(
-                'SELECT pg_advisory_xact_lock(%s)',
-                [0x50535000 + queue_date.toordinal()],
-            )
-    current_max = QueueToken.objects.filter(
-        token_date=queue_date
-    ).aggregate(Max('token_number'))['token_number__max']
-    return (current_max + 1) if current_max else 101
-
-
-def _ensure_processing_queue_token(application):
-    """Assign the processing token only after the application is digitally signed."""
-    queue_date = timezone.localdate()
-    token = QueueToken.objects.select_for_update().filter(
-        application=application
-    ).first()
-
-    if token is None:
-        token = QueueToken.objects.create(
-            application=application,
-            token_number=_next_daily_queue_number(queue_date),
-            queue_status='Waiting',
-        )
-    elif token.queue_status in {'Completed', 'Skipped'} and application.status not in {'Approved', 'Completed'}:
-        # Normalize legacy/pre-workflow tokens without deleting their record.
-        token.token_number = _next_daily_queue_number(queue_date)
-        token.token_date = queue_date
-        token.time_slot = None
-        token.queue_status = 'Waiting'
-        token.called_time = None
-        token.staff = None
-        token.save(update_fields=[
-            'token_number',
-            'token_date',
-            'time_slot',
-            'queue_status',
-            'called_time',
-            'staff',
-        ])
-    return token
 
 
 def _current_document_review_is_complete(application):
@@ -268,7 +237,7 @@ class ApplicantViewSet(viewsets.ModelViewSet):
     serializer_class = ApplicantSerializer
     authentication_classes = [CustomTokenAuthentication]
     permission_classes = [
-        IsApplicant | IsStaffOrAdministrator
+        IsApplicant | IsOnDutyStaffOrAdministrator
     ]
 
     def get_permissions(self):
@@ -276,7 +245,7 @@ class ApplicantViewSet(viewsets.ModelViewSet):
             return [IsAdministrator()]
         if self.action in {'update', 'partial_update'}:
             return [(IsApplicant | IsAdministrator)()]
-        return [(IsApplicant | IsStaffOrAdministrator)()]
+        return [(IsApplicant | IsOnDutyStaffOrAdministrator)()]
 
     def get_queryset(self):
         user = self.request.user
@@ -343,9 +312,9 @@ class ApplicantViewSet(viewsets.ModelViewSet):
             application__applicant=applicant,
             document_type='Passport Photo',
             verification_status='Verified',
-        ).exclude(file_path='').order_by('-upload_date', '-document_id').first()
+        ).order_by('-upload_date', '-document_id').first()
 
-        if not photo or not photo.file_path:
+        if not photo or not photo.has_available_file():
             return Response(
                 {"error": "No verified profile photo is available."},
                 status=status.HTTP_404_NOT_FOUND,
@@ -363,8 +332,8 @@ class ApplicantViewSet(viewsets.ModelViewSet):
             )
 
         try:
-            file_handle = photo.file_path.open('rb')
-        except (FileNotFoundError, OSError):
+            file_handle = photo.open_preserved_file()
+        except (FileNotFoundError, OSError, ValueError):
             return Response(
                 {"error": "The verified profile photo could not be found on storage."},
                 status=status.HTTP_404_NOT_FOUND,
@@ -390,9 +359,18 @@ class StaffViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdministrator]
 
     def get_permissions(self):
-        # Allow staff officers to retrieve desk summary
-        if self.action == 'desk_summary':
+        if self.action == 'duty_status':
+            # The action performs its own explicit role check so a stale
+            # browser session receives a useful portal-specific error.
+            return [IsAuthenticated()]
+        if self.action == 'partial_update':
+            # Administrators may edit staff profiles. Staff may reach this
+            # route only for the tightly restricted self-duty compatibility
+            # flow enforced in partial_update below.
             return [IsStaffOrAdministrator()]
+        # Only on-duty staff officers can retrieve operational desk data.
+        if self.action == 'desk_summary':
+            return [IsOnDutyStaffOrAdministrator()]
         return [IsAdministrator()]
 
     def _get_admin(self):
@@ -405,7 +383,9 @@ class StaffViewSet(viewsets.ModelViewSet):
         return None
 
     def perform_create(self, serializer):
-        staff = serializer.save()
+        # Duty is controlled by the officer from their own dashboard. Every
+        # newly registered officer starts off duty.
+        staff = serializer.save(status='Inactive', is_active=False)
         admin = self._get_admin()
         if admin:
             ActivityLog.objects.create(
@@ -417,11 +397,72 @@ class StaffViewSet(viewsets.ModelViewSet):
         staff = serializer.save()
         admin = self._get_admin()
         if admin:
-            status_label = "Active" if staff.is_active and staff.status == "Active" else "Inactive"
             ActivityLog.objects.create(
                 administrator=admin,
-                action_taken=f"Updated staff officer #{staff.staff_id}: {staff.full_name} ({status_label})"
+                action_taken=f"Updated staff officer #{staff.staff_id}: {staff.full_name}"
             )
+
+    def partial_update(self, request, *args, **kwargs):
+        if getattr(request.user, 'user_type', None) != 'staff':
+            return super().partial_update(request, *args, **kwargs)
+
+        staff_id = getattr(request.user, 'user_id', None)
+        if str(kwargs.get('pk')) != str(staff_id):
+            return Response(
+                {'error': 'Staff officers can change only their own duty status.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        unexpected_fields = set(request.data.keys()) - {'status', 'is_active'}
+        if unexpected_fields:
+            return Response(
+                {'error': 'Only your Active or Inactive duty status can be changed here.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        requested_state = request.data.get('is_active')
+        requested_status = request.data.get('status')
+        if not isinstance(requested_state, bool):
+            if requested_status == 'Active':
+                requested_state = True
+            elif requested_status == 'Inactive':
+                requested_state = False
+            else:
+                return Response(
+                    {'is_active': 'A true or false value is required.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        if requested_status and requested_status != ('Active' if requested_state else 'Inactive'):
+            return Response(
+                {'status': 'Status and active value must agree.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        staff = Staff.objects.get(staff_id=staff_id)
+        if not requested_state and QueueToken.objects.filter(
+            staff=staff,
+            queue_status__in=['Called', 'Serving'],
+        ).exists():
+            return Response(
+                {'error': 'Complete or skip your current token before going inactive.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        staff.is_active = requested_state
+        staff.status = 'Active' if requested_state else 'Inactive'
+        staff.save(update_fields=['is_active', 'status'])
+        ActivityLog.objects.create(
+            action_taken=(
+                f"Staff officer #{staff.staff_id} ({staff.full_name}) set duty "
+                f"status to {staff.status}"
+            )[:255]
+        )
+        return Response({
+            'staff_id': staff.staff_id,
+            'status': staff.status,
+            'is_active': bool(staff.is_active),
+            'can_work': bool(staff.is_active and staff.status == 'Active'),
+        }, status=status.HTTP_200_OK)
 
     def perform_destroy(self, instance):
         admin = self._get_admin()
@@ -503,6 +544,119 @@ class StaffViewSet(viewsets.ModelViewSet):
             "verified_payments": payments,
             "current_token": current_token_data
         }, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get', 'post'], url_path='duty-status')
+    def duty_status(self, request):
+        """Read or change only the signed-in staff officer's duty status."""
+        if getattr(request.user, 'user_type', None) != 'staff':
+            return Response(
+                {
+                    'error': 'Your current browser session is not a staff session. Please sign in through the Staff Portal.',
+                    'code': 'staff_session_required',
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        staff = Staff.objects.filter(
+            staff_id=getattr(request.user, 'user_id', None)
+        ).first()
+        if not staff:
+            return Response(
+                {'error': 'Staff account was not found.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if request.method == 'POST':
+            requested_state = request.data.get('is_active')
+            if not isinstance(requested_state, bool):
+                return Response(
+                    {'is_active': 'A true or false value is required.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if not requested_state and QueueToken.objects.filter(
+                staff=staff,
+                queue_status__in=['Called', 'Serving'],
+            ).exists():
+                return Response(
+                    {'error': 'Complete or skip your current token before going inactive.'},
+                    status=status.HTTP_409_CONFLICT,
+                )
+
+            staff.is_active = requested_state
+            staff.status = 'Active' if requested_state else 'Inactive'
+            staff.save(update_fields=['is_active', 'status'])
+            ActivityLog.objects.create(
+                action_taken=(
+                    f"Staff officer #{staff.staff_id} ({staff.full_name}) set duty "
+                    f"status to {staff.status}"
+                )[:255]
+            )
+
+        return Response({
+            'staff_id': staff.staff_id,
+            'status': staff.status,
+            'is_active': bool(staff.is_active),
+            'can_work': bool(staff.is_active and staff.status == 'Active'),
+        }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET', 'POST'])
+@authentication_classes([CustomTokenAuthentication])
+@permission_classes([IsAuthenticated])
+def staff_duty_status_view(request):
+    """Dedicated self-service duty endpoint, independent of admin staff CRUD."""
+    if getattr(request.user, 'user_type', None) != 'staff':
+        return Response(
+            {
+                'error': 'Please sign in through the Staff Portal to change duty status.',
+                'code': 'staff_session_required',
+            },
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    staff = Staff.objects.filter(
+        staff_id=getattr(request.user, 'user_id', None)
+    ).first()
+    if not staff:
+        return Response(
+            {'error': 'Staff account was not found.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    if request.method == 'POST':
+        requested_state = request.data.get('is_active')
+        if not isinstance(requested_state, bool):
+            return Response(
+                {'is_active': 'A true or false value is required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not requested_state and QueueToken.objects.filter(
+            staff=staff,
+            queue_status__in=['Called', 'Serving'],
+        ).exists():
+            return Response(
+                {'error': 'Complete or skip your current token before going inactive.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        staff.is_active = requested_state
+        staff.status = 'Active' if requested_state else 'Inactive'
+        staff.save(update_fields=['is_active', 'status'])
+        ActivityLog.objects.create(
+            action_taken=(
+                f"Staff officer #{staff.staff_id} ({staff.full_name}) set duty "
+                f"status to {staff.status}"
+            )[:255]
+        )
+
+    response = Response({
+        'staff_id': staff.staff_id,
+        'status': staff.status,
+        'is_active': bool(staff.is_active),
+        'can_work': bool(staff.is_active and staff.status == 'Active'),
+    }, status=status.HTTP_200_OK)
+    response['Cache-Control'] = 'no-store'
+    return response
 
 
 class AdministratorViewSet(viewsets.ModelViewSet):
@@ -598,7 +752,7 @@ class ApplicationViewSet(viewsets.ModelViewSet):
     queryset = Application.objects.all().order_by('-application_id')
     serializer_class = ApplicationSerializer
     authentication_classes = [CustomTokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticatedWithStaffOnDuty]
 
     def get_queryset(self):
         user = self.request.user
@@ -1092,7 +1246,7 @@ class ApplicationViewSet(viewsets.ModelViewSet):
                 {"step": 5, "key": "verification", "title": "Staff Document Verification", "status": "Not Started", "details": "Staff inspect and decide every current document", "action_url": "/applicant/dashboard/", "action_label": "Track Review"},
                 {"step": 6, "key": "biometrics", "title": "Biometrics Verification", "status": "Not Started", "details": "Authorized staff complete biometric verification", "action_url": "/applicant/documents/", "action_label": "Biometrics"},
                 {"step": 7, "key": "signature", "title": "Digital Signature", "status": "Not Started", "details": "Government digital signature authorization", "action_url": "/applicant/dashboard/", "action_label": "Signature"},
-                {"step": 8, "key": "queue", "title": "Queue / Processing", "status": "Not Started", "details": "A processing token is assigned after digital signing", "action_url": "/applicant/queue/", "action_label": "Queue Info"},
+                {"step": 8, "key": "queue", "title": "Queue / Processing", "status": "Not Started", "details": "A processing token is assigned after payment verification", "action_url": "/applicant/queue/", "action_label": "Queue Info"},
                 {"step": 9, "key": "passport_ready", "title": "Passport Generation", "status": "Not Started", "details": "Generated after queue processing is completed", "action_url": "/applicant/dashboard/", "action_label": "Virtual Passport", "can_download": False}
             ]
             return Response({
@@ -1449,7 +1603,9 @@ class ApplicationViewSet(viewsets.ModelViewSet):
                     app.save(update_fields=['issue_date', 'expiry_date', 'last_updated'])
                 sig = _sign_application_record(app)
 
-            token = _ensure_processing_queue_token(app)
+            # Payment verification normally created this token. Keep this
+            # idempotent call so older verified records repair themselves.
+            token = ensure_processing_queue_token(app)
             if token.queue_status != 'Completed' and app.status != 'Pending':
                 app.status = 'Pending'
                 app.processing_notes = (
@@ -1535,7 +1691,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
     queryset = Document.objects.all().order_by('-document_id')
     serializer_class = DocumentSerializer
     authentication_classes = [CustomTokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticatedWithStaffOnDuty]
     # Document records are append-only. Decisions happen only through the
     # explicit, transaction-protected inspection/verify/reject actions below.
     http_method_names = ['get', 'post', 'head', 'options']
@@ -1630,9 +1786,13 @@ class DocumentViewSet(viewsets.ModelViewSet):
                 })
 
             fname = os.path.basename(getattr(uploaded_file, 'name', 'document.pdf'))
+            uploaded_file.seek(0)
+            durable_content = uploaded_file.read()
+            uploaded_file.seek(0)
             doc = serializer.save(
                 application=locked_application,
                 file_path=uploaded_file,
+                file_content=durable_content,
                 file_name=fname,
                 verification_status='Pending',
                 rejection_reason='',
@@ -1730,14 +1890,13 @@ class DocumentViewSet(viewsets.ModelViewSet):
         elif user_type not in ['staff', 'administrator']:
             raise PermissionDenied("Authentication required to inspect documents.")
 
-        if not doc.file_path:
-            return Response({"error": "Document file not found on storage."}, status=status.HTTP_404_NOT_FOUND)
-        try:
-            file_exists = doc.file_path.storage.exists(doc.file_path.name)
-        except (OSError, ValueError, NotImplementedError):
-            file_exists = False
-        if not file_exists:
-            return Response({"error": "Document file not found on storage."}, status=status.HTTP_404_NOT_FOUND)
+        if not doc.has_available_file():
+            return Response({
+                "error": (
+                    "Document content is missing. Reject this record and request a new upload."
+                ),
+                "code": "document_file_missing",
+            }, status=status.HTTP_404_NOT_FOUND)
 
         # Automatically mark as inspected if staff or admin views it
         if user_type in ['staff', 'administrator']:
@@ -1761,9 +1920,10 @@ class DocumentViewSet(viewsets.ModelViewSet):
                     pass
 
         import mimetypes
-        content_type, _ = mimetypes.guess_type(doc.file_name or doc.file_path.name)
+        stored_name = doc.file_path.name if doc.file_path else ''
+        content_type, _ = mimetypes.guess_type(doc.file_name or stored_name)
         if not content_type:
-            ext = os.path.splitext(doc.file_path.name)[1].lower()
+            ext = os.path.splitext(doc.file_name or stored_name)[1].lower()
             if ext == '.pdf':
                 content_type = 'application/pdf'
             elif ext in ['.jpg', '.jpeg']:
@@ -1775,8 +1935,8 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
         from django.http import FileResponse
         try:
-            f = doc.file_path.open('rb')
-            filename = doc.file_name or os.path.basename(doc.file_path.name)
+            f = doc.open_preserved_file()
+            filename = doc.file_name or os.path.basename(stored_name) or 'document'
             response = FileResponse(f, content_type=content_type, as_attachment=False, filename=filename)
             response['X-Frame-Options'] = 'SAMEORIGIN'
             response['X-Content-Type-Options'] = 'nosniff'
@@ -1966,7 +2126,9 @@ class DocumentViewSet(viewsets.ModelViewSet):
             payment_is_verified = application.payments.filter(
                 Q(status='VERIFIED') | Q(payment_status='Completed')
             ).exists()
-            if not payment_is_verified:
+            # A missing legacy file must be rejectable so the citizen can
+            # replace it, even when the fee has not yet been paid.
+            if not payment_is_verified and doc.has_available_file():
                 return Response(
                     {"error": "Payment must be verified before staff can decide a document."},
                     status=status.HTTP_400_BAD_REQUEST,
@@ -2028,7 +2190,7 @@ class DigitalSignatureViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = DigitalSignature.objects.all().order_by('-signature_id')
     serializer_class = DigitalSignatureSerializer
     authentication_classes = [CustomTokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticatedWithStaffOnDuty]
 
     def get_queryset(self):
         user = self.request.user
@@ -2042,7 +2204,7 @@ class QueueTokenViewSet(viewsets.ModelViewSet):
     queryset = QueueToken.objects.all().order_by('token_number')
     serializer_class = QueueTokenSerializer
     authentication_classes = [CustomTokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticatedWithStaffOnDuty]
 
     VALID_STATUS_TRANSITIONS = {
         'Waiting': {'Called', 'Skipped'},
@@ -2054,12 +2216,12 @@ class QueueTokenViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.action in {'list', 'retrieve'}:
-            return [IsAuthenticated()]
-        return [IsStaffOrAdministrator()]
+            return [IsAuthenticatedWithStaffOnDuty()]
+        return [IsOnDutyStaffOrAdministrator()]
 
     def create(self, request, *args, **kwargs):
         return Response(
-            {"error": "Queue tokens are assigned automatically after digital signature authorization."},
+            {"error": "Queue tokens are assigned automatically after payment verification."},
             status=status.HTTP_405_METHOD_NOT_ALLOWED,
         )
 
@@ -2073,9 +2235,7 @@ class QueueTokenViewSet(viewsets.ModelViewSet):
         user = self.request.user
         user_type = getattr(user, 'user_type', None)
         user_id = getattr(user, 'user_id', None)
-        queryset = QueueToken.objects.filter(
-            application__digital_signature__is_valid=True
-        )
+        queryset = QueueToken.objects.all()
         if user_type == 'applicant':
             return queryset.filter(application__applicant_id=user_id).order_by('-token_id')
         return queryset.order_by('token_number')
@@ -2115,7 +2275,10 @@ class QueueTokenViewSet(viewsets.ModelViewSet):
         if new_status == token.queue_status:
             return False
 
-        self._validate_processing_gate(token.application)
+        # Skipping retires a broken, stale, or no-show token and must remain
+        # possible even if a legacy record does not satisfy modern gates.
+        if new_status != 'Skipped':
+            self._validate_processing_gate(token.application)
 
         update_fields = ['queue_status']
         token.queue_status = new_status
@@ -2136,6 +2299,17 @@ class QueueTokenViewSet(viewsets.ModelViewSet):
                     token.application.save(update_fields=['staff', 'last_updated'])
 
         token.save(update_fields=update_fields)
+        if new_status == 'Skipped':
+            try:
+                ActivityLog.objects.create(
+                    application=token.application,
+                    action_taken=(
+                        f"Queue token T-{token.token_number:03d} retired as Skipped "
+                        f"from {current_status} status"
+                    )[:255],
+                )
+            except Exception:
+                pass
         if new_status == 'Completed' and token.application:
             self._handle_token_completion(token)
         return True
@@ -2214,7 +2388,13 @@ class QueueTokenViewSet(viewsets.ModelViewSet):
                 application__digital_signature__is_valid=True,
             ).order_by('token_date', 'token_number').first()
             if not token:
-                return Response({"message": "No pending citizens in waiting queue.", "token": None}, status=status.HTTP_200_OK)
+                return Response({
+                    "message": (
+                        "No eligible tokens are ready for processing. Complete document "
+                        "verification, biometrics, and digital signature first."
+                    ),
+                    "token": None,
+                }, status=status.HTTP_200_OK)
 
             self._validate_processing_gate(token.application)
             token.queue_status = 'Called'
@@ -2327,7 +2507,7 @@ class NotificationViewSet(viewsets.ModelViewSet):
     queryset = Notification.objects.all().order_by('-notification_id')
     serializer_class = NotificationSerializer
     authentication_classes = [CustomTokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticatedWithStaffOnDuty]
     http_method_names = ['get', 'post', 'patch', 'head', 'options']
 
     def get_queryset(self):
@@ -2374,7 +2554,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
     queryset = Payment.objects.all().order_by('-payment_id')
     serializer_class = PaymentSerializer
     authentication_classes = [CustomTokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticatedWithStaffOnDuty]
 
     def create(self, request, *args, **kwargs):
         return Response(
@@ -2861,6 +3041,15 @@ def login_view(request):
             status=status.HTTP_403_FORBIDDEN,
         )
 
+    if user_type == 'applicant' and authenticated_user.email_verified_at is None:
+        return Response(
+            {
+                'error': 'Please verify your email before logging in.',
+                'code': 'email_unverified',
+            },
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
     if not _personnel_account_is_active(user_type, authenticated_user):
         return Response(
             {"error": "This personnel account is inactive or deactivated."},
@@ -3005,6 +3194,247 @@ def verify_signature_view(request, verification_code):
     }, status=status.HTTP_200_OK)
 
 
+def _email_verification_request_ip_hash(request):
+    remote_address = str(request.META.get('REMOTE_ADDR') or 'unknown')
+    value = f'{settings.SECRET_KEY}:email-verification-ip:{remote_address}'
+    return hashlib.sha256(value.encode('utf-8')).hexdigest()
+
+
+def _email_verification_rate_hash(label, value):
+    raw_key = f'{settings.SECRET_KEY}:email-verification-rate:{label}:{value}'
+    return hashlib.sha256(raw_key.encode('utf-8')).hexdigest()
+
+
+def _consume_email_verification_quota(key_hash, scope, limit, window_seconds):
+    """Consume one quota unit and return retry seconds, or zero when allowed."""
+    now = timezone.now()
+    window = timedelta(seconds=max(1, window_seconds))
+    with transaction.atomic():
+        quota, created = LoginAttempt.objects.select_for_update().get_or_create(
+            key_hash=key_hash,
+            defaults={
+                'scope': scope,
+                'attempts': 1,
+                'window_started_at': now,
+                'last_failed_at': now,
+            },
+        )
+        if created:
+            return 0
+        if now - quota.window_started_at >= window:
+            quota.attempts = 1
+            quota.window_started_at = now
+            quota.last_failed_at = now
+            quota.locked_until = None
+            quota.save(update_fields=['attempts', 'window_started_at', 'last_failed_at', 'locked_until'])
+            return 0
+        if quota.attempts >= limit:
+            retry_at = quota.window_started_at + window
+            quota.locked_until = retry_at
+            quota.save(update_fields=['locked_until'])
+            return max(1, int((retry_at - now).total_seconds()))
+        quota.attempts += 1
+        quota.last_failed_at = now
+        quota.save(update_fields=['attempts', 'last_failed_at'])
+    return 0
+
+
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def verify_registration_email(request):
+    """Consume one six-digit email OTP and activate the citizen account."""
+    email = str(request.data.get('email') or '').strip().lower()
+    otp = str(request.data.get('otp') or '').strip()
+    try:
+        validate_email(email)
+    except DjangoValidationError:
+        return Response(
+            {'email': ['Enter a valid email address.']},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if not re.fullmatch(r'\d{6}', otp):
+        return Response(
+            {
+                'otp': ['Enter the six-digit verification code.'],
+                'code': 'email_otp_invalid',
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    applicant = Applicant.objects.filter(email__iexact=email).first()
+    if not applicant:
+        return Response(
+            {
+                'email': ['No citizen account is registered with this email address.'],
+                'code': 'email_account_not_found',
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if applicant.email_verified_at is not None:
+        return Response(
+            {
+                'error': 'This email address is already verified. Please log in.',
+                'code': 'email_already_verified',
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    ip_hash = _email_verification_request_ip_hash(request)
+    quota_keys = [
+        _email_verification_rate_hash('otp-attempt-account', email),
+        _email_verification_rate_hash('otp-attempt-ip', ip_hash),
+    ]
+    max_attempts = max(1, settings.EMAIL_VERIFICATION_OTP_MAX_ATTEMPTS)
+    attempt_window = max(60, settings.EMAIL_VERIFICATION_OTP_ATTEMPT_WINDOW_SECONDS)
+    for key_hash, scope in zip(quota_keys, ('account', 'ip')):
+        retry_after = _consume_email_verification_quota(
+            key_hash, scope, max_attempts, attempt_window,
+        )
+        if retry_after:
+            response = Response(
+                {
+                    'error': 'Too many incorrect verification attempts. Please try again later.',
+                    'code': 'email_otp_rate_limited',
+                    'retry_after': retry_after,
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+            response['Retry-After'] = str(retry_after)
+            return response
+
+    try:
+        with transaction.atomic():
+            applicant = Applicant.objects.select_for_update().get(
+                applicant_id=applicant.applicant_id,
+            )
+            if applicant.email_verified_at is not None:
+                return Response(
+                    {
+                        'error': 'This email address is already verified. Please log in.',
+                        'code': 'email_already_verified',
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            verify_registration_email_otp(applicant, otp)
+            applicant.email_verified_at = timezone.now()
+            applicant.save(update_fields=['email_verified_at'])
+    except ExpiredEmailVerificationOtp:
+        return Response(
+            {
+                'error': 'This verification code has expired. Request a new OTP.',
+                'code': 'email_otp_expired',
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    except InvalidEmailVerificationOtp:
+        return Response(
+            {
+                'error': 'The verification code is incorrect.',
+                'code': 'email_otp_invalid',
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    except Applicant.DoesNotExist:
+        return Response(
+            {
+                'email': ['No citizen account is registered with this email address.'],
+                'code': 'email_account_not_found',
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    LoginAttempt.objects.filter(key_hash__in=quota_keys).delete()
+    return Response(
+        {'message': 'Email verified successfully. You can now log in.'},
+        status=status.HTTP_200_OK,
+    )
+
+
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def resend_registration_verification_email(request):
+    """Rate-limit and resend a real SMTP verification OTP."""
+    email = str(request.data.get('email') or '').strip().lower()
+    try:
+        validate_email(email)
+    except DjangoValidationError:
+        return Response(
+            {'email': ['Enter a valid email address.']},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    applicant = Applicant.objects.filter(email__iexact=email).first()
+    if not applicant:
+        return Response(
+            {
+                'email': ['No citizen account is registered with this email address.'],
+                'code': 'email_account_not_found',
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    if applicant.email_verified_at is not None:
+        return Response(
+            {
+                'email': ['This email address is already verified. Please log in.'],
+                'code': 'email_already_verified',
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    cooldown = max(1, settings.EMAIL_VERIFICATION_RESEND_COOLDOWN_SECONDS)
+    ip_hash = _email_verification_request_ip_hash(request)
+    quota_checks = [
+        (_email_verification_rate_hash('cooldown', email), 'account', 1, cooldown),
+        (
+            _email_verification_rate_hash('email-hour', email),
+            'account',
+            settings.EMAIL_VERIFICATION_MAX_SENDS_PER_HOUR,
+            3600,
+        ),
+        (
+            _email_verification_rate_hash('ip-hour', ip_hash),
+            'ip',
+            settings.EMAIL_VERIFICATION_IP_MAX_SENDS_PER_HOUR,
+            3600,
+        ),
+    ]
+    for key_hash, scope, limit, window_seconds in quota_checks:
+        retry_after = _consume_email_verification_quota(
+            key_hash, scope, max(1, limit), window_seconds,
+        )
+        if retry_after:
+            message = (
+                f'Please wait {retry_after} seconds before requesting another verification OTP.'
+                if window_seconds == cooldown
+                else 'Too many verification OTPs were requested. Please try again later.'
+            )
+            response = Response(
+                {
+                    'error': message,
+                    'code': 'email_resend_rate_limited',
+                    'retry_after': retry_after,
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+            response['Retry-After'] = str(retry_after)
+            return response
+
+    try:
+        send_registration_verification_email(applicant)
+    except EmailVerificationDeliveryError as error:
+        return Response(
+            {'error': str(error), 'code': 'verification_email_not_sent'},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    return Response(
+        {'message': 'A new verification OTP was sent. Check your inbox.'},
+        status=status.HTTP_200_OK,
+    )
+
+
 @api_view(['POST'])
 @authentication_classes([])
 @permission_classes([AllowAny])
@@ -3037,6 +3467,7 @@ def register_view(request):
         'gender': validated['gender'],
         'nationality': validated['nationality'],
         'address': validated['address'],
+        'email_verified_at': None,
     }
 
     try:
@@ -3065,8 +3496,20 @@ def register_view(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
+    try:
+        send_registration_verification_email(user)
+    except EmailVerificationDeliveryError as error:
+        return Response(
+            {
+                'error': str(error),
+                'code': 'verification_email_not_sent',
+                'account_created': True,
+            },
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
     return Response({
-        'message': 'Registration successful. You can now log in.',
+        'message': 'Registration successful. Enter the OTP sent to your email before logging in.',
         'role': 'citizen',
         'user_id': user.applicant_id,
     }, status=status.HTTP_201_CREATED)
@@ -3127,9 +3570,9 @@ def track_application_view(request):
     signature_verified = facts['signature_is_valid']
     payment_verified = facts['payment_verified']
 
-    # A queue token belongs to the public workflow only after signing.
+    # The queue number becomes visible as soon as payment is verified.
     token_data = None
-    if signature_verified and facts['queue_token']:
+    if payment_verified and facts['queue_token']:
         token = facts['queue_token']
         token_data = {
             "token_number": token.token_number,

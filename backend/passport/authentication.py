@@ -38,10 +38,10 @@ class CustomTokenAuthentication(BaseAuthentication):
                 try:
                     if direct_user.user_type == "applicant":
                         u = Applicant.objects.get(applicant_id=direct_user.user_id)
+                        if u.email_verified_at is None:
+                            raise AuthenticationFailed("Please verify your email before logging in.")
                     elif direct_user.user_type == "staff":
                         u = Staff.objects.get(staff_id=direct_user.user_id)
-                        if not u.is_active or u.status != "Active":
-                            raise AuthenticationFailed("Staff account is inactive.")
                     elif direct_user.user_type == "administrator":
                         u = Administrator.objects.get(admin_id=direct_user.user_id)
                         if not u.is_active:
@@ -104,6 +104,8 @@ class CustomTokenAuthentication(BaseAuthentication):
                 )
             except Applicant.DoesNotExist:
                 raise AuthenticationFailed("Applicant not found.")
+            if user.email_verified_at is None:
+                raise AuthenticationFailed("Please verify your email before logging in.")
 
         elif auth_token.user_type == "staff":
 
@@ -113,9 +115,6 @@ class CustomTokenAuthentication(BaseAuthentication):
                 )
             except Staff.DoesNotExist:
                 raise AuthenticationFailed("Staff not found.")
-
-            if not user.is_active or user.status != "Active":
-                raise AuthenticationFailed("Staff account is inactive.")
 
         elif auth_token.user_type == "administrator":
 

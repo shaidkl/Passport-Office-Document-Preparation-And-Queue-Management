@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block title %}Verify Email - Nepal Passport Portal{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/public.css?v=20260917-1">
+{% endblock %}
+
+{% block content %}
+<div class="auth-page-wrapper">
+  <div class="auth-card">
+    <header class="auth-header">
+      <div class="auth-header-icon">
+        <span class="material-symbols-outlined">password</span>
+      </div>
+      <h1 class="auth-title" data-i18n="verify_email_title">Verify email with OTP</h1>
+      <p class="auth-subtitle" data-i18n="verify_email_subtitle">Enter the six-digit OTP sent to your email address.</p>
+    </header>
+
+    <div id="verification-result" class="alert alert-info" role="status" aria-live="polite" style="display:none;"></div>
+
+    <form id="email-otp-form">
+      <div class="form-group">
+        <label class="form-label" for="verification-email" data-i18n="email_label">Email Address</label>
+        <input id="verification-email" class="form-control" type="email" autocomplete="email" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="verification-otp" data-i18n="email_otp_label">Six-digit OTP</label>
+        <input
+          id="verification-otp"
+          class="form-control"
+          type="text"
+          inputmode="numeric"
+          pattern="[0-9]{6}"
+          maxlength="6"
+          autocomplete="one-time-code"
+          placeholder="Enter the OTP from your email"
+          data-i18n-placeholder="email_otp_placeholder"
+          required
+        >
+      </div>
+      <button id="verify-otp-button" type="submit" class="btn btn-primary btn-block btn-lg">
+        <span class="material-symbols-outlined">verified</span>
+        <span id="verify-otp-button-text" data-i18n="email_otp_verify">Verify OTP</span>
+      </button>
+    </form>
+
+    <button id="resend-otp-button" type="button" class="btn btn-outline btn-block mt-sm">
+      <span class="material-symbols-outlined">forward_to_inbox</span>
+      <span data-i18n="resend_verification_button">Resend verification OTP</span>
+    </button>
+
+    <a id="verification-login-link" href="/login/" class="btn btn-outline btn-block mt-sm" style="display:none;">
+      <span class="material-symbols-outlined">login</span>
+      <span data-i18n="verify_email_login">Continue to citizen login</span>
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ csp_nonce }}">
+  const translateOtp = (key, fallback) => (typeof I18n !== 'undefined') ? I18n.t(key, fallback) : fallback;
+
+  function showOtpResult(message, type = 'info') {
+    const result = document.getElementById('verification-result');
+    result.className = `alert alert-${type}`;
+    result.textContent = message;
+    result.style.display = 'flex';
+  }
+
+  function otpErrorMessage(error) {
+    const data = error.data || {};
+    if (data.code === 'email_otp_expired') {
+      return translateOtp('verify_email_expired', 'This OTP has expired. Request a new OTP.');
+    }
+    if (data.code === 'email_otp_invalid') {
+      return translateOtp('verify_email_invalid', 'The verification OTP is incorrect.');
+    }
+    if (data.code === 'email_otp_rate_limited') {
+      return translateOtp('email_otp_rate_limited', 'Too many incorrect attempts. Please wait {seconds} seconds.')
+        .replace('{seconds}', String(data.retry_after || 60));
+    }
+    if (data.code === 'email_resend_rate_limited') {
+      return translateOtp('email_resend_rate_limited', 'Please wait {seconds} seconds before requesting another verification OTP.')
+        .replace('{seconds}', String(data.retry_after || 60));
+    }
+    if (data.code === 'verification_email_not_sent') {
+      return translateOtp('verification_email_not_sent', 'The verification OTP could not be sent. Please try again.');
+    }
+    if (data.code === 'email_already_verified') {
+      return translateOtp('email_already_verified', 'This email address is already verified. Please log in.');
+    }
+    if (data.code === 'email_account_not_found') {
+      return translateOtp('email_account_not_found', 'No citizen account is registered with this email address.');
+    }
+    if (Array.isArray(data.email)) return data.email[0];
+    if (Array.isArray(data.otp)) return data.otp[0];
+    return error.message || translateOtp('verify_email_invalid', 'The verification OTP is incorrect.');
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const params = new URLSearchParams(window.location.search);
+    const emailInput = document.getElementById('verification-email');
+    const otpInput = document.getElementById('verification-otp');
+    emailInput.value = params.get('email') || '';
+    if (params.get('send_failed') === '1') {
+      showOtpResult(
+        translateOtp('email_verification_failed', 'The OTP email could not be sent. Check SMTP settings, then resend it.'),
+        'danger'
+      );
+    }
+    (emailInput.value ? otpInput : emailInput).focus();
+  });
+
+  document.getElementById('email-otp-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const email = document.getElementById('verification-email').value.trim();
+    const otpInput = document.getElementById('verification-otp');
+    const otp = otpInput.value.trim();
+    const button = document.getElementById('verify-otp-button');
+    const buttonText = document.getElementById('verify-otp-button-text');
+
+    if (!/^\d{6}$/.test(otp)) {
+      showOtpResult(translateOtp('email_otp_invalid', 'Enter the six-digit OTP.'), 'danger');
+      otpInput.focus();
+      return;
+    }
+
+    button.disabled = true;
+    buttonText.textContent = translateOtp('email_otp_verifying', 'Verifying OTP...');
+    try {
+      await API.post('/registration/email-verification/verify/', { email, otp });
+      showOtpResult(translateOtp('verify_email_success', 'Email verified successfully. You can now log in.'), 'success');
+      document.getElementById('email-otp-form').style.display = 'none';
+      document.getElementById('resend-otp-button').style.display = 'none';
+      document.getElementById('verification-login-link').style.display = 'flex';
+    } catch (error) {
+      showOtpResult(otpErrorMessage(error), 'danger');
+      otpInput.select();
+      button.disabled = false;
+      buttonText.textContent = translateOtp('email_otp_verify', 'Verify OTP');
+    }
+  });
+
+  document.getElementById('resend-otp-button').addEventListener('click', async () => {
+    const email = document.getElementById('verification-email').value.trim();
+    const button = document.getElementById('resend-otp-button');
+    if (!email) {
+      showOtpResult(translateOtp('email_otp_email_required', 'Enter your registered email address.'), 'danger');
+      document.getElementById('verification-email').focus();
+      return;
+    }
+    button.disabled = true;
+    try {
+      await API.post('/registration/email-verification/resend/', { email });
+      showOtpResult(translateOtp('verification_email_resent', 'A new verification OTP was sent. Check your inbox.'), 'success');
+      document.getElementById('verification-otp').value = '';
+      document.getElementById('verification-otp').focus();
+    } catch (error) {
+      showOtpResult(otpErrorMessage(error), 'danger');
+    } finally {
+      button.disabled = false;
+    }
+  });
+</script>
+{% endblock %}

@@ -4,6 +4,7 @@ from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
 import hashlib
+import io
 import secrets
 import uuid
 
@@ -508,10 +509,10 @@ class Application(models.Model):
             "has_identity_document": has_identity,
         }
 
-        # Step 8: Queue / Processing. This remains locked until signing.
+        # Step 8: Issue the number after verified payment; processing remains gated.
         token = facts['queue_token']
         token_status = "Locked"
-        token_details = "Locked until the government digital signature is authorized"
+        token_details = "Locked until the application fee payment is verified"
 
         step4 = {
             "step": 4,
@@ -693,19 +694,21 @@ class Application(models.Model):
             "action_label": "View Signature"
         }
 
-        # The processing queue begins only after a valid signature exists.
-        if facts['signature_is_valid']:
+        # The token number is issued after payment verification. Staff cannot
+        # call it until documents, biometrics, and signing are complete.
+        if is_payment_verified:
             if token:
                 q_pos = self.queue_position
                 pos_text = f" • Position #{q_pos} in line" if q_pos > 0 else ""
                 token_status = "Completed" if token.queue_status == "Completed" else "In Progress"
                 token_details = (
                     f"Token T-{token.token_number:03d} "
+                    f"issued after payment verification "
                     f"(Status: {token.queue_status}{pos_text})"
                 )
             else:
                 token_status = "In Progress"
-                token_details = "Digital signature authorized; processing token is being assigned"
+                token_details = "Payment verified; processing token is being assigned"
             step4.update({
                 "status": token_status,
                 "details": token_details,
@@ -808,6 +811,14 @@ class Document(models.Model):
         upload_to="documents/"
     )
 
+    # Durable copy of the validated upload. The FileField path is retained for
+    # compatibility, while protected reads prefer these PostgreSQL bytes.
+    file_content = models.BinaryField(
+        null=True,
+        blank=True,
+        editable=False,
+    )
+
     upload_date = models.DateTimeField(auto_now_add=True)
 
     verification_status = models.CharField(
@@ -825,6 +836,27 @@ class Document(models.Model):
         default=False,
         help_text="Tracks whether staff/admin has opened and visually inspected the uploaded document file."
     )
+
+    def has_available_file(self):
+        if self.file_content:
+            return True
+        if not self.file_path:
+            return False
+        try:
+            return self.file_path.storage.exists(self.file_path.name)
+        except (OSError, ValueError, NotImplementedError):
+            return False
+
+    def open_preserved_file(self):
+        """Open the database copy first, then a legacy filesystem upload."""
+        if self.file_content:
+            return io.BytesIO(bytes(self.file_content))
+        if self.file_path:
+            try:
+                return self.file_path.open('rb')
+            except (FileNotFoundError, OSError, ValueError):
+                pass
+        raise FileNotFoundError('Document content is unavailable.')
 
     def __str__(self):
         return self.document_type

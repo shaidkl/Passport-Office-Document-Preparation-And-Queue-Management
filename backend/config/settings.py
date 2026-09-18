@@ -213,27 +213,42 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 _MAILER_BACKEND = os.environ.get(
     'EMAIL_BACKEND',
-    'django.core.mail.backends.console.EmailBackend' if DEBUG
-    else 'django.core.mail.backends.smtp.EmailBackend',
+    'django.core.mail.backends.smtp.EmailBackend',
 )
-DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'no-reply@passport.gov.np')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', '').strip()
 
 _MAILER_OPTIONS = {}
 if _MAILER_BACKEND.endswith('smtp.EmailBackend'):
+    _email_host = os.environ.get('EMAIL_HOST', '').strip()
+    _email_password = os.environ.get('EMAIL_HOST_PASSWORD', '')
+    # Google displays app passwords in four-character groups. Ignore those
+    # display spaces while preserving spaces for every other SMTP provider.
+    if _email_host.casefold() == 'smtp.gmail.com':
+        _email_password = ''.join(_email_password.split())
     _MAILER_OPTIONS = {
-        'host': os.environ.get('EMAIL_HOST', ''),
+        'host': _email_host,
         'port': int(os.environ.get('EMAIL_PORT', '587')),
         'username': os.environ.get('EMAIL_HOST_USER', ''),
-        'password': os.environ.get('EMAIL_HOST_PASSWORD', ''),
+        'password': _email_password,
         'use_tls': _env_bool('EMAIL_USE_TLS', True),
         'timeout': int(os.environ.get('EMAIL_TIMEOUT', '20')),
     }
+
 MAILERS = {
     'default': {
         'BACKEND': _MAILER_BACKEND,
         'OPTIONS': _MAILER_OPTIONS,
     },
 }
+
+PUBLIC_BASE_URL = os.environ.get(
+    'PUBLIC_BASE_URL',
+    'http://127.0.0.1:8000' if DEBUG else '',
+).strip().rstrip('/')
+if not PUBLIC_BASE_URL:
+    raise ImproperlyConfigured('PUBLIC_BASE_URL is required for email verification links.')
+if not DEBUG and not PUBLIC_BASE_URL.startswith('https://'):
+    raise ImproperlyConfigured('PUBLIC_BASE_URL must use HTTPS in production.')
 
 # Passport Configuration
 PASSPORT_VALIDITY_YEARS = 10
@@ -250,15 +265,37 @@ PERSONNEL_MFA_REQUIRED = _env_bool('PERSONNEL_MFA_REQUIRED', not DEBUG)
 PERSONNEL_MFA_TTL_SECONDS = int(os.environ.get('PERSONNEL_MFA_TTL_SECONDS', '300'))
 PERSONNEL_MFA_MAX_ATTEMPTS = int(os.environ.get('PERSONNEL_MFA_MAX_ATTEMPTS', '5'))
 
-if not DEBUG and PERSONNEL_MFA_REQUIRED:
+# Citizen verification always requires real SMTP delivery. The service layer
+# rejects console, in-memory, and other local-only backends in every environment.
+EMAIL_VERIFICATION_TTL_SECONDS = int(os.environ.get('EMAIL_VERIFICATION_TTL_SECONDS', '300'))
+EMAIL_VERIFICATION_RESEND_COOLDOWN_SECONDS = int(
+    os.environ.get('EMAIL_VERIFICATION_RESEND_COOLDOWN_SECONDS', '60')
+)
+EMAIL_VERIFICATION_MAX_SENDS_PER_HOUR = int(
+    os.environ.get('EMAIL_VERIFICATION_MAX_SENDS_PER_HOUR', '5')
+)
+EMAIL_VERIFICATION_IP_MAX_SENDS_PER_HOUR = int(
+    os.environ.get('EMAIL_VERIFICATION_IP_MAX_SENDS_PER_HOUR', '20')
+)
+EMAIL_VERIFICATION_OTP_MAX_ATTEMPTS = int(
+    os.environ.get('EMAIL_VERIFICATION_OTP_MAX_ATTEMPTS', '5')
+)
+EMAIL_VERIFICATION_OTP_ATTEMPT_WINDOW_SECONDS = int(
+    os.environ.get('EMAIL_VERIFICATION_OTP_ATTEMPT_WINDOW_SECONDS', '900')
+)
+EMAIL_VERIFICATION_OTP_CLEANUP_INTERVAL_SECONDS = int(
+    os.environ.get('EMAIL_VERIFICATION_OTP_CLEANUP_INTERVAL_SECONDS', '5')
+)
+
+if not DEBUG:
     if _MAILER_BACKEND != 'django.core.mail.backends.smtp.EmailBackend':
-        raise ImproperlyConfigured('Personnel MFA requires a real SMTP email backend in production.')
+        raise ImproperlyConfigured('Citizen email verification requires a real SMTP backend in production.')
     if not all(_MAILER_OPTIONS.get(name) for name in ('host', 'username', 'password')):
         raise ImproperlyConfigured(
-            'EMAIL_HOST, EMAIL_HOST_USER, and EMAIL_HOST_PASSWORD are required when personnel MFA is enabled.'
+            'EMAIL_HOST, EMAIL_HOST_USER, and EMAIL_HOST_PASSWORD are required in production.'
         )
     if not DEFAULT_FROM_EMAIL:
-        raise ImproperlyConfigured('DEFAULT_FROM_EMAIL is required when personnel MFA is enabled.')
+        raise ImproperlyConfigured('DEFAULT_FROM_EMAIL is required in production.')
 
 MALWARE_SCAN_ENABLED = _env_bool('MALWARE_SCAN_ENABLED', not DEBUG)
 CLAMAV_HOST = os.environ.get('CLAMAV_HOST', '127.0.0.1')

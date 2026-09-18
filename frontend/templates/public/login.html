@@ -48,6 +48,22 @@
 
     <div id="login-alert" class="alert alert-danger" role="alert" aria-live="polite" style="display: none;"></div>
 
+    {% if portal_role == 'citizen' %}
+    <section id="resend-verification-panel" class="p-md mb-md" style="display:none; border:1px solid var(--outline-variant); border-radius:var(--radius-md); background:var(--surface-container-low);">
+      <h2 class="text-md font-bold mb-xs" data-i18n="resend_verification_title">Resend verification OTP</h2>
+      <p class="text-sm text-muted mb-sm" data-i18n="resend_verification_help">Enter the email used during registration. A new six-digit OTP will be sent through SMTP.</p>
+      <form onsubmit="handleResendVerification(event)">
+        <label class="form-label" for="resend-verification-email" data-i18n="email_label">Email Address</label>
+        <input id="resend-verification-email" type="email" class="form-control" autocomplete="email" required>
+        <button id="resend-verification-btn" type="submit" class="btn btn-outline btn-block mt-sm">
+          <span class="material-symbols-outlined">forward_to_inbox</span>
+          <span id="resend-verification-text" data-i18n="resend_verification_button">Resend verification OTP</span>
+        </button>
+      </form>
+      <p id="resend-verification-result" class="text-sm mt-sm" role="status" aria-live="polite"></p>
+    </section>
+    {% endif %}
+
     <section id="mfa-panel" aria-labelledby="mfa-title" style="display: none;">
       <h2 id="mfa-title" class="auth-title" data-i18n="mfa_title">Verify your identity</h2>
       <p class="auth-subtitle" data-i18n="mfa_description">Enter the six-digit code sent to your registered personnel email.</p>
@@ -133,6 +149,9 @@
             <span data-i18n="no_account_yet">Don't have a citizen account yet?</span>
             <a href="/register/" class="font-bold text-primary hover:underline" data-i18n="nav_register">Register here</a>
           </p>
+          <button type="button" class="text-sm text-primary" style="border:0; background:none; cursor:pointer;" onclick="showResendPanel(document.getElementById('login-email').value)">
+            <span data-i18n="resend_verification_button">Resend verification OTP</span>
+          </button>
         </div>
       {% else %}
         <div class="portal-login-footer personnel-login-footer">
@@ -214,6 +233,56 @@
     );
   }
 
+  function showResendPanel(email = '') {
+    const panel = document.getElementById('resend-verification-panel');
+    const input = document.getElementById('resend-verification-email');
+    if (!panel || !input) return;
+    panel.style.display = 'block';
+    if (email) input.value = email;
+    input.focus();
+  }
+
+  async function handleResendVerification(event) {
+    event.preventDefault();
+    const emailInput = document.getElementById('resend-verification-email');
+    const button = document.getElementById('resend-verification-btn');
+    const buttonText = document.getElementById('resend-verification-text');
+    const result = document.getElementById('resend-verification-result');
+    const email = emailInput.value.trim();
+    button.disabled = true;
+    buttonText.textContent = translate('resending_verification', 'Sending…');
+    result.textContent = '';
+    try {
+      await API.post('/registration/email-verification/resend/', { email });
+      result.style.color = 'var(--success, #15803d)';
+      result.textContent = translate('verification_email_resent', 'A new verification OTP was sent. Check your inbox.');
+      setTimeout(() => {
+        window.location.href = `/verify-email/?email=${encodeURIComponent(email)}`;
+      }, 700);
+    } catch (error) {
+      result.style.color = 'var(--danger, #b91c1c)';
+      const code = error.data && error.data.code;
+      if (code === 'email_account_not_found') {
+        result.textContent = translate('email_account_not_found', 'No citizen account is registered with this email address.');
+      } else if (code === 'email_already_verified') {
+        result.textContent = translate('email_already_verified', 'This email address is already verified. Please log in.');
+      } else if (code === 'verification_email_not_sent') {
+        result.textContent = translate('verification_email_not_sent', 'The verification OTP could not be sent. Please try again.');
+      } else if (code === 'email_resend_rate_limited') {
+        result.textContent = translate('email_resend_rate_limited', 'Please wait {seconds} seconds before requesting another verification OTP.')
+          .replace('{seconds}', String(error.data.retry_after || 60));
+      } else {
+        const rawMessage = error.data && Array.isArray(error.data.email) ? error.data.email[0] : error.message;
+        result.textContent = (typeof I18n !== 'undefined' && I18n.translateError)
+          ? I18n.translateError(rawMessage)
+          : rawMessage;
+      }
+    } finally {
+      button.disabled = false;
+      buttonText.textContent = translate('resend_verification_button', 'Resend verification OTP');
+    }
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     const urlParams = new URLSearchParams(window.location.search);
     const msg = urlParams.get('msg');
@@ -222,12 +291,21 @@
     if (msg === 'session_expired') {
       alertBox.textContent = translate('session_expired_msg', 'Your session has expired. Please sign in again.');
       alertBox.style.display = 'flex';
+    } else if (msg === 'staff_session_required') {
+      alertBox.textContent = translate('staff_session_required_msg', 'This browser was signed in to another portal. Please sign in again with your staff account.');
+      alertBox.style.display = 'flex';
     } else if (msg === 'logged_out') {
       UI.showToast(translate('logged_out_msg', 'You have been signed out safely.'), 'info');
-    } else if (msg === 'registered') {
+    } else if (msg === 'verification_sent') {
       alertBox.className = 'alert alert-success';
-      alertBox.textContent = translate('registration_success_login', 'Registration successful. You can now sign in.');
+      alertBox.textContent = translate('email_verification_sent', 'Account created. Enter the six-digit OTP sent to your email before logging in.');
       alertBox.style.display = 'flex';
+      showResendPanel(urlParams.get('email') || '');
+    } else if (msg === 'verification_send_failed') {
+      alertBox.className = 'alert alert-danger';
+      alertBox.textContent = translate('email_verification_failed', 'Your account was created, but the OTP email could not be sent. Check SMTP settings, then resend it.');
+      alertBox.style.display = 'flex';
+      showResendPanel(urlParams.get('email') || '');
     }
 
     if (Auth.isAuthenticated()) {
@@ -287,10 +365,14 @@
     } catch (error) {
       console.error('Login error:', error);
       const wrongPortal = error.data && error.data.code === 'wrong_portal';
+      const emailUnverified = error.data && error.data.code === 'email_unverified';
       alertBox.textContent = wrongPortal
         ? translate('login_wrong_portal', 'These credentials do not belong to this portal. Choose the correct sign-in portal.')
-        : ((typeof I18n !== 'undefined' && I18n.translateError) ? I18n.translateError(error.message) : error.message);
+        : emailUnverified
+          ? translate('email_unverified_login', 'Please verify your email before logging in.')
+          : ((typeof I18n !== 'undefined' && I18n.translateError) ? I18n.translateError(error.message) : error.message);
       alertBox.style.display = 'flex';
+      if (emailUnverified) showResendPanel(identifier);
       loginIsSubmitting = false;
       submitBtn.disabled = false;
       restoreLoginButton();

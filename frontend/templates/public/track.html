@@ -236,7 +236,7 @@
     } else {
       document.getElementById('res-token-number').textContent = isNe ? 'लम्बित' : 'Pending';
       document.getElementById('res-queue-status-badge').innerHTML = `<span class="badge badge-inactive">${isNe ? 'जारी नभएको' : 'Not Issued'}</span>`;
-      document.getElementById('res-token-slot').textContent = isNe ? 'डिजिटल हस्ताक्षरपछि प्रशोधन टोकन जारी हुनेछ' : 'Processing token assigned after digital signing';
+      document.getElementById('res-token-slot').textContent = isNe ? 'भुक्तानी प्रमाणित भएपछि प्रशोधन टोकन जारी हुनेछ' : 'Processing token assigned after payment verification';
     }
 
     resultCard.style.display = 'block';

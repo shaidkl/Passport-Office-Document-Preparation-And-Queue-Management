@@ -539,6 +539,9 @@
       try { renderApplicationsTable(); } catch (e) { console.error('Error in renderApplicationsTable:', e); }
       try { renderWorkflowPipeline(_wfState); } catch (e) { console.error('Error in renderWorkflowPipeline:', e); }
       if (typeof I18n !== 'undefined') I18n.applyTranslations();
+      if (_wfState?.payment_status === 'PAID' && _wfState?.payment_reference) {
+        setTimeout(() => pollPaymentStatus(_wfState.payment_reference, false), 300);
+      }
     } catch (err) {
       console.error('Dashboard load error:', err);
       UI.showToast(t('msg_load_dashboard_error', 'Could not load dashboard information. Please try again.'), 'error');
@@ -587,7 +590,7 @@
       </div>`;
     }
 
-    if ((card.type === 'initiate_payment' || card.type === 'complete_payment') && wf?.payment_reference) {
+    if ((card.type === 'initiate_payment' || card.type === 'complete_payment' || card.type === 'payment_verification_pending') && wf?.payment_reference) {
       extraHtml += renderPaymentPanel(wf);
     }
 
@@ -630,6 +633,25 @@
   function renderPaymentPanel(wf) {
     const payRef = wf.payment_reference;
     const feeAmt = wf.fee_amount || 5000;
+    const awaitingVerification = wf.payment_status === 'PAID';
+    const paymentActions = awaitingVerification
+      ? `<button type="button" class="btn btn-outline btn-sm" data-payment-reference="${esc(payRef)}" onclick="pollPaymentStatus(this.dataset.paymentReference, true)">
+          <span class="material-symbols-outlined" style="font-size:15px;">refresh</span>
+          ${t('btn_check_status', 'Check Status')}
+        </button>`
+      : `<button type="button" class="btn btn-primary btn-sm" onclick="initiatePayment()" style="background:#60bb46;border-color:#55a83f;">
+          <span class="material-symbols-outlined" style="font-size:15px;">account_balance_wallet</span>
+          ${t('btn_continue_esewa', 'Continue with eSewa')}
+        </button>
+        <button type="button" class="btn btn-outline btn-sm" data-payment-reference="${esc(payRef)}" onclick="pollPaymentStatus(this.dataset.paymentReference, true)">
+          <span class="material-symbols-outlined" style="font-size:15px;">refresh</span>
+          ${t('btn_check_status', 'Check Status')}
+        </button>`;
+    const paymentNotice = awaitingVerification
+      ? (I18n.currentLang === 'ne'
+          ? 'भुक्तानी प्राप्त भयो। अन्तिम eSewa प्रमाणीकरण हुँदैछ; फेरि भुक्तानी नगर्नुहोस्।'
+          : 'Payment received. Final eSewa verification is pending; do not pay again.')
+      : t('payment_verification_notice', 'Payment is completed on eSewa and verified by the passport system before the next step unlocks.');
     return `
       <div class="nsc-qr-panel mb-md">
         <div class="flex flex-col gap-xs">
@@ -637,17 +659,10 @@
           <p class="text-xs text-muted m-0">${t('label_amount', 'Amount')}: <strong>NPR ${parseFloat(feeAmt).toLocaleString()}</strong></p>
           <p class="text-xs text-muted m-0">${t('label_status', 'Status')}: <strong>${I18n.translateStatus(wf.payment_status || 'PENDING')}</strong></p>
           <div class="flex gap-xs mt-xs flex-wrap">
-            <button type="button" class="btn btn-primary btn-sm" onclick="initiatePayment()" style="background:#60bb46;border-color:#55a83f;">
-              <span class="material-symbols-outlined" style="font-size:15px;">account_balance_wallet</span>
-              ${t('btn_continue_esewa', 'Continue with eSewa')}
-            </button>
-            <button type="button" class="btn btn-outline btn-sm" data-payment-reference="${esc(payRef)}" onclick="pollPaymentStatus(this.dataset.paymentReference, true)">
-              <span class="material-symbols-outlined" style="font-size:15px;">refresh</span>
-              ${t('btn_check_status', 'Check Status')}
-            </button>
+            ${paymentActions}
           </div>
           <p class="text-xs text-muted" style="margin-top:4px;">
-            ${t('payment_verification_notice', 'Payment is completed on eSewa and verified by the passport system before the next step unlocks.')}
+            ${paymentNotice}
           </p>
         </div>
       </div>
@@ -659,6 +674,11 @@
   async function openPaymentPanel() {
     if (!_wfState || !_wfState.application_id) return;
     await initiatePayment();
+  }
+
+  async function checkCurrentPaymentStatus() {
+    if (!_wfState?.payment_reference) return;
+    await pollPaymentStatus(_wfState.payment_reference, true);
   }
 
   async function initiatePayment() {
@@ -915,9 +935,18 @@
         if (elStatStatus) elStatStatus.textContent = I18n.translateStatus(activeToken.queue_status);
       } else {
         const elStatToken = document.getElementById('stat-queue-token');
-        if (elStatToken) elStatToken.textContent = '--';
+        const awaitingQueueAssignment = _wfState?.current_step === 'queue';
+        if (elStatToken) {
+          elStatToken.textContent = awaitingQueueAssignment
+            ? t('queue_assignment_pending', 'Pending')
+            : t('queue_locked', 'Locked');
+        }
         const elStatStatus = document.getElementById('stat-queue-status');
-        if (elStatStatus) elStatStatus.textContent = t('not_issued', 'Not Issued');
+        if (elStatStatus) {
+          elStatStatus.textContent = awaitingQueueAssignment
+            ? t('queue_awaiting_assignment', 'Awaiting token assignment')
+            : t('queue_after_payment', 'Issued after payment verification');
+        }
       }
 
       const paymentNotice = document.getElementById('approved-payment-notice');
@@ -978,19 +1007,30 @@
         }
       } else if (_wfState?.current_step === 'fee' && !_wfState?.is_payment_verified) {
         passportSection.style.display = 'none';
-        if (paymentNotice) paymentNotice.style.display = 'block';
-        document.getElementById('stat-passport-status').textContent = t('status_fee_pending', 'Fee Pending');
+        const paymentAwaitingVerification = _wfState?.payment_status === 'PAID';
+        if (paymentNotice) paymentNotice.style.display = paymentAwaitingVerification ? 'none' : 'block';
+        document.getElementById('stat-passport-status').textContent = paymentAwaitingVerification
+          ? (I18n.currentLang === 'ne' ? 'प्रमाणीकरण बाँकी' : 'Verification Pending')
+          : t('status_fee_pending', 'Fee Pending');
         document.getElementById('stat-passport-status').className = 'stat-value text-warning';
-        document.getElementById('stat-passport-desc').textContent = t('status_uploads_complete_pay_fee', 'Uploads Complete — Pay Fee');
+        document.getElementById('stat-passport-desc').textContent = paymentAwaitingVerification
+          ? (I18n.currentLang === 'ne' ? 'भुक्तानी प्राप्त भयो — फेरि भुक्तानी नगर्नुहोस्' : 'Payment received — do not pay again')
+          : t('status_uploads_complete_pay_fee', 'Uploads Complete — Pay Fee');
       } else {
         passportSection.style.display = 'none';
         if (paymentNotice) paymentNotice.style.display = 'none';
         const workflowStep = _wfState?.current_step;
         const awaitingFinalApproval = latestApp.status === 'Pending' && _wfState?.is_payment_verified;
+        const pendingDescriptionByStep = {
+          verification: t('status_awaiting_document_verification', 'Awaiting document verification'),
+          biometrics: t('status_awaiting_biometrics', 'Awaiting biometric verification'),
+          signature: t('status_awaiting_signature', 'Awaiting digital signature'),
+          queue: t('status_awaiting_queue_processing', 'Awaiting queue processing'),
+        };
         document.getElementById('stat-passport-status').textContent = awaitingFinalApproval ? I18n.translateStatus('Pending') : t('status_inactive', 'Inactive');
         document.getElementById('stat-passport-status').className = awaitingFinalApproval ? 'stat-value text-warning' : 'stat-value text-muted';
         document.getElementById('stat-passport-desc').textContent = awaitingFinalApproval
-          ? (workflowStep === 'signature' ? t('status_awaiting_signature', 'Awaiting digital signature') : t('status_awaiting_biometrics', 'Awaiting biometric verification'))
+          ? (pendingDescriptionByStep[workflowStep] || t('status_application_processing', 'Application processing'))
           : t('status_not_issued', 'Not yet issued');
       }
 

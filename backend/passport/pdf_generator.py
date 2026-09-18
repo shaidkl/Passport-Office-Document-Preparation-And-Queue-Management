@@ -185,16 +185,16 @@ def _prepare_portrait(application):
         .order_by("-upload_date")
         .first()
     )
-    if not photo_document or not photo_document.file_path:
+    if not photo_document or not photo_document.has_available_file():
         return None
 
     try:
-        photo_document.file_path.open("rb")
+        source = photo_document.open_preserved_file()
         try:
-            image = Image.open(photo_document.file_path)
+            image = Image.open(source)
             image.load()
         finally:
-            photo_document.file_path.close()
+            source.close()
         image = ImageOps.exif_transpose(image).convert("RGB")
         portrait = ImageOps.fit(image, (450, 600), method=Image.Resampling.LANCZOS, centering=(0.5, 0.43))
         output = io.BytesIO()

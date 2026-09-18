@@ -4,6 +4,13 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="/static/css/staff.css">
+<style nonce="{{ csp_nonce }}">
+  #staff-operations[aria-disabled="true"] {
+    opacity: 0.48;
+    pointer-events: none;
+    user-select: none;
+  }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -52,19 +59,29 @@
       <div>
         <div class="flex items-center gap-sm">
           <h1 style="font-size: 1.75rem; color: var(--primary); margin: 0;" data-i18n="staff_desk_title">Digital Verification &amp; Queue Desk</h1>
-          <span class="counter-active-badge" data-i18n="staff_desk_active">Desk Active</span>
+          <span class="badge badge-inactive" id="staff-duty-badge" data-i18n="staff_desk_inactive">Desk Inactive</span>
         </div>
         <p class="text-sm text-muted m-0" data-i18n="staff_desk_subtitle">Review citizen applications, verify uploaded digital documents, and grant instant Virtual e-Passports.</p>
       </div>
 
       <div class="flex items-center gap-sm">
-        <button type="button" onclick="loadStaffWorkspace()" class="btn btn-outline" title="Refresh queue" data-i18n-title="title_refresh_queue">
+        <button type="button" onclick="toggleStaffDutyStatus()" class="btn btn-success" id="btn-duty-toggle">
+          <span class="material-symbols-outlined">play_circle</span>
+          <span id="staff-duty-toggle-label" data-i18n="staff_go_active">Go Active</span>
+        </button>
+        <button type="button" onclick="loadStaffWorkspace()" class="btn btn-outline" id="btn-sync-queue" title="Refresh queue" data-i18n-title="title_refresh_queue" disabled>
           <span class="material-symbols-outlined">sync</span>
           <span data-i18n="staff_sync_queue">Sync Queue</span>
         </button>
       </div>
     </div>
 
+    <div id="staff-inactive-notice" class="alert alert-warning mb-xl">
+      <span class="material-symbols-outlined">lock</span>
+      <span data-i18n="staff_inactive_notice">You are currently inactive. Go active to access applications, document verification, and queue controls.</span>
+    </div>
+
+    <div id="staff-operations" aria-disabled="true">
     <!-- Live Queue Calling Controller & Counter Statistics -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-xl mb-xl">
       
@@ -190,6 +207,7 @@
           </tbody>
         </table>
       </div>
+    </div>
     </div>
 
   </main>
@@ -332,6 +350,7 @@
   let deskSummaryData = null;
   let currentModalApp = null;
   let currentModalDocs = [];
+  let staffIsActive = false;
   const documentActionInFlight = new Set();
 
   function documentsForApplication(response, applicationId) {
@@ -423,6 +442,10 @@
       UI.showToast(t('msg_doc_wrong_application', 'This document does not belong to the application being inspected.'), 'error');
       return;
     }
+    if (doc.file_available === false) {
+      UI.showToast(t('document_file_missing_reject', 'File missing — reject for re-upload'), 'error');
+      return;
+    }
     try {
       await API.openFile(`/documents/${docId}/view-file/?application=${encodeURIComponent(currentModalApp.application_id)}`);
       await refreshCurrentApplicationDocuments();
@@ -432,18 +455,18 @@
     }
   }
 
-  document.addEventListener('DOMContentLoaded', () => {
-    // 1. Guard page for Staff / Administrator
-    if (!Auth.requireAuth(['staff', 'administrator'])) return;
+  document.addEventListener('DOMContentLoaded', async () => {
+    if (!Auth.requireAuth(['staff'])) return;
 
     populateStaffProfile();
-    loadStaffWorkspace();
+    await loadStaffDutyStatus();
   });
 
   // Re-apply translations on language change
   window.addEventListener('languageChanged', () => {
     if (typeof I18n !== 'undefined') I18n.applyTranslations();
-    loadStaffWorkspace();
+    updateStaffDutyUI();
+    if (staffIsActive) loadStaffWorkspace();
   });
 
   function t(key, fallback) {
@@ -459,18 +482,134 @@
     const roleEl = document.getElementById('staff-officer-role');
     const avatarEl = document.getElementById('staff-avatar');
 
-    if (nameEl && user.full_name) nameEl.textContent = user.full_name;
+    const displayName = user.name || user.full_name;
+    if (nameEl && displayName) nameEl.textContent = displayName;
     if (unameEl) unameEl.textContent = user.username ? `@${user.username}` : (user.email || '');
     if (roleEl) {
       const parts = [user.department, user.designation].filter(Boolean);
       roleEl.textContent = parts.length ? parts.join(' • ') : t('status_active_duty', 'Active Duty');
     }
-    if (avatarEl && user.full_name) {
-      avatarEl.textContent = user.full_name.substring(0, 2).toUpperCase();
+    if (avatarEl && displayName) {
+      avatarEl.textContent = displayName.substring(0, 2).toUpperCase();
+    }
+  }
+
+  function persistStaffDutyStatus(result) {
+    const user = Auth.getUser();
+    if (!user || !result) return;
+    user.status = result.status;
+    user.is_active = result.is_active === true;
+    localStorage.setItem(Auth.USER_KEY, JSON.stringify(user));
+  }
+
+  function updateStaffDutyUI() {
+    const badge = document.getElementById('staff-duty-badge');
+    const button = document.getElementById('btn-duty-toggle');
+    const buttonLabel = document.getElementById('staff-duty-toggle-label');
+    const operations = document.getElementById('staff-operations');
+    const notice = document.getElementById('staff-inactive-notice');
+    const syncButton = document.getElementById('btn-sync-queue');
+
+    badge.className = `badge ${staffIsActive ? 'badge-approved' : 'badge-inactive'}`;
+    badge.textContent = staffIsActive
+      ? t('staff_desk_active', 'Desk Active')
+      : t('staff_desk_inactive', 'Desk Inactive');
+    button.className = `btn ${staffIsActive ? 'btn-outline' : 'btn-success'}`;
+    button.querySelector('.material-symbols-outlined').textContent = staffIsActive ? 'pause_circle' : 'play_circle';
+    buttonLabel.textContent = staffIsActive
+      ? t('staff_go_inactive', 'Go Inactive')
+      : t('staff_go_active', 'Go Active');
+    operations.setAttribute('aria-disabled', staffIsActive ? 'false' : 'true');
+    notice.style.display = staffIsActive ? 'none' : 'flex';
+    syncButton.disabled = !staffIsActive;
+  }
+
+  function clearInactiveWorkspace() {
+    activeToken = null;
+    queueTokensList = [];
+    applicationsList = [];
+    deskSummaryData = null;
+    document.getElementById('stat-waiting-count').textContent = '0';
+    document.getElementById('stat-pending-verifications').textContent = '0';
+    document.getElementById('stat-verified-docs').textContent = '0';
+    document.getElementById('stat-completed-count').textContent = '0';
+    document.getElementById('staff-queue-table-body').innerHTML = `
+      <tr><td colspan="5" class="text-center text-muted py-lg">${t('staff_inactive_notice', 'Go active to access staff operations.')}</td></tr>
+    `;
+    document.getElementById('table-record-count').textContent = '0';
+  }
+
+  function redirectMismatchedSessionToStaffLogin(error) {
+    // Any 403 from the self-duty endpoint means the browser's secure cookie
+    // does not represent a usable staff session. Clear the stale local profile
+    // and force one clean Staff Portal sign-in instead of showing a dead-end
+    // permission toast.
+    if (error?.status !== 403) {
+      return false;
+    }
+    Auth.logout(false);
+    window.location.href = '/staff/login/?msg=staff_session_required';
+    return true;
+  }
+
+  async function loadStaffDutyStatus() {
+    UI.showLoading(t('label_loading', 'Loading...'));
+    try {
+      const result = await API.get('/staff/duty-status/');
+      staffIsActive = result.can_work === true;
+      persistStaffDutyStatus(result);
+      updateStaffDutyUI();
+      if (staffIsActive) {
+        await loadStaffWorkspace();
+      } else {
+        clearInactiveWorkspace();
+      }
+    } catch (err) {
+      console.error('Could not load staff duty status:', err);
+      if (redirectMismatchedSessionToStaffLogin(err)) return;
+      staffIsActive = false;
+      updateStaffDutyUI();
+      clearInactiveWorkspace();
+      UI.showToast(err.message ? I18n.translateError(err.message) : t('msg_load_staff_failed', 'Could not load staff status.'), 'error');
+    } finally {
+      UI.hideLoading();
+    }
+  }
+
+  async function toggleStaffDutyStatus() {
+    const nextState = !staffIsActive;
+    UI.showLoading(nextState ? t('staff_go_active', 'Going active...') : t('staff_go_inactive', 'Going inactive...'));
+    try {
+      const result = await API.post('/staff/duty-status/', { is_active: nextState });
+      staffIsActive = result.can_work === true;
+      persistStaffDutyStatus(result);
+      updateStaffDutyUI();
+      UI.showToast(
+        staffIsActive
+          ? t('staff_duty_active_message', 'You are now active and can use staff operations.')
+          : t('staff_duty_inactive_message', 'You are now inactive. Staff operations are locked.'),
+        'success'
+      );
+      if (staffIsActive) {
+        await loadStaffWorkspace();
+      } else {
+        UI.closeModal('app-workspace-modal');
+        clearInactiveWorkspace();
+      }
+    } catch (err) {
+      console.error('Could not update staff duty status:', err);
+      if (redirectMismatchedSessionToStaffLogin(err)) return;
+      UI.showToast(err.message ? I18n.translateError(err.message) : t('msg_update_staff_failed', 'Could not update staff status.'), 'error');
+    } finally {
+      UI.hideLoading();
     }
   }
 
   async function loadStaffWorkspace() {
+    if (!staffIsActive) {
+      clearInactiveWorkspace();
+      return;
+    }
     UI.showLoading(t('loading_syncing_queue', 'Syncing desk queue...'));
 
     try {
@@ -564,7 +703,9 @@
     countEl.textContent = I18n.format('application_count', '{count} applications', { count: applicationsList.length });
 
     tbody.innerHTML = applicationsList.map(app => {
-      const token = queueTokensList.find(t => t.application === app.application_id);
+      const token = queueTokensList.find(t =>
+        t.application === app.application_id && t.queue_status !== 'Skipped'
+      );
       const tokenText = token ? `T-${token.token_number}` : t('label_none', 'Unassigned');
       const citizenName = app.applicant_name || `${t('label_applicant', 'Applicant')} #${app.applicant}`;
       const paymentStep = Array.isArray(app.workflow_steps)
@@ -690,31 +831,37 @@
     const isPaymentVerified = Boolean(paymentStep && (paymentStep.is_verified === true || paymentStep.status === 'Completed'));
 
     tbody.innerHTML = currentModalDocs.map(doc => {
+      const fileAvailable = doc.file_available !== false;
       const statusBadge = doc.verification_status === 'Verified'
         ? `<span class="badge badge-approved">${I18n.translateStatus('Verified')}</span>`
         : (doc.verification_status === 'Rejected'
           ? `<span class="badge badge-error">${I18n.translateStatus('Rejected')}</span>`
           : `<span class="badge badge-pending">${I18n.translateStatus('Pending Review')}</span>`);
 
-      const fileLink = doc.document_id
+      const fileLink = doc.document_id && fileAvailable
         ? `<button type="button" onclick="handleInspectDocument(${doc.document_id})" class="text-xs text-primary font-bold flex items-center gap-xs" style="border:0;background:none;padding:0;cursor:pointer;"><span class="material-symbols-outlined" style="font-size:14px;">open_in_new</span> ${t('btn_inspect_file', 'Inspect File')}</button>`
-        : `<span class="text-xs text-muted">${t('label_digital_record', 'Digital Record')}</span>`;
+        : `<span class="text-xs text-error font-bold">${t('document_file_missing_reject', 'File missing — reject for re-upload')}</span>`;
 
       const isPending = doc.verification_status === 'Pending';
       const isBusy = documentActionInFlight.has(String(doc.document_id));
-      const verifyDisabled = !isPending || !isPaymentVerified || !doc.is_inspected || isBusy;
-      const rejectDisabled = !isPending || !isPaymentVerified || isBusy;
-      const verifyTitle = !isPaymentVerified
+      const verifyDisabled = !isPending || !fileAvailable || !isPaymentVerified || !doc.is_inspected || isBusy;
+      const rejectDisabled = !isPending || (!isPaymentVerified && fileAvailable) || isBusy;
+      const verifyTitle = !fileAvailable
+        ? t('document_file_missing_reject', 'File missing — reject for re-upload')
+        : (!isPaymentVerified
         ? t('msg_payment_first', 'Payment must be verified first.')
         : (!isPending
         ? I18n.format('decision_is_final', 'Decision is final: {status}', { status: I18n.translateStatus(doc.verification_status) })
-        : (!doc.is_inspected ? t('msg_inspect_before_verify', 'Inspect the file before verifying it.') : t('btn_verify_document', 'Verify Document')));
+        : (!doc.is_inspected ? t('msg_inspect_before_verify', 'Inspect the file before verifying it.') : t('btn_verify_document', 'Verify Document'))));
+      const rejectTitle = !fileAvailable
+        ? t('reject_missing_file_title', 'Reject missing file and request re-upload')
+        : (isPaymentVerified ? t('btn_reject_document', 'Reject Document') : t('msg_payment_first', 'Payment must be verified first.'));
       const decisionControls = isPending
         ? `<div class="flex items-center gap-xs">
             <button type="button" onclick="handleVerifyDoc(${doc.document_id})" class="btn btn-outline-success btn-xs" title="${verifyTitle}" ${verifyDisabled ? 'disabled' : ''}>
               <span class="material-symbols-outlined" style="font-size:14px;">check</span> ${isBusy ? t('state_saving', 'Saving…') : t('btn_verify_short', 'Verify')}
             </button>
-            <button type="button" onclick="handleRejectDoc(${doc.document_id})" class="btn btn-outline-danger btn-xs" title="${isPaymentVerified ? t('btn_reject_document', 'Reject Document') : t('msg_payment_first', 'Payment must be verified first.')}" ${rejectDisabled ? 'disabled' : ''}>
+            <button type="button" onclick="handleRejectDoc(${doc.document_id})" class="btn btn-outline-danger btn-xs" title="${rejectTitle}" ${rejectDisabled ? 'disabled' : ''}>
               <span class="material-symbols-outlined" style="font-size:14px;">close</span> ${t('btn_reject_short', 'Reject')}
             </button>
           </div>`
@@ -739,6 +886,10 @@
     }
     if (doc.verification_status !== 'Pending') {
       UI.showToast(I18n.format('document_already_final', 'This document already has a final {status} decision.', { status: I18n.translateStatus(doc.verification_status) }), 'warning');
+      return;
+    }
+    if (doc.file_available === false) {
+      UI.showToast(t('document_file_missing_reject', 'File missing — reject for re-upload'), 'error');
       return;
     }
     const paymentStep = Array.isArray(currentModalApp?.workflow_steps)
@@ -795,14 +946,17 @@
     const paymentStep = Array.isArray(currentModalApp?.workflow_steps)
       ? currentModalApp.workflow_steps.find(step => step.key === 'fee')
       : null;
-    if (!paymentStep || (paymentStep.is_verified !== true && paymentStep.status !== 'Completed')) {
+    if (doc.file_available !== false && (!paymentStep || (paymentStep.is_verified !== true && paymentStep.status !== 'Completed'))) {
       UI.showToast(t('msg_payment_first', 'Payment must be verified first.'), 'warning');
       return;
     }
     const actionKey = String(docId);
     if (documentActionInFlight.has(actionKey)) return;
 
-    const reason = prompt(t('prompt_reject_document', 'Reason for rejecting this document:'));
+    const missingFileReason = doc.file_available === false
+      ? t('missing_file_reupload_reason', 'Uploaded file is missing from secure storage. Please re-upload the document.')
+      : '';
+    const reason = prompt(t('prompt_reject_document', 'Reason for rejecting this document:'), missingFileReason);
     if (!reason || !reason.trim()) return;
     documentActionInFlight.add(actionKey);
     renderModalDocsTable();
@@ -881,7 +1035,7 @@
       if (res && res.token) {
         UI.showToast(I18n.format('token_called_to_counter', 'Token T-{token} called to desk counter.', { token: res.token.token_number }), 'success');
       } else {
-        UI.showToast(res.message ? I18n.translateError(res.message) : t('msg_no_queue_citizens', 'No pending citizens in waiting queue.'), 'info');
+        UI.showToast(res.message ? I18n.translateError(res.message) : t('msg_no_queue_citizens', 'No eligible tokens are ready for processing. Complete document verification, biometrics, and digital signature first.'), 'info');
       }
       loadStaffWorkspace();
     } catch (err) {
